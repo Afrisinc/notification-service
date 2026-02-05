@@ -1,0 +1,46 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": ["ES2020"],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "rootDir": "./",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": false,
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@afrisinc/notify-api/*": ["apps/api/src/*"],
+      "@afrisinc/notify-worker-email/*": ["apps/worker-email/src/*"],
+      "@afrisinc/notify-worker-sms/*": ["apps/worker-sms/src/*"],
+      "@afrisinc/notify-worker-inapp/*": ["apps/worker-inapp/src/*"],
+      "@afrisinc/notify-common": ["packages/common/src"],
+      "@afrisinc/notify-common/*": ["packages/common/src/*"],
+      "@afrisinc/notify-db": ["packages/db/src"],
+      "@afrisinc/notify-db/*": ["packages/db/src/*"],
+      "@afrisinc/notify-config": ["packages/config/src"],
+      "@afrisinc/notify-config/*": ["packages/config/src/*"]
+    }
+  },
+  "include": [
+    "apps/**/*",
+    "packages/**/*",
+    "scripts/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
+}

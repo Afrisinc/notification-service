@@ -1,0 +1,96 @@
+/**
+ * Schema for POST /notify/send endpoint
+ * Send a single notification
+ */
+
+export const sendNotificationRequestBody = {
+  type: 'object',
+  description: 'Request to send a single notification',
+  required: ['channel', 'recipient', 'templateCode', 'payload'],
+  properties: {
+    channel: {
+      type: 'string',
+      enum: ['EMAIL', 'SMS', 'IN_APP'],
+      description: 'Notification channel',
+    },
+    recipient: {
+      type: 'string',
+      minLength: 1,
+      description: 'Recipient email, phone number, or user ID',
+    },
+    templateCode: {
+      type: 'string',
+      minLength: 1,
+      pattern: '^[A-Z_]+$',
+      description: 'Template code identifier',
+    },
+    payload: {
+      type: 'object',
+      description: 'Dynamic variables for template interpolation',
+    },
+    priority: {
+      type: 'string',
+      enum: ['LOW', 'NORMAL', 'HIGH', 'URGENT'],
+      default: 'NORMAL',
+      description: 'Notification priority level',
+    },
+  },
+};
+
+export const sendNotificationResponseBody = {
+  type: 'object',
+  properties: {
+    notificationId: {
+      type: 'string',
+      format: 'uuid',
+      description: 'Unique notification identifier',
+    },
+    status: {
+      type: 'string',
+      enum: ['PENDING', 'QUEUED', 'SENT', 'FAILED'],
+      description: 'Current notification status',
+    },
+  },
+  required: ['notificationId', 'status'],
+};
+
+export const sendNotificationSchema = {
+  description: 'Send a single notification',
+  tags: ['Notifications'],
+  body: sendNotificationRequestBody,
+  response: {
+    202: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+        data: sendNotificationResponseBody,
+      },
+    },
+    400: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+      },
+    },
+    401: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+      },
+    },
+    404: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+      },
+    },
+  },
+};

@@ -1,0 +1,24 @@
+{
+  "name": "@afrisinc-notify/scripts",
+  "version": "1.0.0",
+  "description": "Database and utility scripts for notification service",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc --build",
+    "migrate": "npm run --workspace=@afrisinc-notify/db migrate",
+    "seed": "npm run --workspace=@afrisinc-notify/db seed"
+  },
+  "dependencies": {
+    "@afrisinc-notify/config": "workspace:*",
+    "@afrisinc-notify/db": "workspace:*",
+    "pino": "^8.17.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "keywords": ["scripts", "database", "migrations"],
+  "author": "Afrisinc",
+  "license": "MIT"
+}

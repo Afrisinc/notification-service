@@ -1,0 +1,79 @@
+{
+  "name": "afrisinc-notify",
+  "version": "1.0.0",
+  "description": "Production-ready notification service monorepo - Email, SMS, In-App notifications with Fastify, TypeScript, and Prisma",
+  "homepage": "https://github.com/afrisinc/notification-service",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/afrisinc/notification-service.git"
+  },
+  "bugs": {
+    "url": "https://github.com/afrisinc/notification-service/issues"
+  },
+  "author": {
+    "name": "Afrisinc Engineering",
+    "email": "info@afrisinc.com",
+    "url": "https://afrisinc.com"
+  },
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  },
+  "workspaces": [
+    "apps/api",
+    "apps/worker-email",
+    "apps/worker-sms",
+    "apps/worker-inapp",
+    "packages/common",
+    "packages/db",
+    "packages/config"
+  ],
+  "scripts": {
+    "dev": "npm run dev -ws",
+    "build": "npm run build -ws",
+    "start": "npm start -ws",
+    "test": "npm test -ws -- --passWithNoTests",
+    "test:watch": "npm run test:watch -ws -- --passWithNoTests",
+    "test:coverage": "npm run test:coverage -ws -- --passWithNoTests",
+    "lint": "npm run lint -ws",
+    "lint:fix": "npm run lint:fix -ws",
+    "format": "npm run format -ws",
+    "format:check": "npm run format:check -ws",
+    "type-check": "npm run type-check -ws",
+    "api:dev": "npm run dev -w @afrisinc-notify/api",
+    "worker:email:dev": "npm run dev -w @afrisinc-notify/worker-email",
+    "worker:sms:dev": "npm run dev -w @afrisinc-notify/worker-sms",
+    "worker:inapp:dev": "npm run dev -w @afrisinc-notify/worker-inapp",
+    "db:migrate": "npm run migrate -w @afrisinc-notify/db",
+    "db:seed": "npm run seed -w @afrisinc-notify/db",
+    "db:generate": "npm run generate -w @afrisinc-notify/db",
+    "db:push": "npm run push -w @afrisinc-notify/db",
+    "db:reset": "npm run reset -w @afrisinc-notify/db",
+    "db:studio": "npm run studio -w @afrisinc-notify/db",
+    "queue:status": "tsx scripts/queue-status.ts",
+    "queue:replay-dlq": "tsx scripts/replay-dlq.ts",
+    "queue:clear": "tsx scripts/queue-clear.ts",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f"
+  },
+  "keywords": [
+    "notification",
+    "email",
+    "sms",
+    "in-app",
+    "fastify",
+    "postgresql",
+    "monorepo",
+    "microservices",
+    "production-ready"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

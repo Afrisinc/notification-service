@@ -1,0 +1,1 @@
+export { createFastifyApp } from './app';
