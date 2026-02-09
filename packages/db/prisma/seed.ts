@@ -9,9 +9,104 @@ async function main() {
 
   try {
     // Clear existing data (for development only)
-    logger.info('Clearing existing notifications...');
+    logger.info('Clearing existing data...');
+    await prisma.notificationLog.deleteMany({});
     await prisma.notification.deleteMany({});
-    logger.info('✅ Cleared existing notifications');
+    await prisma.userPreference.deleteMany({});
+    await prisma.template.deleteMany({});
+    await prisma.apiKey.deleteMany({});
+    await prisma.tenant.deleteMany({});
+    logger.info('✅ Cleared existing data');
+
+    // Create test tenants
+    logger.info('Creating test tenants...');
+    const tenant1 = await prisma.tenant.create({
+      data: {
+        code: 'afrisinc-auth',
+        name: 'Afrisinc Auth',
+        status: 'ACTIVE',
+      },
+    });
+
+    const tenant2 = await prisma.tenant.create({
+      data: {
+        code: 'afrisinc-internal',
+        name: 'Afrisinc Internal',
+        status: 'ACTIVE',
+      },
+    });
+
+    const tenant3 = await prisma.tenant.create({
+      data: {
+        code: 'afrisinc-core',
+        name: 'Afrisinc Core Tenant',
+        status: 'ACTIVE',
+      },
+    });
+
+    const tenant4 = await prisma.tenant.create({
+      data: {
+        code: 'afrisinc-test',
+        name: 'Afrisinc Test Tenant',
+        status: 'ACTIVE',
+      },
+    });
+    logger.info('✅ Created test tenants');
+
+    // Create sample templates
+    logger.info('Creating sample templates...');
+    await prisma.template.create({
+      data: {
+        id: 'template-welcome-1',
+        tenantId: tenant1.id,
+        code: 'WELCOME_EMAIL',
+        channel: 'EMAIL',
+        subject: 'Welcome to Afrisinc Auth',
+        content: 'Welcome to our notification service! This is a test template.',
+        language: 'en',
+        active: true,
+      },
+    });
+
+    await prisma.template.create({
+      data: {
+        id: 'template-verification-1',
+        tenantId: tenant1.id,
+        code: 'VERIFY_EMAIL',
+        channel: 'EMAIL',
+        subject: 'Verify Your Email',
+        content: 'Please verify your email address by clicking the link below.',
+        language: 'en',
+        active: true,
+      },
+    });
+
+    await prisma.template.create({
+      data: {
+        id: 'template-welcome-3',
+        tenantId: tenant3.id,
+        code: 'WELCOME_EMAIL',
+        channel: 'EMAIL',
+        subject: 'Welcome to Afrisinc Core',
+        content: 'Welcome to the Afrisinc Core notification service!',
+        language: 'en',
+        active: true,
+      },
+    });
+
+    await prisma.template.create({
+      data: {
+        id: 'template-welcome-4',
+        tenantId: tenant4.id,
+        code: 'WELCOME_EMAIL',
+        channel: 'EMAIL',
+        subject: 'Welcome to Afrisinc Test',
+        content: 'Welcome to the test environment!',
+        language: 'en',
+        active: true,
+      },
+    });
+    logger.info('✅ Created sample templates');
 
     // Create sample notifications
     logger.info('Creating sample notifications...');
@@ -19,45 +114,44 @@ async function main() {
     const sampleNotifications = [
       {
         id: 'notif-seed-1',
-        tenantId: 'tenant-default',
-        recipientId: 'user-1',
-        channel: 'email',
-        subject: 'Welcome to Notification Service',
-        body: 'This is a sample email notification',
-        status: 'pending',
-        priority: 'normal',
+        tenantId: tenant1.id,
+        channel: 'EMAIL' as const,
+        recipient: 'user1@example.com',
+        templateCode: 'WELCOME_EMAIL',
+        payload: { name: 'User 1' },
+        status: 'PENDING' as const,
+        priority: 'NORMAL' as const,
       },
       {
         id: 'notif-seed-2',
-        tenantId: 'tenant-default',
-        recipientId: 'user-2',
-        channel: 'email',
-        subject: 'Account Verification Required',
-        body: 'Please verify your email address to complete account setup',
-        status: 'pending',
-        priority: 'high',
+        tenantId: tenant1.id,
+        channel: 'EMAIL' as const,
+        recipient: 'user2@example.com',
+        templateCode: 'VERIFY_EMAIL',
+        payload: { verifyLink: 'https://example.com/verify?token=abc123' },
+        status: 'QUEUED' as const,
+        priority: 'HIGH' as const,
       },
       {
         id: 'notif-seed-3',
-        tenantId: 'tenant-default',
-        recipientId: 'user-3',
-        channel: 'email',
-        subject: 'Password Reset Request',
-        body: 'You requested to reset your password. Click the link below to proceed.',
-        status: 'pending',
-        priority: 'high',
+        tenantId: tenant1.id,
+        channel: 'EMAIL' as const,
+        recipient: 'user3@example.com',
+        templateCode: 'WELCOME_EMAIL',
+        payload: { name: 'User 3' },
+        status: 'SENT' as const,
+        priority: 'NORMAL' as const,
+        sentAt: new Date(),
       },
       {
         id: 'notif-seed-4',
-        tenantId: 'tenant-test',
-        recipientId: 'test-user-1',
-        channel: 'email',
-        subject: 'Test Notification',
-        body: 'This is a test notification from the seeder',
-        status: 'sent',
-        priority: 'normal',
-        sentAt: new Date(),
-        externalId: 'msg-test-123',
+        tenantId: tenant2.id,
+        channel: 'SMS' as const,
+        recipient: '+1234567890',
+        templateCode: 'WELCOME_EMAIL',
+        payload: { message: 'Test SMS' },
+        status: 'PENDING' as const,
+        priority: 'LOW' as const,
       },
     ];
 

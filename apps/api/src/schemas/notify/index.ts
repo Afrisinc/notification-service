@@ -4,13 +4,13 @@
  */
 
 // Send single notification
-export * from './send';
+export * from "./send";
 
 // Send bulk notifications
-export * from './bulk';
+export * from "./bulk";
 
 // Get notification status
-export * from './status';
+export * from "./status";
 
 // List notifications
-export * from './list';
+export * from "./list";

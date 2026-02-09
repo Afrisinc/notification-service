@@ -1,21 +1,21 @@
-import pino from 'pino';
-import { getConfig } from './env';
+import pino from "pino";
+import { getConfig } from "@afrisinc-notify/config";
 
 const config = getConfig();
 
 const pinoConfig =
-  config.nodeEnv === 'production'
+  config.NODE_ENV === "production"
     ? {
-        level: config.logLevel,
+        level: config.LOG_LEVEL,
       }
     : {
-        level: config.logLevel,
+        level: config.LOG_LEVEL,
         transport: {
-          target: 'pino-pretty',
+          target: "pino-pretty",
           options: {
             colorize: true,
-            translateTime: 'SYS:standard',
-            ignore: 'pid,hostname',
+            translateTime: "SYS:standard",
+            ignore: "pid,hostname",
           },
         },
       };

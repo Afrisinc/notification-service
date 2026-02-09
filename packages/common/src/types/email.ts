@@ -6,7 +6,7 @@ export interface EmailNotification {
   subject: string;
   body: string;
   html?: string;
-  priority?: 'low' | 'normal' | 'high';
+  priority?: "low" | "normal" | "high";
   metadata?: Record<string, unknown>;
   createdAt: Date;
 }

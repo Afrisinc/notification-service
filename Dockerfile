@@ -47,14 +47,14 @@ USER nodejs
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/health/live || exit 1
+    CMD curl -f http://localhost:8010/health/live || exit 1
 
 # Environment
 ENV NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=256"
 
 # Expose port
-EXPOSE 3000
+EXPOSE 8010
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]

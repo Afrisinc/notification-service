@@ -1,6 +1,6 @@
-import { FastifyInstance } from 'fastify';
-import fastifyHelmet from '@fastify/helmet';
-import fastifyCors from '@fastify/cors';
+import { FastifyInstance } from "fastify";
+import fastifyHelmet from "@fastify/helmet";
+import fastifyCors from "@fastify/cors";
 
 export async function registerSecurityPlugin(fastify: FastifyInstance) {
   // Security headers
@@ -10,7 +10,7 @@ export async function registerSecurityPlugin(fastify: FastifyInstance) {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         scriptSrc: ["'self'"],
-        imgSrc: ["'self'", 'data:', 'https:'],
+        imgSrc: ["'self'", "data:", "https:"],
       },
     },
   });
@@ -19,7 +19,12 @@ export async function registerSecurityPlugin(fastify: FastifyInstance) {
   await fastify.register(fastifyCors, {
     origin: true,
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'X-Correlation-ID'],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Tenant-ID",
+      "X-Correlation-ID",
+    ],
   });
 }

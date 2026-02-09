@@ -23,7 +23,7 @@ This directory contains independent applications that make up the Afrisinc Notif
   - Prisma (database ORM)
 
 - Entry Point: `src/server.ts`
-- Port: 3000 (default)
+- Port: 8010 (default)
 
 ---
 
@@ -90,7 +90,7 @@ This directory contains independent applications that make up the Afrisinc Notif
 ## Application Communication
 
 ```
-API (port 3000)
+API (port 8010)
 ├── Receives notification request
 ├── Validates and stores
 ├── Publishes to Message Queue
@@ -142,7 +142,7 @@ NODE_ENV=development
 LOG_LEVEL=debug
 
 # API specific
-API_PORT=3000
+API_PORT=8010
 
 # Workers
 QUEUE_TYPE=bull
@@ -191,7 +191,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --production
 COPY dist ./dist
-EXPOSE 3000
+EXPOSE 8010
 CMD ["node", "dist/server.js"]
 ```
 

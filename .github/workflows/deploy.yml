@@ -52,15 +52,15 @@ jobs:
       - name: Run smoke tests
         run: |
           # Port forward
-          kubectl port-forward svc/staging-notification-api 3000:80 \
+          kubectl port-forward svc/staging-notification-api 8010:80 \
             -n notification-service &
           sleep 5
 
           # Test health endpoint
-          curl -f http://localhost:3000/health || exit 1
+          curl -f http://localhost:8010/health || exit 1
 
           # Test API endpoint
-          curl -f http://localhost:3000/api/v1 || exit 1
+          curl -f http://localhost:8010/api/v1 || exit 1
 
   deploy-production:
     name: Deploy to Production
@@ -114,7 +114,7 @@ jobs:
       - name: Run smoke tests
         run: |
           # Port forward
-          kubectl port-forward svc/prod-notification-api 3000:80 \
+          kubectl port-forward svc/prod-notification-api 8010:80 \
             -n notification-service &
           sleep 5
 

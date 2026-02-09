@@ -1,1 +1,1 @@
-export { createFastifyApp } from './app';
+export { createFastifyApp } from "./app";

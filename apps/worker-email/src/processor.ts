@@ -1,9 +1,9 @@
-import pino from 'pino';
-import { EmailNotification } from '@afrisinc-notify/common';
-import { db } from '@afrisinc-notify/db';
-import { getConfig } from '@afrisinc-notify/config';
-import { SMTPProvider } from './providers/smtp';
-import { SendGridProvider } from './providers/sendgrid';
+import pino from "pino";
+import { EmailNotification } from "@afrisinc-notify/common";
+import { db } from "@afrisinc-notify/db";
+import { getConfig } from "@afrisinc-notify/config";
+import { SMTPProvider } from "./providers/smtp";
+import { SendGridProvider } from "./providers/sendgrid";
 
 export class EmailProcessor {
   private smtpProvider?: SMTPProvider;
@@ -13,9 +13,9 @@ export class EmailProcessor {
     const config = getConfig();
 
     // Initialize providers based on config
-    if (config.EMAIL_PROVIDER === 'smtp') {
+    if (config.EMAIL_PROVIDER === "smtp") {
       this.smtpProvider = new SMTPProvider(logger);
-    } else if (config.EMAIL_PROVIDER === 'sendgrid') {
+    } else if (config.EMAIL_PROVIDER === "sendgrid") {
       this.sendgridProvider = new SendGridProvider(logger);
     }
   }
@@ -24,39 +24,38 @@ export class EmailProcessor {
     try {
       this.logger.info(
         { emailId: email.id, to: email.to },
-        'Processing email notification'
+        "Processing email notification",
       );
 
       // Select provider
       let result;
       const config = getConfig();
 
-      if (config.EMAIL_PROVIDER === 'sendgrid' && this.sendgridProvider) {
+      if (config.EMAIL_PROVIDER === "sendgrid" && this.sendgridProvider) {
         result = await this.sendgridProvider.send(email);
       } else if (this.smtpProvider) {
         result = await this.smtpProvider.send(email);
       } else {
-        throw new Error('No email provider configured');
+        throw new Error("No email provider configured");
       }
 
       // Update notification status to sent
       await db.notification.update({
         where: { id: email.id },
         data: {
-          status: 'sent',
+          status: "SENT",
           sentAt: new Date(),
-          externalId: result.messageId,
         },
       });
 
       this.logger.info(
         { emailId: email.id, messageId: result.messageId },
-        'Email sent successfully'
+        "Email sent successfully",
       );
     } catch (error) {
       this.logger.error(
         { error, emailId: email.id },
-        'Failed to process email'
+        "Failed to process email",
       );
 
       // Update notification status to failed
@@ -64,13 +63,11 @@ export class EmailProcessor {
         await db.notification.update({
           where: { id: email.id },
           data: {
-            status: 'failed',
-            failedAt: new Date(),
-            failureReason: error instanceof Error ? error.message : 'Unknown error',
+            status: "FAILED",
           },
         });
       } catch (updateError) {
-        this.logger.error(updateError, 'Failed to update notification status');
+        this.logger.error(updateError, "Failed to update notification status");
       }
 
       throw error;

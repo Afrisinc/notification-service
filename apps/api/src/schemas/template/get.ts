@@ -3,99 +3,111 @@
  * Retrieve a specific template
  */
 
+import { templateHeaders } from "../common";
+
 export const templateResponseBody = {
-  type: 'object',
+  type: "object",
   properties: {
     id: {
-      type: 'string',
-      format: 'uuid',
-      description: 'Unique template identifier',
+      type: "string",
+      format: "uuid",
+      description: "Unique template identifier",
     },
     code: {
-      type: 'string',
-      description: 'Template code identifier',
+      type: "string",
+      description: "Template code identifier",
     },
     channel: {
-      type: 'string',
-      enum: ['EMAIL', 'SMS', 'IN_APP'],
-      description: 'Notification channel',
+      type: "string",
+      enum: ["EMAIL", "SMS", "IN_APP", "PUSH", "WHATSAPP"],
+      description: "Notification channel",
     },
     subject: {
-      type: 'string',
-      description: 'Email subject (for EMAIL channel)',
+      type: "string",
+      description: "Email subject (for EMAIL channel)",
     },
     content: {
-      type: 'string',
-      description: 'Template content with placeholders',
+      type: "string",
+      description: "Template content with placeholders",
     },
     language: {
-      type: 'string',
-      description: 'Language code',
+      type: "string",
+      description: "Language code",
     },
     active: {
-      type: 'boolean',
-      description: 'Whether template is active',
+      type: "boolean",
+      description: "Whether template is active",
     },
     createdAt: {
-      type: 'string',
-      format: 'date-time',
-      description: 'When template was created',
+      type: "string",
+      format: "date-time",
+      description: "When template was created",
     },
     updatedAt: {
-      type: 'string',
-      format: 'date-time',
-      description: 'When template was last updated',
+      type: "string",
+      format: "date-time",
+      description: "When template was last updated",
     },
   },
-  required: ['id', 'code', 'channel', 'content', 'language', 'active', 'createdAt', 'updatedAt'],
+  required: [
+    "id",
+    "code",
+    "channel",
+    "content",
+    "language",
+    "active",
+    "createdAt",
+    "updatedAt",
+  ],
 };
 
 export const getTemplateSchema = {
-  description: 'Get a specific template by ID',
-  tags: ['Templates'],
+  description: "Get a specific template by ID",
+  tags: ["Templates"],
+  headers: templateHeaders,
   params: {
-    type: 'object',
+    type: "object",
     properties: {
       id: {
-        type: 'string',
-        format: 'uuid',
-        description: 'Template ID',
+        type: "string",
+        format: "uuid",
+        description: "Template ID",
       },
     },
-    required: ['id'],
+    required: ["id"],
   },
   response: {
     200: {
-      type: 'object',
+      type: "object",
       properties: {
-        success: { type: 'boolean' },
-        resp_msg: { type: 'string' },
-        resp_code: { type: 'number' },
+        success: { type: "boolean" },
+        resp_msg: { type: "string" },
+        resp_code: { type: "number" },
         data: templateResponseBody,
       },
     },
     400: {
-      type: 'object',
+      type: "object",
       properties: {
-        success: { type: 'boolean' },
-        resp_msg: { type: 'string' },
-        resp_code: { type: 'number' },
+        success: { type: "boolean" },
+        resp_msg: { type: "string" },
+        resp_code: { type: "number" },
       },
     },
     401: {
-      type: 'object',
+      type: "object",
       properties: {
-        success: { type: 'boolean' },
-        resp_msg: { type: 'string' },
-        resp_code: { type: 'number' },
+        success: { type: "boolean" },
+        resp_msg: { type: "string" },
+        resp_code: { type: "number" },
       },
     },
     404: {
-      type: 'object',
+      type: "object",
       properties: {
-        success: { type: 'boolean' },
-        resp_msg: { type: 'string' },
-        resp_code: { type: 'number' },
+        success: { type: "boolean" },
+        resp_msg: { type: "string" },
+        resp_code: { type: "number" },
       },
     },
   },

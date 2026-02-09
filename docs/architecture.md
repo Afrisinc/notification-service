@@ -12,7 +12,7 @@ The Afrisinc Notification Service is a production-grade microservices architectu
                        ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                    Fastify API Server                        │
-│                    Port: 3000                                │
+│                    Port: 8010                                │
 ├─────────────────────────────────────────────────────────────┤
 │  Routes:                                                    │
 │  POST   /notifications          - Create notification       │

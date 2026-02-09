@@ -1,10 +1,7 @@
-import { FastifyInstance } from 'fastify';
-import { registerHealthRoutes } from '../routes/health.routes';
-import { registerNotifyRoutes } from '../routes/notify.routes';
-import { registerTemplateRoutes } from '../routes/template.routes';
+import { FastifyInstance } from "fastify";
+import { v1Routes } from "../routes";
 
 export async function registerRoutesPlugin(fastify: FastifyInstance) {
-  await registerHealthRoutes(fastify);
-  await registerNotifyRoutes(fastify);
-  await registerTemplateRoutes(fastify);
+  // Register all routes with their configured prefixes
+  await fastify.register(v1Routes);
 }

@@ -163,7 +163,7 @@ GET /health/ready        # Readiness probe
 ```env
 # Server
 NODE_ENV=development
-API_PORT=3000
+API_PORT=8010
 LOG_LEVEL=debug
 
 # Database
@@ -228,7 +228,7 @@ docker build -t notification-api:latest -f Dockerfile .
 
 ### Run Container
 ```bash
-docker run -p 3000:3000 \
+docker run -p 8010:8010 \
   -e DATABASE_URL="..." \
   -e JWT_SECRET="..." \
   notification-api:latest
@@ -277,8 +277,8 @@ Standard error response format:
 ## OpenAPI Documentation
 
 Interactive API docs available at:
-- Development: `http://localhost:3000/docs`
-- Swagger JSON: `http://localhost:3000/docs/json`
+- Development: `http://localhost:8010/docs`
+- Swagger JSON: `http://localhost:8010/docs/json`
 
 ---
 

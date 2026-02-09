@@ -104,13 +104,13 @@ jobs:
         run: |
           docker run --rm --detach \
             --name test-container \
-            -p 3000:3000 \
+            -p 8010:8010 \
             -e NODE_ENV=test \
             -e DATABASE_URL="postgresql://test:test@localhost:5432/notification_test" \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
           sleep 5
 
-          docker exec test-container curl -f http://localhost:3000/health || true
+          docker exec test-container curl -f http://localhost:8010/health || true
 
           docker stop test-container

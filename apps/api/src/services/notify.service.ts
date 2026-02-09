@@ -1,10 +1,16 @@
-import { logger } from '../config/logger';
-import { tenantService, Tenant } from './tenant.service';
-import { templateService } from './template.service';
+import { logger } from "../config/logger";
+import { tenantService, Tenant } from "./tenant.service";
+import { templateService } from "./template.service";
+import {
+  IQueuePublisher,
+  QueueMessage,
+  QueuePublisherFactory,
+  QueuePublisherConfig,
+} from "./queue";
 
-export type Channel = 'EMAIL' | 'SMS' | 'IN_APP';
-export type NotificationStatus = 'PENDING' | 'QUEUED' | 'SENT' | 'FAILED';
-export type Priority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+export type Channel = "EMAIL" | "SMS" | "IN_APP" | "PUSH" | "WHATSAPP";
+export type NotificationStatus = "PENDING" | "QUEUED" | "SENT" | "FAILED";
+export type Priority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
 
 export interface SendNotificationRequest {
   channel: Channel;
@@ -41,40 +47,18 @@ export interface BulkSendResponse {
 // Mock notification repository
 const notifications: Map<string, Notification> = new Map();
 
-// Mock queue publisher
-interface QueueMessage {
-  notificationId: string;
-  tenantId: string;
-  channel: Channel;
-  recipient: string;
-  templateCode: string;
-  payload: Record<string, any>;
-  priority: Priority;
-  timestamp: Date;
-}
-
-const queuePublisher = {
-  async publish(message: QueueMessage): Promise<void> {
-    logger.info(
-      {
-        notificationId: message.notificationId,
-        channel: message.channel,
-        recipient: message.recipient,
-      },
-      'Published message to queue'
-    );
-  },
-};
+// Queue publisher instance (will be initialized on startup)
+let queuePublisher: IQueuePublisher;
 
 export class NotifyService {
   async sendNotification(
     tenantId: string,
-    request: SendNotificationRequest
+    request: SendNotificationRequest,
   ): Promise<Notification> {
     const tenant = await tenantService.getTenantById(tenantId);
     if (!tenant) {
       const error = new Error(`Tenant not found: ${tenantId}`);
-      logger.error({ tenantId }, 'Tenant not found for notification');
+      logger.error({ tenantId }, "Tenant not found for notification");
       throw error;
     }
 
@@ -82,12 +66,15 @@ export class NotifyService {
     const template = await templateService.getTemplateByCode(
       tenantId,
       request.templateCode,
-      request.channel
+      request.channel,
     );
 
     if (!template) {
       const error = new Error(`Template not found: ${request.templateCode}`);
-      logger.warn({ tenantId, templateCode: request.templateCode }, 'Template not found');
+      logger.warn(
+        { tenantId, templateCode: request.templateCode },
+        "Template not found",
+      );
       throw error;
     }
 
@@ -98,8 +85,8 @@ export class NotifyService {
       channel: request.channel,
       recipient: request.recipient,
       templateId: template.id,
-      status: 'PENDING',
-      priority: request.priority || 'NORMAL',
+      status: "PENDING",
+      priority: request.priority || "NORMAL",
       payload: request.payload,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -115,12 +102,12 @@ export class NotifyService {
       recipient: request.recipient,
       templateCode: request.templateCode,
       payload: request.payload,
-      priority: request.priority || 'NORMAL',
+      priority: request.priority || "NORMAL",
       timestamp: new Date(),
     });
 
     // Update status to QUEUED
-    notification.status = 'QUEUED';
+    notification.status = "QUEUED";
     notification.updatedAt = new Date();
     notifications.set(notification.id, notification);
 
@@ -130,7 +117,7 @@ export class NotifyService {
         tenantId,
         channel: request.channel,
       },
-      'Notification enqueued'
+      "Notification enqueued",
     );
 
     return notification;
@@ -138,12 +125,12 @@ export class NotifyService {
 
   async bulkSend(
     tenantId: string,
-    requests: SendNotificationRequest[]
+    requests: SendNotificationRequest[],
   ): Promise<{ notifications: Notification[]; response: BulkSendResponse }> {
     const tenant = await tenantService.getTenantById(tenantId);
     if (!tenant) {
       const error = new Error(`Tenant not found: ${tenantId}`);
-      logger.error({ tenantId }, 'Tenant not found for bulk send');
+      logger.error({ tenantId }, "Tenant not found for bulk send");
       throw error;
     }
 
@@ -159,9 +146,13 @@ export class NotifyService {
         accepted++;
       } catch (error) {
         rejected++;
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
         errors.push({ index: i, error: errorMessage });
-        logger.warn({ index: i, error: errorMessage }, 'Failed to process notification in bulk');
+        logger.warn(
+          { index: i, error: errorMessage },
+          "Failed to process notification in bulk",
+        );
       }
     }
 
@@ -175,19 +166,22 @@ export class NotifyService {
     };
   }
 
-  async getNotificationStatus(tenantId: string, notificationId: string): Promise<Notification> {
+  async getNotificationStatus(
+    tenantId: string,
+    notificationId: string,
+  ): Promise<Notification> {
     const notification = notifications.get(notificationId);
 
     if (!notification) {
       const error = new Error(`Notification not found: ${notificationId}`);
-      logger.warn({ notificationId }, 'Notification not found');
+      logger.warn({ notificationId }, "Notification not found");
       throw error;
     }
 
     // Verify tenant access
     if (notification.tenantId !== tenantId) {
-      const error = new Error('Access denied');
-      logger.warn({ notificationId, tenantId }, 'Tenant access denied');
+      const error = new Error("Access denied");
+      logger.warn({ notificationId, tenantId }, "Tenant access denied");
       throw error;
     }
 
@@ -201,7 +195,7 @@ export class NotifyService {
       status?: NotificationStatus;
       limit?: number;
       offset?: number;
-    }
+    },
   ): Promise<{
     data: Notification[];
     meta: { limit: number; offset: number; total: number };
@@ -210,7 +204,7 @@ export class NotifyService {
     const offset = filters.offset || 0;
 
     let results = Array.from(notifications.values()).filter(
-      (n) => n.tenantId === tenantId
+      (n) => n.tenantId === tenantId,
     );
 
     if (filters.channel) {
@@ -234,11 +228,47 @@ export class NotifyService {
 }
 
 function generateId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
     const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 }
 
 export const notifyService = new NotifyService();
+
+/**
+ * Initialize the NotifyService with a queue publisher
+ * Must be called during application startup
+ */
+export async function initializeNotifyService(
+  config?: QueuePublisherConfig,
+): Promise<void> {
+  const queueConfig = config || QueuePublisherFactory.getDefaultConfig();
+
+  // Validate configuration
+  const errors = QueuePublisherFactory.validateConfig(queueConfig);
+  if (errors.length > 0) {
+    throw new Error(`Invalid queue configuration: ${errors.join(", ")}`);
+  }
+
+  // Create and initialize queue publisher
+  queuePublisher = await QueuePublisherFactory.createPublisher(queueConfig);
+
+  logger.info(
+    { provider: queueConfig.provider },
+    "✅ NotifyService initialized with queue publisher",
+  );
+}
+
+/**
+ * Get the current queue publisher (for testing/debugging)
+ */
+export function getQueuePublisher(): IQueuePublisher {
+  if (!queuePublisher) {
+    throw new Error(
+      "Queue publisher not initialized. Call initializeNotifyService first.",
+    );
+  }
+  return queuePublisher;
+}

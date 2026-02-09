@@ -1,16 +1,17 @@
-import { FastifyInstance } from 'fastify';
-import { notifyController } from '../controllers/notify.controller';
+import { FastifyInstance } from "fastify";
+import { notifyController } from "../controllers/notify.controller";
+import { asyncWrapper } from "../middlewares/async_wrapper.middleware";
 import {
   sendNotificationSchema,
   bulkNotificationSchema,
   notificationStatusSchema,
   notificationListSchema,
-} from '../schemas/notify';
-import { gatewayHeaders } from '../schemas/common';
+} from "../schemas/notify";
+import { gatewayHeaders } from "../schemas/common";
 
 export async function registerNotifyRoutes(fastify: FastifyInstance) {
   fastify.post(
-    '/notify/send',
+    "/notify/send",
     {
       // onRequest: [authMiddleware],
       schema: {
@@ -18,11 +19,11 @@ export async function registerNotifyRoutes(fastify: FastifyInstance) {
         headers: gatewayHeaders,
       },
     },
-    (request, reply) => notifyController.sendNotification(request, reply)
+    asyncWrapper(notifyController.sendNotification.bind(notifyController)),
   );
 
   fastify.post(
-    '/notify/bulk',
+    "/notify/bulk",
     {
       // Auth handled by API Gateway
       schema: {
@@ -30,12 +31,12 @@ export async function registerNotifyRoutes(fastify: FastifyInstance) {
         headers: gatewayHeaders,
       },
     },
-    (request, reply) => notifyController.bulkSend(request, reply)
+    asyncWrapper(notifyController.bulkSend.bind(notifyController)),
   );
 
   // Define /notify/logs before /notify/:id to avoid route collision
   fastify.get(
-    '/notify/logs',
+    "/notify/logs",
     {
       // Auth handled by API Gateway
       schema: {
@@ -43,11 +44,11 @@ export async function registerNotifyRoutes(fastify: FastifyInstance) {
         headers: gatewayHeaders,
       },
     },
-    (request, reply) => notifyController.listNotifications(request, reply)
+    asyncWrapper(notifyController.listNotifications.bind(notifyController)),
   );
 
   fastify.get(
-    '/notify/:id',
+    "/notify/:id",
     {
       // Auth handled by API Gateway
       schema: {
@@ -55,6 +56,6 @@ export async function registerNotifyRoutes(fastify: FastifyInstance) {
         headers: gatewayHeaders,
       },
     },
-    (request, reply) => notifyController.getNotificationStatus(request, reply)
+    asyncWrapper(notifyController.getNotificationStatus.bind(notifyController)),
   );
 }

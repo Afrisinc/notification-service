@@ -1,39 +1,56 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { logger } from '../config/logger';
-import { notifyService, SendNotificationRequest, BulkSendRequest } from '../services/notify.service';
-import { tenantService } from '../services/tenant.service';
-import { ApiResponseHelper } from '../utils';
+import { FastifyRequest, FastifyReply } from "fastify";
+import { logger } from "../config/logger";
+import {
+  notifyService,
+  SendNotificationRequest,
+  BulkSendRequest,
+} from "../services/notify.service";
+import { tenantService } from "../services/tenant.service";
+import { ApiResponseHelper } from "../utils";
 
 export class NotifyController {
   async sendNotification(request: FastifyRequest, reply: FastifyReply) {
+    console.log("Received send notification request with body:", request.body);
     try {
       const tenant = await tenantService.resolveTenant(request);
       const body = request.body as SendNotificationRequest;
 
-      const notification = await notifyService.sendNotification(tenant.id, body);
+      const notification = await notifyService.sendNotification(
+        tenant.id,
+        body,
+      );
+
+      console.log("Notification created with ID:", notification);
 
       logger.info(
         { notificationId: notification.id, correlationId: request.id },
-        'Notification sent successfully'
+        "Notification sent successfully",
       );
 
-      ApiResponseHelper.accepted(reply, 'Notification queued for processing', {
+      ApiResponseHelper.accepted(reply, "Notification queued for processing", {
         notificationId: notification.id,
         status: notification.status,
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to send notification');
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      logger.error(
+        { error: errorMessage, correlationId: request.id },
+        "Failed to send notification",
+      );
 
-      if (errorMessage.includes('not found')) {
-        ApiResponseHelper.notFound(reply, errorMessage);
+      if (errorMessage.includes("not found")) {
+        return ApiResponseHelper.notFound(reply, errorMessage);
       }
 
-      if (errorMessage.includes('Missing') || errorMessage.includes('inactive')) {
-        ApiResponseHelper.unauthorized(reply, errorMessage);
+      if (
+        errorMessage.includes("Missing") ||
+        errorMessage.includes("inactive")
+      ) {
+        return ApiResponseHelper.unauthorized(reply, errorMessage);
       }
 
-      ApiResponseHelper.badRequest(reply, errorMessage);
+      return ApiResponseHelper.badRequest(reply, errorMessage);
     }
   }
 
@@ -44,28 +61,39 @@ export class NotifyController {
 
       const { notifications, response } = await notifyService.bulkSend(
         tenant.id,
-        body.notifications
+        body.notifications,
       );
 
       logger.info(
-        { accepted: response.accepted, rejected: response.rejected, correlationId: request.id },
-        'Bulk notifications processed'
+        {
+          accepted: response.accepted,
+          rejected: response.rejected,
+          correlationId: request.id,
+        },
+        "Bulk notifications processed",
       );
 
       ApiResponseHelper.accepted(
         reply,
-        'Bulk notifications queued for processing',
-        response
+        "Bulk notifications queued for processing",
+        response,
       );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to send bulk notifications');
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      logger.error(
+        { error: errorMessage, correlationId: request.id },
+        "Failed to send bulk notifications",
+      );
 
-      if (errorMessage.includes('Missing') || errorMessage.includes('inactive')) {
-        ApiResponseHelper.unauthorized(reply, errorMessage);
+      if (
+        errorMessage.includes("Missing") ||
+        errorMessage.includes("inactive")
+      ) {
+        return ApiResponseHelper.unauthorized(reply, errorMessage);
       }
 
-      ApiResponseHelper.badRequest(reply, errorMessage);
+      return ApiResponseHelper.badRequest(reply, errorMessage);
     }
   }
 
@@ -74,11 +102,17 @@ export class NotifyController {
       const tenant = await tenantService.resolveTenant(request);
       const { id } = request.params as { id: string };
 
-      const notification = await notifyService.getNotificationStatus(tenant.id, id);
+      const notification = await notifyService.getNotificationStatus(
+        tenant.id,
+        id,
+      );
 
-      logger.debug({ notificationId: id, correlationId: request.id }, 'Fetched notification status');
+      logger.debug(
+        { notificationId: id, correlationId: request.id },
+        "Fetched notification status",
+      );
 
-      ApiResponseHelper.success(reply, 'Notification status retrieved', {
+      ApiResponseHelper.success(reply, "Notification status retrieved", {
         id: notification.id,
         channel: notification.channel,
         recipient: notification.recipient,
@@ -87,18 +121,22 @@ export class NotifyController {
         updatedAt: notification.updatedAt.toISOString(),
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to fetch notification status');
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      logger.error(
+        { error: errorMessage, correlationId: request.id },
+        "Failed to fetch notification status",
+      );
 
-      if (errorMessage.includes('not found')) {
-        ApiResponseHelper.notFound(reply, errorMessage);
+      if (errorMessage.includes("not found")) {
+        return ApiResponseHelper.notFound(reply, errorMessage);
       }
 
-      if (errorMessage.includes('Access denied')) {
-        ApiResponseHelper.forbidden(reply, errorMessage);
+      if (errorMessage.includes("Access denied")) {
+        return ApiResponseHelper.forbidden(reply, errorMessage);
       }
 
-      ApiResponseHelper.badRequest(reply, errorMessage);
+      return ApiResponseHelper.badRequest(reply, errorMessage);
     }
   }
 
@@ -120,11 +158,15 @@ export class NotifyController {
       });
 
       logger.debug(
-        { count: result.data.length, total: result.meta.total, correlationId: request.id },
-        'Listed notifications'
+        {
+          count: result.data.length,
+          total: result.meta.total,
+          correlationId: request.id,
+        },
+        "Listed notifications",
       );
 
-      ApiResponseHelper.success(reply, 'Notifications listed', {
+      ApiResponseHelper.success(reply, "Notifications listed", {
         data: result.data.map((n) => ({
           id: n.id,
           channel: n.channel,
@@ -136,14 +178,21 @@ export class NotifyController {
         meta: result.meta,
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to list notifications');
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      logger.error(
+        { error: errorMessage, correlationId: request.id },
+        "Failed to list notifications",
+      );
 
-      if (errorMessage.includes('Missing') || errorMessage.includes('inactive')) {
-        ApiResponseHelper.unauthorized(reply, errorMessage);
+      if (
+        errorMessage.includes("Missing") ||
+        errorMessage.includes("inactive")
+      ) {
+        return ApiResponseHelper.unauthorized(reply, errorMessage);
       }
 
-      ApiResponseHelper.badRequest(reply, errorMessage);
+      return ApiResponseHelper.badRequest(reply, errorMessage);
     }
   }
 }

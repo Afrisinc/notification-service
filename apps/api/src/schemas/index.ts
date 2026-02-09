@@ -12,10 +12,10 @@
  */
 
 // Common schemas (errors, pagination, etc.)
-export * from './common';
+export * from "./common";
 
 // Notification schemas
-export * from './notify';
+export * from "./notify";
 
 // Template schemas
-export * from './template';
+export * from "./template";

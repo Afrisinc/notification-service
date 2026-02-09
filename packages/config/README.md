@@ -42,7 +42,7 @@ APP_VERSION=1.0.0
 ### Server
 
 ```env
-API_PORT=3000
+API_PORT=8010
 API_HOST=0.0.0.0
 CORS_ORIGIN=*|https://example.com
 ```
@@ -54,7 +54,7 @@ DATABASE_URL=postgresql://user:pass@localhost:5432/notify_db
 DATABASE_POOL_MIN=2
 DATABASE_POOL_MAX=10
 DATABASE_STATEMENT_CACHE_SIZE=25
-DATABASE_TIMEOUT=30000
+DATABASE_TIMEOUT=80100
 ```
 
 ### Redis
@@ -164,7 +164,7 @@ RETRY_BACKOFF_MULTIPLIER=2
 import { getConfig, isDevelopment } from '@afrisinc/notify-config';
 
 const config = getConfig();
-console.log(config.API_PORT);        // 3000
+console.log(config.API_PORT);        // 8010
 console.log(config.DATABASE_URL);    // postgresql://...
 console.log(isDevelopment());         // true|false
 ```
@@ -262,7 +262,7 @@ Different defaults per environment:
 
 ```env
 NODE_ENV=development
-API_PORT=3000
+API_PORT=8010
 LOG_LEVEL=debug
 
 DATABASE_URL=postgresql://localhost/notify_dev
@@ -327,7 +327,7 @@ import { getConfig } from '@afrisinc/notify-config';
 
 jest.mock('@afrisinc/notify-config', () => ({
   getConfig: jest.fn(() => ({
-    API_PORT: 3000,
+    API_PORT: 8010,
     DATABASE_URL: 'test://...',
     // ...
   })),

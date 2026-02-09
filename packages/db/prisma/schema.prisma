@@ -24,6 +24,8 @@ enum Channel {
   EMAIL
   SMS
   IN_APP
+  PUSH
+  WHATSAPP
 }
 
 enum NotificationStatus {
@@ -82,23 +84,51 @@ model ApiKey {
 ////////////////////////////////////////////////////////////
 
 model Template {
-  id        String   @id @default(uuid())
-  tenantId  String
-  code      String
-  channel   Channel
-  subject   String?
-  content   String
-  language  String   @default("en")
-  version   Int      @default(1)
-  active    Boolean  @default(true)
+  id                String               @id @default(uuid())
+  tenantId          String
+  code              String
+  channel           Channel
+  subject           String?
+  content           String
+  language          String               @default("en")
+  version           Int                  @default(1)
+  active            Boolean              @default(true)
+  requiredVariables Json?
+  description       String?
+  deletedAt         DateTime?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant            Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  versions          TemplateVersion[]
 
-  @@unique([tenantId, code, channel])
+  @@unique([tenantId, code, channel, language])
   @@index([tenantId, active])
+  @@index([tenantId, code, channel, active])
+  @@index([tenantId, deletedAt])
+}
+
+////////////////////////////////////////////////////////////
+// TEMPLATE VERSIONS (VERSIONING SUPPORT)
+////////////////////////////////////////////////////////////
+
+model TemplateVersion {
+  id                String   @id @default(uuid())
+  templateId        String
+  version           Int
+  subject           String?
+  content           String
+  requiredVariables Json?
+  isActive          Boolean  @default(false)
+  createdBy         String?
+  createdAt         DateTime @default(now())
+
+  template          Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, version])
+  @@index([templateId, isActive])
+  @@index([templateId, version])
 }
 
 ////////////////////////////////////////////////////////////

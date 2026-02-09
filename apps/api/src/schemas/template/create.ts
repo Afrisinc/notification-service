@@ -3,105 +3,108 @@
  * Create a new template
  */
 
+import { templateHeaders } from "../common";
+
 export const createTemplateRequestBody = {
-  type: 'object',
-  required: ['code', 'channel', 'content', 'language'],
+  type: "object",
+  required: ["code", "channel", "content", "language"],
   properties: {
     code: {
-      type: 'string',
+      type: "string",
       minLength: 1,
       maxLength: 100,
-      pattern: '^[A-Z_]+$',
-      description: 'Unique template code (uppercase with underscores)',
+      pattern: "^[A-Z_]+$",
+      description: "Unique template code (uppercase with underscores)",
     },
     channel: {
-      type: 'string',
-      enum: ['EMAIL', 'SMS', 'IN_APP'],
-      description: 'Notification channel this template is for',
+      type: "string",
+      enum: ["EMAIL", "SMS", "IN_APP", "PUSH", "WHATSAPP"],
+      description: "Notification channel this template is for",
     },
     subject: {
-      type: 'string',
-      description: 'Email subject (optional, required for EMAIL channel)',
+      type: "string",
+      description: "Email subject (optional, required for EMAIL channel)",
     },
     content: {
-      type: 'string',
+      type: "string",
       minLength: 1,
-      description: 'Template content with {{variable}} placeholders',
+      description: "Template content with {{variable}} placeholders",
     },
     language: {
-      type: 'string',
+      type: "string",
       minLength: 2,
       maxLength: 5,
-      description: 'Language code (ISO 639-1)',
+      description: "Language code (ISO 639-1)",
     },
     description: {
-      type: 'string',
-      description: 'Optional template description',
+      type: "string",
+      description: "Optional template description",
     },
   },
 };
 
 export const createTemplateResponseBody = {
-  type: 'object',
+  type: "object",
   properties: {
     id: {
-      type: 'string',
-      format: 'uuid',
-      description: 'Unique template identifier',
+      type: "string",
+      format: "uuid",
+      description: "Unique template identifier",
     },
     code: {
-      type: 'string',
-      description: 'Template code',
+      type: "string",
+      description: "Template code",
     },
     channel: {
-      type: 'string',
-      enum: ['EMAIL', 'SMS', 'IN_APP'],
-      description: 'Notification channel',
+      type: "string",
+      enum: ["EMAIL", "SMS", "IN_APP", "PUSH", "WHATSAPP"],
+      description: "Notification channel",
     },
     active: {
-      type: 'boolean',
-      description: 'Whether template is active',
+      type: "boolean",
+      description: "Whether template is active",
     },
   },
-  required: ['id', 'code', 'channel', 'active'],
+  required: ["id", "code", "channel", "active"],
 };
 
 export const createTemplateSchema = {
-  description: 'Create a new notification template',
-  tags: ['Templates'],
+  description: "Create a new notification template",
+  tags: ["Templates"],
+  headers: templateHeaders,
   body: createTemplateRequestBody,
   response: {
     201: {
-      type: 'object',
+      type: "object",
       properties: {
-        success: { type: 'boolean' },
-        resp_msg: { type: 'string' },
-        resp_code: { type: 'number' },
+        success: { type: "boolean" },
+        resp_msg: { type: "string" },
+        resp_code: { type: "number" },
         data: createTemplateResponseBody,
       },
     },
     400: {
-      type: 'object',
+      type: "object",
       properties: {
-        success: { type: 'boolean' },
-        resp_msg: { type: 'string' },
-        resp_code: { type: 'number' },
+        success: { type: "boolean" },
+        resp_msg: { type: "string" },
+        resp_code: { type: "number" },
       },
     },
     401: {
-      type: 'object',
+      type: "object",
       properties: {
-        success: { type: 'boolean' },
-        resp_msg: { type: 'string' },
-        resp_code: { type: 'number' },
+        success: { type: "boolean" },
+        resp_msg: { type: "string" },
+        resp_code: { type: "number" },
       },
     },
     409: {
-      type: 'object',
+      type: "object",
       properties: {
-        success: { type: 'boolean' },
-        resp_msg: { type: 'string' },
-        resp_code: { type: 'number' },
+        success: { type: "boolean" },
+        resp_msg: { type: "string" },
+        resp_code: { type: "number" },
       },
     },
   },

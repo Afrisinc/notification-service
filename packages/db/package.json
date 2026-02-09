@@ -5,29 +5,51 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
+    "--- BUILD ---": "",
     "build": "tsc --build",
+    "--- TESTING ---": "",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch --passWithNoTests",
     "test:coverage": "jest --coverage --passWithNoTests",
+    "--- CODE QUALITY ---": "",
     "lint": "eslint src --ext .ts",
-    "format": "prettier --write 'src/**/*.ts'",
+    "format": "prettier --write src",
+    "--- PRISMA SCHEMA ---": "",
+    "generate": "prisma generate",
+    "--- DATABASE MIGRATIONS ---": "",
     "migrate": "prisma migrate dev",
     "migrate:prod": "prisma migrate deploy",
-    "generate": "prisma generate",
+    "migrate:status": "prisma migrate status",
+    "migrate:resolve": "prisma migrate resolve",
+    "--- DATABASE MANAGEMENT ---": "",
+    "db:push": "prisma db push",
+    "db:pull": "prisma db pull",
+    "db:seed": "ts-node prisma/seed.ts",
+    "db:reset": "prisma migrate reset",
+    "db:validate": "prisma validate",
+    "--- PRISMA STUDIO ---": "",
     "studio": "prisma studio",
-    "seed": "ts-node prisma/seed.ts"
+    "--- UTILITIES ---": "",
+    "seed": "ts-node prisma/seed.ts",
+    "format:schema": "prisma format"
   },
   "dependencies": {
+    "@afrisinc-notify/config": "workspace:*",
     "@prisma/client": "^5.6.0",
+    "dotenv": "^17.2.4",
     "pino": "^8.17.2"
   },
   "devDependencies": {
     "@types/jest": "^29.5.10",
     "@types/node": "^20.10.6",
     "jest": "^29.7.0",
+    "prettier": "^3.1.1",
     "prisma": "^5.6.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   },
   "keywords": [
     "database",
