@@ -54,6 +54,14 @@ const EnvSchema = z.object({
   // Queue Configuration
   QUEUE_NAME: z.string().default("notifications"),
 
+  // RabbitMQ Configuration
+  RABBITMQ_URL: z.string().default("amqp://guest:guest@localhost:5672"),
+  RABBITMQ_HOST: z.string().optional(),
+  RABBITMQ_PORT: z.coerce.number().optional(),
+  RABBITMQ_USER: z.string().optional(),
+  RABBITMQ_PASSWORD: z.string().optional(),
+  RABBITMQ_VHOST: z.string().optional(),
+
   // CORS Configuration
   CORS_ORIGINS: z.string().optional().default("http://localhost:8010"),
 

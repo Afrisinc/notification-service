@@ -1,6 +1,7 @@
 import { logger } from "../config/logger";
 import { tenantService, Tenant } from "./tenant.service";
 import { templateService } from "./template.service";
+import { db } from "@afrisinc-notify/db";
 import {
   IQueuePublisher,
   QueueMessage,
@@ -78,21 +79,18 @@ export class NotifyService {
       throw error;
     }
 
-    // Create notification record
-    const notification: Notification = {
-      id: generateId(),
-      tenantId,
-      channel: request.channel,
-      recipient: request.recipient,
-      templateId: template.id,
-      status: "PENDING",
-      priority: request.priority || "NORMAL",
-      payload: request.payload,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    notifications.set(notification.id, notification);
+    // Create notification record in database
+    const notification = await db.notification.create({
+      data: {
+        tenantId,
+        channel: request.channel as any,
+        recipient: request.recipient,
+        templateCode: request.templateCode,
+        status: "PENDING",
+        priority: request.priority || "NORMAL",
+        payload: request.payload,
+      },
+    });
 
     // Publish to queue
     await queuePublisher.publish({
@@ -107,9 +105,10 @@ export class NotifyService {
     });
 
     // Update status to QUEUED
-    notification.status = "QUEUED";
-    notification.updatedAt = new Date();
-    notifications.set(notification.id, notification);
+    await db.notification.update({
+      where: { id: notification.id },
+      data: { status: "QUEUED" },
+    });
 
     logger.info(
       {
