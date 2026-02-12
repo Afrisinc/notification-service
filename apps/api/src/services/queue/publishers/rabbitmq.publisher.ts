@@ -11,13 +11,13 @@
  * Production: Use this in production environments
  */
 
-import { Connection, Channel, connect } from "amqplib";
+import { connect } from "amqplib";
 import { logger } from "../../../config/logger";
 import { IQueuePublisher, QueueMessage } from "../publisher.interface";
 
 export class RabbitMQPublisher implements IQueuePublisher {
-  private connection: Connection | null = null;
-  private channel: Channel | null = null;
+  private connection: any = null;
+  private channel: any = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
   private reconnectDelay = 5000; // 5 seconds
@@ -28,9 +28,15 @@ export class RabbitMQPublisher implements IQueuePublisher {
   async connect(): Promise<void> {
     try {
       this.connection = await connect(this.url);
+      if (!this.connection) {
+        throw new Error("Failed to establish RabbitMQ connection");
+      }
       this.channel = await this.connection.createChannel();
 
       // Set up queue with options
+      if (!this.channel) {
+        throw new Error("Failed to create RabbitMQ channel");
+      }
       await this.channel.assertQueue(this.queueName, {
         durable: true,
         arguments: {
@@ -50,15 +56,17 @@ export class RabbitMQPublisher implements IQueuePublisher {
       this.reconnectAttempts = 0;
 
       // Handle connection errors
-      this.connection.on("error", (error: Error) => {
-        logger.error(error, "RabbitMQ connection error");
-        this.handleConnectionError();
-      });
+      if (this.connection) {
+        this.connection.on("error", (error: Error) => {
+          logger.error(error, "RabbitMQ connection error");
+          this.handleConnectionError();
+        });
 
-      this.connection.on("close", () => {
-        logger.warn("RabbitMQ connection closed, attempting to reconnect...");
-        this.handleConnectionError();
-      });
+        this.connection.on("close", () => {
+          logger.warn("RabbitMQ connection closed, attempting to reconnect...");
+          this.handleConnectionError();
+        });
+      }
     } catch (error) {
       logger.error(error, "Failed to connect to RabbitMQ");
       this.handleConnectionError();
@@ -151,7 +159,7 @@ export class RabbitMQPublisher implements IQueuePublisher {
       }
 
       if (this.connection) {
-        await this.connection.close();
+        await (this.connection as any).close();
         this.connection = null;
       }
 

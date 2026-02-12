@@ -142,7 +142,10 @@ export class NotifyService {
       "Notification enqueued",
     );
 
-    return notification;
+    return {
+      ...notification,
+      payload: (notification.payload || {}) as Record<string, any>,
+    };
   }
 
   /**

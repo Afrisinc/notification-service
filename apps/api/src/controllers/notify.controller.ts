@@ -118,7 +118,6 @@ export class NotifyController {
         recipient: notification.recipient,
         status: notification.status,
         createdAt: notification.createdAt.toISOString(),
-        updatedAt: notification.updatedAt.toISOString(),
       });
     } catch (error) {
       const errorMessage =
@@ -173,7 +172,6 @@ export class NotifyController {
           recipient: n.recipient,
           status: n.status,
           createdAt: n.createdAt.toISOString(),
-          updatedAt: n.updatedAt.toISOString(),
         })),
         meta: result.meta,
       });
