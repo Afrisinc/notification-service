@@ -25,8 +25,8 @@ RUN pnpm install --frozen-lockfile
 # Build all packages
 RUN pnpm -r run build
 
-# Create production bundle
-RUN pnpm deploy --filter @afrisinc-notify/worker-inapp --prod --legacy /prod
+# Create production bundle (including workspace packages)
+RUN pnpm deploy --filter @afrisinc-notify/worker-inapp --legacy /prod
 
 
 
