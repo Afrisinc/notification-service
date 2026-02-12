@@ -1,66 +1,68 @@
-# ============ Build Stage ============
+# =========================
+# ============ Build Stage
+# =========================
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies
-RUN apk add --no-cache python3 make g++
+# System deps required for prisma + native builds
+RUN apk add --no-cache python3 make g++ openssl
 
-# Copy monorepo files
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy root workspace files first (better layer caching)
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY tsconfig.base.json ./
 
-# Copy workspace packages
+# Copy monorepo source
 COPY packages ./packages
 COPY apps ./apps
 
-# Install pnpm globally
-RUN npm install -g pnpm
+# Install dependencies (including dev deps for build)
+RUN pnpm install --frozen-lockfile
 
-# Install all dependencies (skip scripts initially to avoid prepare hook issues)
-RUN pnpm install --frozen-lockfile --ignore-scripts
+# Generate Prisma client
+RUN pnpm --filter @afrisinc-notify/db exec prisma generate
 
-# Now run the prepare script after all dependencies are installed and hoisted
-# RUN pnpm run prepare
-RUN pnpm --filter @***-notify/db exec prisma generate
-
-# Build all packages
+# Build API
 RUN pnpm --filter @afrisinc-notify/api run build
 
-# ============ Runtime Stage ============
-FROM node:20-alpine
+# 👇 CRITICAL STEP
+# Create isolated production bundle with only required deps
+RUN pnpm deploy --filter @afrisinc-notify/api --prod /prod
 
-# Install dumb-init for proper signal handling and curl for health checks
-RUN apk add --no-cache dumb-init curl
+
+# =========================
+# ============ Runtime Stage
+# =========================
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Create app user for security (non-root)
+# Install runtime utilities
+RUN apk add --no-cache dumb-init curl
+
+# Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+    adduser -S nodejs -u 1001 -G nodejs
 
-# Copy from builder - monorepo structure
-COPY --from=builder --chown=nodejs:nodejs /app/package.json /app/pnpm-lock.yaml ./
-COPY --from=builder --chown=nodejs:nodejs /app/packages ./packages
-COPY --from=builder --chown=nodejs:nodejs /app/apps/api/dist ./apps/api/dist
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+# Copy production-ready bundle
+COPY --from=builder --chown=nodejs:nodejs /prod ./
 
-# Switch to non-root user
+# Switch to non-root
 USER nodejs
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8010/health/live || exit 1
 
 # Environment
 ENV NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=256"
 
-# Expose port
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8010/health/live || exit 1
+
 EXPOSE 8010
 
-# Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start application
-CMD ["node", "apps/api/dist/server.js"]
+CMD ["node", "dist/server.js"]
