@@ -3,6 +3,7 @@ import { templateRepository } from '../repositories/template.repository';
 import { templateVersionRepository } from '../repositories/template-version.repository';
 import { templateRenderer, RenderResult } from '../template/renderer';
 import { extractRequiredVariables } from '../template/validators/template.validator';
+import { getDefaultTemplate, hasDefaultTemplate, listDefaultTemplates as listDefaults } from '../templates';
 
 export interface Template {
   id: string;
@@ -107,7 +108,8 @@ export class TemplateService {
   }
 
   /**
-   * Get template by code with locale fallback
+   * Get template by code with locale fallback and default template fallback
+   * Priority: 1) Database template 2) Default hardcoded template
    */
   async getTemplateByCode(
     tenantId: string,
@@ -121,6 +123,7 @@ export class TemplateService {
         'Looking up template by code',
       );
 
+      // First, try to get template from database
       const template = await templateRepository.findByCodeWithFallback(
         tenantId,
         code,
@@ -129,15 +132,44 @@ export class TemplateService {
       );
 
       logger.debug(
-        { found: !!template, active: template?.active },
+        { found: !!template, active: template?.active, source: 'database' },
         'Template lookup result',
       );
 
-      if (!template || !template.active) {
-        return null;
+      if (template && template.active) {
+        return template;
       }
 
-      return template;
+      // Fallback to default template if database lookup fails
+      if (hasDefaultTemplate(code)) {
+        const defaultTemplate = getDefaultTemplate(code);
+        if (defaultTemplate) {
+          logger.info(
+            { code, channel, source: 'default' },
+            'Using default fallback template',
+          );
+
+          // Convert default template to Template interface
+          const fallbackTemplate: Template = {
+            id: `default-${code}`,
+            tenantId,
+            code: defaultTemplate.code,
+            channel: defaultTemplate.channel,
+            content: defaultTemplate.html,
+            language: locale,
+            requiredVariables: defaultTemplate.requiredVariables,
+            description: defaultTemplate.description,
+            version: 0,
+            active: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+
+          return fallbackTemplate;
+        }
+      }
+
+      return null;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error(
@@ -393,6 +425,66 @@ export class TemplateService {
         { error: errorMessage, tenantId, templateCode, channel },
         'Failed to preview template',
       );
+      throw error;
+    }
+  }
+
+  /**
+   * List all available default templates
+   * Returns metadata for fallback templates
+   */
+  async listDefaultTemplates(): Promise<Array<{
+    code: string;
+    name: string;
+    description: string;
+    channel: string;
+    requiredVariables: string[];
+  }>> {
+    try {
+      const defaults = listDefaults();
+      return defaults.map(template => ({
+        code: template.code,
+        name: template.name,
+        description: template.description,
+        channel: template.channel,
+        requiredVariables: template.requiredVariables,
+      }));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage }, 'Failed to list default templates');
+      throw error;
+    }
+  }
+
+  /**
+   * Get a specific default template
+   * Useful for preview or copying to database
+   */
+  async getDefaultTemplateByCode(code: string): Promise<Template | null> {
+    try {
+      const defaultTemplate = getDefaultTemplate(code);
+
+      if (!defaultTemplate) {
+        return null;
+      }
+
+      return {
+        id: `default-${code}`,
+        tenantId: 'system',
+        code: defaultTemplate.code,
+        channel: defaultTemplate.channel,
+        content: defaultTemplate.html,
+        language: 'en',
+        requiredVariables: defaultTemplate.requiredVariables,
+        description: defaultTemplate.description,
+        version: 0,
+        active: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, code }, 'Failed to get default template');
       throw error;
     }
   }

@@ -79,6 +79,26 @@ export class NotifyService {
       throw error;
     }
 
+    // Render template with payload variables
+    let renderedContent = template.content;
+    let renderedSubject = template.subject || request.templateCode;
+
+    if (request.payload && Object.keys(request.payload).length > 0) {
+      try {
+        // Simple Handlebars-like variable replacement
+        renderedContent = this.renderTemplate(template.content, request.payload);
+        if (template.subject) {
+          renderedSubject = this.renderTemplate(template.subject, request.payload);
+        }
+      } catch (renderError) {
+        logger.warn(
+          { templateCode: request.templateCode, error: renderError },
+          "Template rendering failed, using raw template",
+        );
+        // Continue with unrendered template
+      }
+    }
+
     // Create notification record in database
     const notification = await db.notification.create({
       data: {
@@ -92,13 +112,15 @@ export class NotifyService {
       },
     });
 
-    // Publish to queue
+    // Publish to queue with rendered content
     await queuePublisher.publish({
       notificationId: notification.id,
       tenantId,
       channel: request.channel,
       recipient: request.recipient,
       templateCode: request.templateCode,
+      subject: renderedSubject,
+      body: renderedContent,
       payload: request.payload,
       priority: request.priority || "NORMAL",
       timestamp: new Date(),
@@ -120,6 +142,23 @@ export class NotifyService {
     );
 
     return notification;
+  }
+
+  /**
+   * Simple Handlebars-like template rendering
+   * Replaces {{variable}} with values from payload
+   */
+  private renderTemplate(template: string, payload: Record<string, any>): string {
+    let rendered = template;
+
+    // Replace {{variable}} with payload values
+    Object.entries(payload).forEach(([key, value]) => {
+      const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+      const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+      rendered = rendered.replace(regex, stringValue);
+    });
+
+    return rendered;
   }
 
   async bulkSend(

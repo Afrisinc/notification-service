@@ -30,14 +30,21 @@ export class EmailProcessor {
         "Processing email notification",
       );
 
-      // For now, use template code and payload as subject/body
+      // Use rendered template from message, or fallback to defaults
       const emailData = {
         ...email,
         id: emailId,
         to: emailTo,
+        // If subject/body are provided (pre-rendered from API), use them
+        // Otherwise fallback to templateCode as subject and payload as body
         subject: email.subject || `${email.templateCode} Notification`,
-        body: email.body || JSON.stringify(email.payload || {}),
+        body: email.body || (email.payload ? JSON.stringify(email.payload) : ''),
       };
+
+      this.logger.debug(
+        { emailId, hasBody: !!email.body, hasSubject: !!email.subject, templateCode: email.templateCode },
+        "Email data prepared for sending",
+      );
 
       // Select provider
       let result;

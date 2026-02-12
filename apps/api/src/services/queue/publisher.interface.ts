@@ -15,6 +15,9 @@ export interface QueueMessage {
   payload: Record<string, any>;
   priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
   timestamp: Date;
+  // Rendered template content (optional, for EMAIL channel)
+  subject?: string;
+  body?: string;
 }
 
 export interface IQueuePublisher {
