@@ -21,15 +21,6 @@
     "node": ">=20.0.0",
     "npm": ">=9.0.0"
   },
-  "workspaces": [
-    "apps/api",
-    "apps/worker-email",
-    "apps/worker-sms",
-    "apps/worker-inapp",
-    "packages/common",
-    "packages/db",
-    "packages/config"
-  ],
   "scripts": {
     "--- DEVELOPMENT ---": "",
     "dev": "npm run dev -ws",

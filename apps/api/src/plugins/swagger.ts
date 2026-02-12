@@ -26,7 +26,7 @@ export async function registerSwaggerPlugin(fastify: FastifyInstance) {
           description: "Development server",
         },
         {
-          url: "https://api.afrisinc.com",
+          url: "https://notify-api.afrisinc.com",
           description: "Production server",
         },
       ],
