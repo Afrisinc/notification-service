@@ -50,7 +50,7 @@ export class RabbitMQPublisher implements IQueuePublisher {
       this.reconnectAttempts = 0;
 
       // Handle connection errors
-      this.connection.on("error", (error) => {
+      this.connection.on("error", (error: Error) => {
         logger.error(error, "RabbitMQ connection error");
         this.handleConnectionError();
       });

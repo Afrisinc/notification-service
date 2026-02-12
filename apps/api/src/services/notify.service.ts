@@ -26,13 +26,14 @@ export interface Notification {
   tenantId: string;
   channel: Channel;
   recipient: string;
-  templateId: string;
+  templateCode: string;
   status: NotificationStatus;
   priority: Priority;
   payload: Record<string, any>;
-  error?: string;
+  retryCount: number;
+  scheduledAt: Date | null;
+  sentAt: Date | null;
   createdAt: Date;
-  updatedAt: Date;
 }
 
 export interface BulkSendRequest {
