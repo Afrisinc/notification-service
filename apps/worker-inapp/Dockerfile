@@ -1,60 +1,44 @@
-# =========================
-# ============ Build Stage
-# =========================
+# -------------------------
+# Builder Stage
+# -------------------------
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# System deps
-RUN apk add --no-cache python3 make g++ openssl
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 
-# Install pnpm
-RUN npm install -g pnpm@latest
+RUN corepack enable
 
-# Copy monorepo files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY tsconfig.base.json ./
 COPY packages ./packages
 COPY apps ./apps
 
-# Install ALL dependencies (including dev)
 RUN pnpm install --frozen-lockfile
 
-# Generate Prisma
+# Generate Prisma if needed
 RUN pnpm --filter @afrisinc-notify/db exec prisma generate
 
-# Build ALL packages
+# Build all workspaces
 RUN pnpm -r run build
 
-# Remove dev dependencies from node_modules
-RUN pnpm install --prod --frozen-lockfile
+# Remove devDependencies safely
+RUN pnpm prune --prod
 
 
-
-# =========================
-# ============ Runtime Stage
-# =========================
+# -------------------------
+# Runtime Stage
+# -------------------------
 FROM node:20-alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache dumb-init
+ENV NODE_ENV=production
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 -G nodejs
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps ./apps
+COPY --from=builder /app/packages ./packages
 
-# Copy everything built: node_modules (prod only), packages (with dist), and worker dist
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nodejs:nodejs /app/packages ./packages
-COPY --from=builder --chown=nodejs:nodejs /app/apps/worker-inapp/dist ./dist
-COPY --from=builder --chown=nodejs:nodejs /app/apps/worker-inapp/package.json ./package.json
+CMD ["node", "apps/api/dist/index.js"]
 
-USER nodejs
-
-ENV NODE_ENV=production \
-    NODE_OPTIONS="--max-old-space-size=256"
-
-ENTRYPOINT ["dumb-init", "--"]
-
-CMD ["node", "dist/index.js"]
