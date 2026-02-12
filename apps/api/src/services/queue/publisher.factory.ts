@@ -12,6 +12,7 @@
 import { logger } from '../../config/logger';
 import { IQueuePublisher } from './publisher.interface';
 import { GuestQueuePublisher } from './publishers/guest.publisher';
+import { RabbitMQPublisher } from './publishers/rabbitmq.publisher';
 
 export type QueueProviderType = 'guest' | 'rabbitmq' | 'redis' | 'aws-sqs';
 
@@ -36,10 +37,13 @@ export class QueuePublisherFactory {
       case 'guest':
         return new GuestQueuePublisher(config.options);
 
-      case 'rabbitmq':
-        throw new Error(
-          'RabbitMQ queue publisher not yet implemented. Use "guest" for development.',
-        );
+      case 'rabbitmq': {
+        const rabbitmqUrl =
+          process.env.RABBITMQ_URL || 'amqp://admin:password@localhost:5672';
+        const publisher = new RabbitMQPublisher(rabbitmqUrl);
+        await publisher.connect();
+        return publisher;
+      }
 
       case 'redis':
         throw new Error(
@@ -71,6 +75,7 @@ export class QueuePublisherFactory {
           10,
         ),
         maxMessages: parseInt(process.env.QUEUE_MAX_MESSAGES || '10000', 10),
+        rabbitmqUrl: process.env.RABBITMQ_URL,
       },
     };
   }

@@ -1,6 +1,7 @@
 import { logger } from "../config/logger";
 import { tenantService, Tenant } from "./tenant.service";
 import { templateService } from "./template.service";
+import { db } from "@afrisinc-notify/db";
 import {
   IQueuePublisher,
   QueueMessage,
@@ -78,38 +79,58 @@ export class NotifyService {
       throw error;
     }
 
-    // Create notification record
-    const notification: Notification = {
-      id: generateId(),
-      tenantId,
-      channel: request.channel,
-      recipient: request.recipient,
-      templateId: template.id,
-      status: "PENDING",
-      priority: request.priority || "NORMAL",
-      payload: request.payload,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    // Render template with payload variables
+    let renderedContent = template.content;
+    let renderedSubject = template.subject || request.templateCode;
 
-    notifications.set(notification.id, notification);
+    if (request.payload && Object.keys(request.payload).length > 0) {
+      try {
+        // Simple Handlebars-like variable replacement
+        renderedContent = this.renderTemplate(template.content, request.payload);
+        if (template.subject) {
+          renderedSubject = this.renderTemplate(template.subject, request.payload);
+        }
+      } catch (renderError) {
+        logger.warn(
+          { templateCode: request.templateCode, error: renderError },
+          "Template rendering failed, using raw template",
+        );
+        // Continue with unrendered template
+      }
+    }
 
-    // Publish to queue
+    // Create notification record in database
+    const notification = await db.notification.create({
+      data: {
+        tenantId,
+        channel: request.channel as any,
+        recipient: request.recipient,
+        templateCode: request.templateCode,
+        status: "PENDING",
+        priority: request.priority || "NORMAL",
+        payload: request.payload,
+      },
+    });
+
+    // Publish to queue with rendered content
     await queuePublisher.publish({
       notificationId: notification.id,
       tenantId,
       channel: request.channel,
       recipient: request.recipient,
       templateCode: request.templateCode,
+      subject: renderedSubject,
+      body: renderedContent,
       payload: request.payload,
       priority: request.priority || "NORMAL",
       timestamp: new Date(),
     });
 
     // Update status to QUEUED
-    notification.status = "QUEUED";
-    notification.updatedAt = new Date();
-    notifications.set(notification.id, notification);
+    await db.notification.update({
+      where: { id: notification.id },
+      data: { status: "QUEUED" },
+    });
 
     logger.info(
       {
@@ -121,6 +142,23 @@ export class NotifyService {
     );
 
     return notification;
+  }
+
+  /**
+   * Simple Handlebars-like template rendering
+   * Replaces {{variable}} with values from payload
+   */
+  private renderTemplate(template: string, payload: Record<string, any>): string {
+    let rendered = template;
+
+    // Replace {{variable}} with payload values
+    Object.entries(payload).forEach(([key, value]) => {
+      const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+      const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+      rendered = rendered.replace(regex, stringValue);
+    });
+
+    return rendered;
   }
 
   async bulkSend(

@@ -6,23 +6,19 @@ WORKDIR /app
 # Install build dependencies
 RUN apk add --no-cache python3 make g++
 
-# Copy dependency files
-COPY package*.json yarn.lock ./
-COPY tsconfig*.json ./
-COPY prisma ./prisma/
+# Copy monorepo files
+COPY package.json pnpm-lock.yaml ./
+COPY tsconfig.base.json ./
 
-# Install dependencies
-RUN npm ci --only=production && \
-    npm ci --only=development
+# Copy workspace packages
+COPY packages ./packages
+COPY apps ./apps
 
-# Copy source code
-COPY src ./src
+# Install dependencies using pnpm
+RUN npm install -g pnpm && pnpm install --frozen-lockfile
 
-# Build TypeScript
-RUN npm run build
-
-# Generate Prisma client
-RUN npx prisma generate
+# Build all packages
+RUN pnpm run build
 
 # ============ Runtime Stage ============
 FROM node:20-alpine
@@ -36,11 +32,11 @@ WORKDIR /app
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
-# Copy from builder
+# Copy from builder - monorepo structure
+COPY --from=builder --chown=nodejs:nodejs /app/package.json /app/pnpm-lock.yaml ./
+COPY --from=builder --chown=nodejs:nodejs /app/packages ./packages
+COPY --from=builder --chown=nodejs:nodejs /app/apps/api/dist ./apps/api/dist
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
-COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
 
 # Switch to non-root user
 USER nodejs
@@ -60,4 +56,4 @@ EXPOSE 8010
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start application
-CMD ["node", "dist/server.js"]
+CMD ["node", "apps/api/dist/server.js"]

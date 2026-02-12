@@ -28,7 +28,7 @@
     "@afrisinc-notify/common": "workspace:*",
     "@afrisinc-notify/config": "workspace:*",
     "@afrisinc-notify/db": "workspace:*",
-    "bull": "^4.11.5",
+    "amqplib": "^0.10.3",
     "nodemailer": "^6.9.7",
     "@sendgrid/mail": "^7.7.0",
     "pino": "^8.17.2"

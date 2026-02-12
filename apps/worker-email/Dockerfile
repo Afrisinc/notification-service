@@ -3,41 +3,41 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
-
-# Copy monorepo files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY packages ./packages
-COPY apps/worker-email ./apps/worker-email
+# Copy workspace files
+COPY . .
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN npm ci
 
-# Build worker-email
-RUN pnpm --filter @afrisinc-notify/worker-email build
+# Build all packages
+RUN npm run build
 
-# Production stage
+# Runtime stage
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
 
-# Copy from builder
-COPY --from=builder /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+COPY packages ./packages
+COPY apps/worker-email ./apps/worker-email
+
+# Copy built files from builder
+COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/packages ./packages
-COPY --from=builder /app/apps/worker-email/dist ./dist
-COPY --from=builder /app/apps/worker-email/package.json ./apps/worker-email/
+COPY --from=builder /app/apps/worker-email/dist ./apps/worker-email/dist
 
-# Install production dependencies
-RUN pnpm install --prod --frozen-lockfile
+# Install production dependencies only
+RUN npm ci --production
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('fs').accessSync('/tmp/worker-ready')" || exit 1
+# Set NODE_ENV
+ENV NODE_ENV=production
 
-EXPOSE 3001
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["/sbin/dumb-init", "--"]
 
-CMD ["node", "dist/worker.js"]
+# Start worker
+CMD ["node", "apps/worker-email/dist/index.js"]

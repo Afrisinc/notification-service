@@ -1,27 +1,4 @@
-version: '3.9'
-
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:16-alpine
-    container_name: notification-postgres
-    environment:
-      POSTGRES_USER: notification
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: notification_db
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U notification"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - notification-network
-
   # Redis Cache
   redis:
     image: redis:7-alpine
@@ -66,9 +43,9 @@ services:
       dockerfile: Dockerfile
     container_name: notification-api
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     environment:
       NODE_ENV: development
@@ -76,12 +53,14 @@ services:
       PORT: 8010
       HOST: 0.0.0.0
       LOG_LEVEL: debug
-      DATABASE_URL: postgresql://notification:password@postgres:5432/notification_db
+      DATABASE_URL: ${DATABASE_URL}
       DATABASE_POOL_MIN: 2
       DATABASE_POOL_MAX: 10
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: password
+      RABBITMQ_URL: amqp://admin:password@rabbitmq:5672
+      QUEUE_PROVIDER: rabbitmq
       QUEUE_TYPE: bull
       BULL_REDIS_URL: redis://:password@redis:6379/1
       JWT_SECRET: dev-secret-key-change-in-production
@@ -109,6 +88,35 @@ services:
       - notification-network
     command: npm run dev
 
+  # Email Worker Service
+  worker-email:
+    build:
+      context: .
+      dockerfile: apps/worker-email/Dockerfile
+    container_name: notification-worker-email
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_POOL_MIN: 2
+      DATABASE_POOL_MAX: 5
+      RABBITMQ_URL: amqp://admin:password@rabbitmq:5672
+      QUEUE_PROVIDER: rabbitmq
+      EMAIL_PROVIDER: smtp
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_FROM: noreply@notification.local
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/dist
+    networks:
+      - notification-network
+    command: npm -w @afrisinc-notify/worker-email run start:prod
+
   # Email Service (MailHog for development)
   mailhog:
     image: mailhog/mailhog:latest
@@ -119,31 +127,10 @@ services:
     networks:
       - notification-network
 
-  # Database Admin (pgAdmin)
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: notification-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@example.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-    ports:
-      - "5050:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    depends_on:
-      - postgres
-    networks:
-      - notification-network
-
 volumes:
-  postgres_data:
-    driver: local
   redis_data:
     driver: local
   rabbitmq_data:
-    driver: local
-  pgadmin_data:
     driver: local
 
 networks:

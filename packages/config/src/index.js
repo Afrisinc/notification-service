@@ -51,6 +51,13 @@ const EnvSchema = zod_1.z.object({
     REDIS_URL: zod_1.z.string().default("redis://localhost:6379"),
     // Queue Configuration
     QUEUE_NAME: zod_1.z.string().default("notifications"),
+    // RabbitMQ Configuration
+    RABBITMQ_URL: zod_1.z.string().default("amqp://guest:guest@localhost:5672"),
+    RABBITMQ_HOST: zod_1.z.string().optional(),
+    RABBITMQ_PORT: zod_1.z.coerce.number().optional(),
+    RABBITMQ_USER: zod_1.z.string().optional(),
+    RABBITMQ_PASSWORD: zod_1.z.string().optional(),
+    RABBITMQ_VHOST: zod_1.z.string().optional(),
     // CORS Configuration
     CORS_ORIGINS: zod_1.z.string().optional().default("http://localhost:8010"),
     // Email Configuration
