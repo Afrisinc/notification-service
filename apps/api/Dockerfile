@@ -28,8 +28,8 @@ RUN pnpm --filter @afrisinc-notify/db exec prisma generate
 # Build all packages
 RUN pnpm -r run build
 
-# Create production bundle
-RUN pnpm deploy --filter @afrisinc-notify/api --prod --legacy /prod
+# Create production bundle (including workspace packages)
+RUN pnpm deploy --filter @afrisinc-notify/api --legacy /prod
 
 
 
