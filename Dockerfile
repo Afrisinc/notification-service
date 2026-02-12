@@ -7,21 +7,25 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
 # Copy monorepo files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY tsconfig.base.json ./
 
 # Copy workspace packages
 COPY packages ./packages
 COPY apps ./apps
 
-# Install dependencies using pnpm
-RUN npm install -g pnpm && pnpm install --frozen-lockfile
+# Install pnpm globally
+RUN npm install -g pnpm
 
-# Generate Prisma client
-RUN node node_modules/prisma/build/index.js generate --schema=packages/db/prisma/schema.prisma
+# Install all dependencies (skip scripts initially to avoid prepare hook issues)
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+# Now run the prepare script after all dependencies are installed and hoisted
+# RUN pnpm run prepare
+RUN pnpm --filter @***-notify/db exec prisma generate
 
 # Build all packages
-RUN pnpm run build
+RUN pnpm --filter @afrisinc-notify/api run build
 
 # ============ Runtime Stage ============
 FROM node:20-alpine
