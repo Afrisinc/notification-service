@@ -137,6 +137,9 @@ importers:
         specifier: ^8.17.2
         version: 8.21.0
     devDependencies:
+      '@types/amqplib':
+        specifier: ^0.10.4
+        version: 0.10.8
       '@types/jest':
         specifier: ^29.5.10
         version: 29.5.14
@@ -146,12 +149,24 @@ importers:
       '@types/nodemailer':
         specifier: ^6.4.14
         version: 6.4.22
+      '@typescript-eslint/eslint-plugin':
+        specifier: ^6.13.0
+        version: 6.21.0(@typescript-eslint/parser@6.21.0(eslint@8.57.1)(typescript@5.9.3))(eslint@8.57.1)(typescript@5.9.3)
+      '@typescript-eslint/parser':
+        specifier: ^6.13.0
+        version: 6.21.0(eslint@8.57.1)(typescript@5.9.3)
+      eslint:
+        specifier: ^8.54.0
+        version: 8.57.1
       jest:
         specifier: ^29.7.0
         version: 29.7.0(@types/node@20.19.33)(ts-node@10.9.2(@types/node@20.19.33)(typescript@5.9.3))
       prettier:
         specifier: ^3.1.1
         version: 3.8.1
+      ts-jest:
+        specifier: ^29.1.1
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@29.7.0)(jest@29.7.0(@types/node@20.19.33)(ts-node@10.9.2(@types/node@20.19.33)(typescript@5.9.3)))(typescript@5.9.3)
       tsx:
         specifier: ^4.7.0
         version: 4.21.0
