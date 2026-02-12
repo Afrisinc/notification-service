@@ -30,7 +30,8 @@ RUN pnpm --filter @afrisinc-notify/api run build
 
 # 👇 CRITICAL STEP
 # Create isolated production bundle with only required deps
-RUN pnpm deploy --filter @afrisinc-notify/api --prod /prod
+RUN pnpm deploy --filter @afrisinc-notify/api --prod --legacy /prod
+
 
 
 # =========================
