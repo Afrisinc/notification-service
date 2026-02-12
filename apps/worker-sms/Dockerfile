@@ -1,43 +1,59 @@
-# Build stage
+# =========================
+# ============ Build Stage
+# =========================
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# System deps required for native builds
+RUN apk add --no-cache python3 make g++ openssl
+
 # Install pnpm
 RUN npm install -g pnpm
 
-# Copy monorepo files
+# Copy root workspace files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY tsconfig.base.json ./
+
+# Copy monorepo source
 COPY packages ./packages
-COPY apps/worker-sms ./apps/worker-sms
+COPY apps ./apps
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Build worker-sms
-RUN pnpm --filter @afrisinc-notify/worker-sms build
+# Build all packages
+RUN pnpm -r run build
 
-# Production stage
+# Create production bundle
+RUN pnpm deploy --filter @afrisinc-notify/worker-sms --prod --legacy /prod
+
+
+
+# =========================
+# ============ Runtime Stage
+# =========================
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install runtime utilities
+RUN apk add --no-cache dumb-init
 
-# Copy from builder
-COPY --from=builder /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
-COPY --from=builder /app/packages ./packages
-COPY --from=builder /app/apps/worker-sms/dist ./dist
-COPY --from=builder /app/apps/worker-sms/package.json ./apps/worker-sms/
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 -G nodejs
 
-# Install production dependencies
-RUN pnpm install --prod --frozen-lockfile
+# Copy production-ready bundle
+COPY --from=builder --chown=nodejs:nodejs /prod ./
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('fs').accessSync('/tmp/worker-ready')" || exit 1
+# Switch to non-root
+USER nodejs
 
-EXPOSE 3001
+# Environment
+ENV NODE_ENV=production \
+    NODE_OPTIONS="--max-old-space-size=256"
 
-CMD ["node", "dist/worker.js"]
+ENTRYPOINT ["dumb-init", "--"]
+
+CMD ["node", "dist/index.js"]

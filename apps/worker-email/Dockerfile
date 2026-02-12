@@ -1,43 +1,59 @@
-# Build stage
+# =========================
+# ============ Build Stage
+# =========================
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy workspace files
-COPY . .
+# System deps required for native builds
+RUN apk add --no-cache python3 make g++ openssl
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy root workspace files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY tsconfig.base.json ./
+
+# Copy monorepo source
+COPY packages ./packages
+COPY apps ./apps
 
 # Install dependencies
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 
 # Build all packages
-RUN npm run build
+RUN pnpm -r run build
 
-# Runtime stage
+# Create production bundle
+RUN pnpm deploy --filter @afrisinc-notify/worker-email --prod --legacy /prod
+
+
+
+# =========================
+# ============ Runtime Stage
+# =========================
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dumb-init for proper signal handling
+# Install runtime utilities
 RUN apk add --no-cache dumb-init
 
-# Copy package files
-COPY package.json pnpm-lock.yaml ./
-COPY packages ./packages
-COPY apps/worker-email ./apps/worker-email
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 -G nodejs
 
-# Copy built files from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/packages ./packages
-COPY --from=builder /app/apps/worker-email/dist ./apps/worker-email/dist
+# Copy production-ready bundle
+COPY --from=builder --chown=nodejs:nodejs /prod ./
 
-# Install production dependencies only
-RUN npm ci --production
+# Switch to non-root
+USER nodejs
 
-# Set NODE_ENV
-ENV NODE_ENV=production
+# Environment
+ENV NODE_ENV=production \
+    NODE_OPTIONS="--max-old-space-size=256"
 
-# Use dumb-init to handle signals properly
-ENTRYPOINT ["/sbin/dumb-init", "--"]
+ENTRYPOINT ["dumb-init", "--"]
 
-# Start worker
-CMD ["node", "apps/worker-email/dist/index.js"]
+CMD ["node", "dist/index.js"]
