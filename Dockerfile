@@ -15,10 +15,10 @@ COPY packages ./packages
 COPY apps ./apps
 
 # Install dependencies using pnpm
-RUN npm install -g pnpm && pnpm install --frozen-lockfile --ignore-scripts
+RUN npm install -g pnpm && pnpm install --frozen-lockfile
 
 # Generate Prisma client
-RUN pnpm exec prisma generate --schema=packages/db/prisma/schema.prisma
+RUN node node_modules/prisma/build/index.js generate --schema=packages/db/prisma/schema.prisma
 
 # Build all packages
 RUN pnpm run build
