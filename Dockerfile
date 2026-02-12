@@ -18,7 +18,7 @@ COPY apps ./apps
 RUN npm install -g pnpm && pnpm install --frozen-lockfile --ignore-scripts
 
 # Generate Prisma client
-RUN cd packages/db && npx prisma generate
+RUN pnpm exec prisma generate --schema=packages/db/prisma/schema.prisma
 
 # Build all packages
 RUN pnpm run build
