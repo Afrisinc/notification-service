@@ -1,5 +1,5 @@
 import pino from "pino";
-import { connect, Channel, Connection } from "amqplib";
+import { connect } from "amqplib";
 import { getConfig } from "@afrisinc-notify/config";
 import { EmailNotification } from "@afrisinc-notify/common";
 import { EmailProcessor } from "./processor";
@@ -7,8 +7,8 @@ import { EmailProcessor } from "./processor";
 const logger = pino();
 
 async function startEmailWorker() {
-  let connection: Connection | null = null;
-  let channel: Channel | null = null;
+  let connection: any = null;
+  let channel: any = null;
 
   try {
     const config = getConfig();
@@ -38,7 +38,7 @@ async function startEmailWorker() {
     const processor = new EmailProcessor(logger);
 
     // Consume messages
-    await channel.consume(queueName, async (msg) => {
+    await channel.consume(queueName, async (msg: any) => {
       if (!msg) {
         return;
       }
@@ -67,7 +67,7 @@ async function startEmailWorker() {
         );
 
         // Reject and requeue message (up to 3 times)
-        const retryCount = (msg.properties.headers["x-retry-count"] as number) || 0;
+        const retryCount = ((msg.properties?.headers?.["x-retry-count"] as number) || 0);
 
         if (retryCount < 3) {
           await channel!.nack(msg, false, true); // Requeue
