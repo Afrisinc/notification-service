@@ -5,31 +5,29 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# System deps required for prisma + native builds
+# System deps
 RUN apk add --no-cache python3 make g++ openssl
 
 # Install pnpm
-RUN npm install -g pnpm
+RUN npm install -g pnpm@latest
 
-# Copy root workspace files
+# Copy monorepo files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY tsconfig.base.json ./
-
-# Copy monorepo source
 COPY packages ./packages
 COPY apps ./apps
 
-# Install dependencies
+# Install ALL dependencies (including dev)
 RUN pnpm install --frozen-lockfile
 
-# Generate Prisma client
+# Generate Prisma
 RUN pnpm --filter @afrisinc-notify/db exec prisma generate
 
-# Build all packages
+# Build ALL packages
 RUN pnpm -r run build
 
-# Create production bundle (including workspace packages)
-RUN pnpm deploy --filter @afrisinc-notify/api --legacy /prod
+# Remove dev dependencies from node_modules
+RUN pnpm install --prod --frozen-lockfile
 
 
 
@@ -40,24 +38,23 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install runtime utilities
 RUN apk add --no-cache dumb-init curl
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001 -G nodejs
 
-# Copy production-ready bundle
-COPY --from=builder --chown=nodejs:nodejs /prod ./
+# Copy everything built: node_modules (prod only), packages (with dist), and api dist
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/packages ./packages
+COPY --from=builder --chown=nodejs:nodejs /app/apps/api/dist ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/apps/api/package.json ./package.json
 
-# Switch to non-root
 USER nodejs
 
-# Environment
 ENV NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=256"
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8010/health/live || exit 1
 
