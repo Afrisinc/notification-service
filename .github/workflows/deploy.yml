@@ -50,8 +50,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ secrets.GHCR_OWNER }} 
-          password: ${{ secrets.GHCR_TOKEN }}  
+          username: ${{ secrets.GHCR_OWNER }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Extract metadata for ${{ matrix.service }}
         id: meta
@@ -85,53 +85,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Step 5: SSH deploy to VPS
       - name: Deploy to VPS
-        uses: appleboy/ssh-action@v0.1.10
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT != '' && secrets.VPS_PORT || 22 }}
+          port: 22
           timeout: 30s
-          command_timeout: 15m
+          command_timeout: 10m
+
+          # 🔐 PASS DEPLOY CREDS TO VPS
+          envs: DEPLOY_GHCR_USERNAME,DEPLOY_GHCR_TOKEN
           script: |
             set -e
-
-            # Set application path
             APP_PATH="${{ secrets.VPS_APP_PATH }}"
             APP_PATH=${APP_PATH:=/opt/apps/afrisinc/notification-service}
-
-            echo "📁 Deploying to: $APP_PATH"
             cd $APP_PATH
 
-            # Login to GitHub Container Registry
-            echo "🔐 Authenticating with GHCR..."
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
-              -u "${{ secrets.GHCR_OWNER }}" \
-              --password-stdin
+            echo "$DEPLOY_GHCR_TOKEN" | docker login ghcr.io -u "$DEPLOY_GHCR_USERNAME" --password-stdin
 
-            # Pull latest images for all services
-            echo "📥 Pulling latest Docker images..."
             docker compose pull
-
-            # Deploy with new images
-            echo "🚀 Deploying services..."
             docker compose up -d --remove-orphans
-
-            # Wait for services to be healthy
-            echo "⏳ Waiting for services to start..."
-            sleep 5
-
-            # Verify all services are running
-            echo "✅ Verifying services..."
-            docker compose ps --format "table {{.Service}}\t{{.Status}}"
-
-            # Check health endpoints
-            echo "🏥 Checking API health..."
-            curl -f http://localhost:8010/health/live || echo "⚠️  Health check warning"
-
-            # Cleanup old images
-            echo "🧹 Cleaning up old images..."
-            docker image prune -af --filter "until=24h"
-
-            echo "✨ Deployment completed successfully!"
+            docker image prune -af
+            docker compose ps
