@@ -25,8 +25,8 @@ RUN pnpm install --frozen-lockfile
 # Generate Prisma client
 RUN pnpm --filter @afrisinc-notify/db exec prisma generate
 
-# Build API
-RUN pnpm --filter @afrisinc-notify/api run build
+# 🔥 Build all workspace packages
+RUN pnpm -r run build
 
 # 👇 CRITICAL STEP
 # Create isolated production bundle with only required deps
