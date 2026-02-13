@@ -27,7 +27,7 @@ RUN pnpm --filter @afrisinc-notify/db exec prisma generate
 RUN pnpm -r run build
 
 # Remove dev dependencies from node_modules
-RUN pnpm install --prod --frozen-lockfile
+RUN CI=true pnpm install --prod --frozen-lockfile
 
 
 
