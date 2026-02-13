@@ -1,44 +1,67 @@
-# -------------------------
-# Builder Stage
-# -------------------------
+# =========================
+# ============ Build Stage
+# =========================
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
+# System deps
+RUN apk add --no-cache python3 make g++ openssl
 
-RUN corepack enable
+# Install pnpm
+RUN npm install -g pnpm@latest
 
+# Copy monorepo files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY tsconfig.base.json ./
-COPY packages ./packages
-COPY apps ./apps
 
-RUN pnpm install --frozen-lockfile
+# Copy shared packages (common, config only - NOT db)
+COPY packages/common ./packages/common
+COPY packages/config ./packages/config
 
-# Generate Prisma if needed
-RUN pnpm --filter @afrisinc-notify/db exec prisma generate
+# Copy this service
+COPY apps/worker-inapp ./apps/worker-inapp
 
-# Build all workspaces
-RUN pnpm -r run build
+# Install ALL dependencies (including dev for build)
+RUN CI=true pnpm install --frozen-lockfile
 
-# Remove devDependencies safely
-RUN pnpm prune --prod
+# CRITICAL: Copy Prisma schema from packages/db to service
+COPY packages/db/prisma/schema.prisma ./apps/worker-inapp/prisma/schema.prisma
 
+# Generate Prisma client for this service
+RUN cd apps/worker-inapp && npx prisma generate --schema=./prisma/schema.prisma
 
-# -------------------------
-# Runtime Stage
-# -------------------------
+# Build shared packages
+RUN pnpm --filter @afrisinc-notify/common run build
+RUN pnpm --filter @afrisinc-notify/config run build
+
+# Build this service
+RUN pnpm --filter @afrisinc-notify/worker-inapp run build
+
+# Create production bundle (includes generated Prisma client)
+RUN pnpm --filter @afrisinc-notify/worker-inapp --prod deploy /prod
+
+# =========================
+# ============ Runtime Stage
+# =========================
 FROM node:20-alpine
 
 WORKDIR /app
 
-ENV NODE_ENV=production
+RUN apk add --no-cache dumb-init
 
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps ./apps
-COPY --from=builder /app/packages ./packages
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 -G nodejs
 
-CMD ["node", "apps/api/dist/index.js"]
+# Copy production bundle from builder
+COPY --from=builder --chown=nodejs:nodejs /prod ./
 
+USER nodejs
+
+ENV NODE_ENV=production \
+    NODE_OPTIONS="--max-old-space-size=256"
+
+ENTRYPOINT ["dumb-init", "--"]
+
+CMD ["node", "dist/index.js"]

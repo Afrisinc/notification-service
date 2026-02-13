@@ -76,8 +76,7 @@
     "--- UTILITIES ---": "",
     "clean": "rimraf dist node_modules && pnpm install",
     "reinstall": "pnpm run clean",
-    "precommit": "pnpm run lint:fix && pnpm run format && pnpm run type-check",
-    "prepare": "pnpm run db:generate"
+    "precommit": "pnpm run lint:fix && pnpm run format && pnpm run type-check"
   },
   "keywords": [
     "notification",
