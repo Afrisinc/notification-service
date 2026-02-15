@@ -15,10 +15,12 @@ RUN npm install -g pnpm@latest
 COPY package.json pnpm-lock.yaml ./
 
 # Install dependencies (dev + prod for build)
-RUN pnpm install --frozen-lockfile
+# Set CI=true to skip prepare script (husky install)
+RUN CI=true pnpm install --frozen-lockfile
 
-# Copy source code
+# Copy source code and configuration
 COPY tsconfig.json ./
+COPY register-paths.js ./
 COPY prisma ./prisma
 COPY src ./src
 

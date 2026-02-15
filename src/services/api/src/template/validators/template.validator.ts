@@ -21,7 +21,7 @@ export function extractRequiredVariables(template: string): string[] {
   try {
     // Match both simple variables {{var}} and block helpers {{#section}}
     // Pattern: {{ followed by optional # or /, variable name/path, then }}
-    const variablePattern = /\{\{#?\/?([a-zA-Z_$][a-zA-Z0-9_$.@\[\]]*)/g;
+    const variablePattern = /\{\{#?\/?([a-zA-Z_$][a-zA-Z0-9_$.@[\]]*)/g;
     const matches = new Set<string>();
 
     let match;
@@ -32,7 +32,7 @@ export function extractRequiredVariables(template: string): string[] {
       varName = varName.replace(/\.\[[0-9]+\]/g, '');
 
       // Extract the root variable (before first dot or bracket)
-      const rootVar = varName.split(/[\.\[]/).pop() || varName;
+      const rootVar = varName.split(/[.[]/).pop() || varName;
 
       // Skip built-in helpers
       if (!['if', 'else', 'each', 'unless', 'with', 'is', 'and', 'or', 'not'].includes(rootVar)) {
@@ -57,7 +57,7 @@ export function extractRequiredVariables(template: string): string[] {
 export function checkNestedPath(obj: any, path: string): boolean {
   try {
     // Handle array access notation
-    const parts = path.replace(/\.\[/g, '.').replace(/\]/g, '').split('.');
+    const parts = path.replace(/\.\[/g, '.').replace(/]/g, '').split('.');
 
     let current = obj;
     for (const part of parts) {
@@ -132,10 +132,7 @@ export function validateVariables(required: string[], provided: Record<string, a
  * @param provided - Provided variables object
  * @returns ValidationResult
  */
-export function validateTemplateVariables(
-  template: string,
-  provided: Record<string, any>,
-): ValidationResult {
+export function validateTemplateVariables(template: string, provided: Record<string, any>): ValidationResult {
   try {
     const required = extractRequiredVariables(template);
     return validateVariables(required, provided);

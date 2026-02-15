@@ -4,6 +4,8 @@
 # Run lint-staged on staged files
 npx lint-staged
 
+pnpm lint
+
 # Run type checking to ensure code compiles
 pnpm type-check
 

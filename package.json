@@ -7,7 +7,7 @@
 
   "scripts": {
     "--- SETUP ---": "",
-    "prepare": "husky install",
+    "prepare": "husky install || true",
 
     "--- DATABASE ---": "",
     "db:generate": "prisma generate --schema=./prisma/schema.prisma",
