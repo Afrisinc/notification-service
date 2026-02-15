@@ -118,24 +118,14 @@ jobs:
           port: 22
           timeout: 30s
           command_timeout: 10m
-          envs: DEPLOY_GHCR_USERNAME,DEPLOY_GHCR_TOKEN,IMAGE_NAME,REGISTRY,GHCR_OWNER
           script: |
             set -e
             APP_PATH="${{ secrets.VPS_APP_PATH }}"
             APP_PATH=${APP_PATH:=/opt/apps/afrisinc/notification-service}
             cd $APP_PATH
 
-            echo "Logging in to GHCR..."
-            echo "$DEPLOY_GHCR_TOKEN" | docker login ghcr.io -u "$DEPLOY_GHCR_USERNAME" --password-stdin
-
             echo "Pulling latest image..."
             docker compose pull
-
-            echo "Starting services with docker-compose..."
             docker compose up -d --remove-orphans
-
-            echo "Cleaning up unused images..."
             docker image prune -af
-
-            echo "Deployment complete. Services status:"
             docker compose ps
