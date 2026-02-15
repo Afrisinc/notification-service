@@ -1,7 +1,7 @@
 # =========================
 # Build Stage
 # =========================
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
@@ -36,7 +36,7 @@ RUN pnpm prune --prod
 # =========================
 # Runtime Stage
 # =========================
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
