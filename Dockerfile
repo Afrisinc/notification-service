@@ -6,7 +6,12 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 # Install system dependencies
-RUN apk add --no-cache python3 make g++ openssl
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    openssl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install pnpm
 RUN npm install -g pnpm@latest
@@ -40,7 +45,10 @@ FROM node:20-slim
 
 WORKDIR /app
 
-RUN apk add --no-cache dumb-init curl
+RUN apt-get update && apt-get install -y \
+    dumb-init \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
