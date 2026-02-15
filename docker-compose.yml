@@ -1,199 +1,117 @@
 version: '3.8'
 
 services:
-  # ==========================================
-  # 📧 API SERVICE
-  # ==========================================
-  api:
-    build:
-      context: .
-      dockerfile: ./apps/api/Dockerfile
-    container_name: notification-api
-    restart: unless-stopped
-    ports:
-      - "8010:8010"
-    environment:
-      NODE_ENV: production
-      PORT: 8010
-      HOST: 0.0.0.0
-      DATABASE_URL: ${DATABASE_URL}
-      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://rabbitmq:5672}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-    depends_on:
-      - rabbitmq
-      - postgres
-      - redis
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8010/health/live"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    networks:
-      - notification-network
-    volumes:
-      - ./logs/api:/app/logs
-
-  # ==========================================
-  # 📨 EMAIL WORKER SERVICE
-  # ==========================================
-  worker-email:
-    build:
-      context: .
-      dockerfile: ./apps/worker-email/Dockerfile
-    container_name: notification-worker-email
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL}
-      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://rabbitmq:5672}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
-      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
-    depends_on:
-      - rabbitmq
-      - postgres
-      - redis
-      - api
-    networks:
-      - notification-network
-    volumes:
-      - ./logs/worker-email:/app/logs
-
-  # ==========================================
-  # 📱 SMS WORKER SERVICE
-  # ==========================================
-  worker-sms:
-    build:
-      context: .
-      dockerfile: ./apps/worker-sms/Dockerfile
-    container_name: notification-worker-sms
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL}
-      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://rabbitmq:5672}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
-      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
-    depends_on:
-      - rabbitmq
-      - postgres
-      - redis
-      - api
-    networks:
-      - notification-network
-    volumes:
-      - ./logs/worker-sms:/app/logs
-
-  # ==========================================
-  # 🔔 IN-APP WORKER SERVICE
-  # ==========================================
-  worker-inapp:
-    build:
-      context: .
-      dockerfile: ./apps/worker-inapp/Dockerfile
-    container_name: notification-worker-inapp
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL}
-      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://rabbitmq:5672}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-    depends_on:
-      - rabbitmq
-      - postgres
-      - redis
-      - api
-    networks:
-      - notification-network
-    volumes:
-      - ./logs/worker-inapp:/app/logs
-
-  # ==========================================
-  # 🐰 RABBITMQ - MESSAGE QUEUE
-  # ==========================================
-  rabbitmq:
-    image: rabbitmq:3.12-management-alpine
-    container_name: notification-rabbitmq
-    restart: unless-stopped
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
-      RABBITMQ_DEFAULT_VHOST: /
-    healthcheck:
-      test: rabbitmq-diagnostics -q ping
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    networks:
-      - notification-network
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
-
-  # ==========================================
-  # 🐘 POSTGRESQL - DATABASE
-  # ==========================================
   postgres:
     image: postgres:16-alpine
-    container_name: notification-postgres
-    restart: unless-stopped
+    environment:
+      POSTGRES_USER: notification
+      POSTGRES_PASSWORD: notification
+      POSTGRES_DB: notification_db
     ports:
       - "5432:5432"
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-notification_db}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U notification"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - notification-network
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
 
-  # ==========================================
-  # ⚡ REDIS - CACHE
-  # ==========================================
   redis:
     image: redis:7-alpine
-    container_name: notification-redis
-    restart: unless-stopped
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - notification-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: notification
+      RABBITMQ_DEFAULT_PASS: notification
     volumes:
-      - redis-data:/data
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
-# ==========================================
-# NETWORKS
-# ==========================================
-networks:
-  notification-network:
-    driver: bridge
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: afrisinc-notification:latest
+    command: ["node", "-r", "./register-paths.js", "dist/services/api/src/server.js"]
+    ports:
+      - "8010:8010"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://notification:notification@postgres:5432/notification_db
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://notification:notification@rabbitmq:5672
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
 
-# ==========================================
-# VOLUMES
-# ==========================================
+  worker-email:
+    image: afrisinc-notification:latest
+    command: ["node", "-r", "./register-paths.js", "dist/services/worker-email/src/index.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://notification:notification@postgres:5432/notification_db
+      RABBITMQ_URL: amqp://notification:notification@rabbitmq:5672
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+    depends_on:
+      - postgres
+      - rabbitmq
+      - api
+    restart: unless-stopped
+
+  worker-sms:
+    image: afrisinc-notification:latest
+    command: ["node", "-r", "./register-paths.js", "dist/services/worker-sms/src/index.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://notification:notification@postgres:5432/notification_db
+      REDIS_URL: redis://redis:6379
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+    depends_on:
+      - postgres
+      - redis
+      - api
+    restart: unless-stopped
+
+  worker-inapp:
+    image: afrisinc-notification:latest
+    command: ["node", "-r", "./register-paths.js", "dist/services/worker-inapp/src/index.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://notification:notification@postgres:5432/notification_db
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+      - api
+    restart: unless-stopped
+
 volumes:
-  postgres-data:
-    driver: local
-  rabbitmq-data:
-    driver: local
-  redis-data:
-    driver: local
+  postgres_data:
+  redis_data:
+  rabbitmq_data:

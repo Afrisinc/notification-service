@@ -1,69 +1,63 @@
 # =========================
-# ============ Build Stage
+# Build Stage
 # =========================
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# System deps required for prisma + native builds
+# Install system dependencies
 RUN apk add --no-cache python3 make g++ openssl
 
 # Install pnpm
-RUN npm install -g pnpm
+RUN npm install -g pnpm@latest
 
-# Copy root workspace files first (better layer caching)
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY tsconfig.base.json ./
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
 
-# Copy monorepo source
-COPY packages ./packages
-COPY apps ./apps
-
-# Install dependencies (including dev deps for build)
+# Install dependencies (dev + prod for build)
 RUN pnpm install --frozen-lockfile
 
-# Generate Prisma client
-RUN pnpm --filter @afrisinc-notify/db exec prisma generate
+# Copy source code
+COPY tsconfig.json ./
+COPY prisma ./prisma
+COPY src ./src
 
-# 🔥 Build all workspace packages
-RUN pnpm -r run build
+# Generate Prisma Client
+RUN pnpm db:generate
 
-# 👇 CRITICAL STEP
-# Create isolated production bundle with only required deps
-RUN pnpm deploy --filter @afrisinc-notify/api --prod --legacy /prod
+# Build TypeScript
+RUN pnpm build
 
-
+# Prune dev dependencies
+RUN pnpm prune --prod
 
 # =========================
-# ============ Runtime Stage
+# Runtime Stage
 # =========================
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install runtime utilities
 RUN apk add --no-cache dumb-init curl
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001 -G nodejs
 
-# Copy production-ready bundle
-COPY --from=builder --chown=nodejs:nodejs /prod ./
+# Copy production files from builder
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nodejs:nodejs /app/register-paths.js ./register-paths.js
 
-# Switch to non-root
 USER nodejs
 
-# Environment
 ENV NODE_ENV=production \
-    NODE_OPTIONS="--max-old-space-size=256"
+    NODE_OPTIONS="--max-old-space-size=512"
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8010/health/live || exit 1
+# Default to API server
+# Override CMD in docker-compose for different services
+CMD ["node", "-r", "./register-paths.js", "dist/services/api/src/server.js"]
 
 EXPOSE 8010
-
-ENTRYPOINT ["dumb-init", "--"]
-
-CMD ["node", "dist/server.js"]
