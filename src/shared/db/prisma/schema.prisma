@@ -1,0 +1,197 @@
+////////////////////////////////////////////////////////////
+// GENERATOR & DATASOURCE
+////////////////////////////////////////////////////////////
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // recommended for SaaS
+  url      = env("DATABASE_URL")
+}
+
+////////////////////////////////////////////////////////////
+// ENUMS
+////////////////////////////////////////////////////////////
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum Channel {
+  EMAIL
+  SMS
+  IN_APP
+  PUSH
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  PENDING
+  QUEUED
+  SENT
+  FAILED
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+////////////////////////////////////////////////////////////
+// TENANT (FOUNDATION)
+////////////////////////////////////////////////////////////
+
+model Tenant {
+  id        String       @id @default(uuid())
+  code      String       @unique                // afrisinc-auth, afrisinc-media
+  name      String
+  status    TenantStatus @default(ACTIVE)
+
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  apiKeys       ApiKey[]
+  templates     Template[]
+  notifications Notification[]
+  userPrefs     UserPreference[]
+}
+
+////////////////////////////////////////////////////////////
+// API KEYS (SERVICE-TO-SERVICE AUTH)
+////////////////////////////////////////////////////////////
+
+model ApiKey {
+  id         String   @id @default(uuid())
+  keyHash   String   @unique
+  name      String               // auth-service, media-service
+  revoked   Boolean  @default(false)
+  lastUsedAt DateTime?
+
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+////////////////////////////////////////////////////////////
+// TEMPLATES
+////////////////////////////////////////////////////////////
+
+model Template {
+  id                String               @id @default(uuid())
+  tenantId          String
+  code              String
+  channel           Channel
+  subject           String?
+  content           String
+  language          String               @default("en")
+  version           Int                  @default(1)
+  active            Boolean              @default(true)
+  requiredVariables Json?
+  description       String?
+  deletedAt         DateTime?
+
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  tenant            Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  versions          TemplateVersion[]
+
+  @@unique([tenantId, code, channel, language])
+  @@index([tenantId, active])
+  @@index([tenantId, code, channel, active])
+  @@index([tenantId, deletedAt])
+}
+
+////////////////////////////////////////////////////////////
+// TEMPLATE VERSIONS (VERSIONING SUPPORT)
+////////////////////////////////////////////////////////////
+
+model TemplateVersion {
+  id                String   @id @default(uuid())
+  templateId        String
+  version           Int
+  subject           String?
+  content           String
+  requiredVariables Json?
+  isActive          Boolean  @default(false)
+  createdBy         String?
+  createdAt         DateTime @default(now())
+
+  template          Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, version])
+  @@index([templateId, isActive])
+  @@index([templateId, version])
+}
+
+////////////////////////////////////////////////////////////
+// NOTIFICATIONS (CORE RECORD)
+////////////////////////////////////////////////////////////
+
+model Notification {
+  id           String               @id @default(uuid())
+  tenantId     String
+  channel      Channel
+  recipient    String
+  templateCode String
+  payload      Json
+
+  status       NotificationStatus   @default(PENDING)
+  priority     NotificationPriority @default(NORMAL)
+  retryCount   Int                  @default(0)
+
+  scheduledAt  DateTime?
+  sentAt       DateTime?
+  createdAt    DateTime             @default(now())
+
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  logs         NotificationLog[]
+
+  @@index([tenantId, status])
+  @@index([createdAt])
+}
+
+////////////////////////////////////////////////////////////
+// NOTIFICATION LOGS (AUDIT / DEBUG)
+////////////////////////////////////////////////////////////
+
+model NotificationLog {
+  id              String   @id @default(uuid())
+  notificationId  String
+  provider        String   // sendgrid, twilio, smtp
+  status          NotificationStatus
+  response        Json
+
+  createdAt       DateTime @default(now())
+
+  notification    Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId])
+}
+
+////////////////////////////////////////////////////////////
+// USER PREFERENCES (OPTIONAL / FUTURE)
+////////////////////////////////////////////////////////////
+
+model UserPreference {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String
+  channel   Channel
+
+  enabled   Boolean  @default(true)
+  dndStart  String?
+  dndEnd    String?
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, channel])
+}

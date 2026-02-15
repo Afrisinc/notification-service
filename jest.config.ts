@@ -2,25 +2,34 @@ import type { Config } from 'jest';
 
 const config: Config = {
   testEnvironment: 'node',
-  roots: ['<rootDir>/apps', '<rootDir>/packages', '<rootDir>/__tests__'],
-  testMatch: ['**/src/**/*.test.ts', '**/__tests__/**/*.test.ts'],
+  roots: ['<rootDir>/src'],
+  testMatch: ['**/*.test.ts', '**/*.spec.ts'],
   testPathIgnorePatterns: ['/dist/', '/node_modules/'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   collectCoverageFrom: [
-    'apps/**/src/**/*.ts',
-    'packages/**/src/**/*.ts',
+    'src/**/*.ts',
     '!**/*.test.ts',
+    '!**/*.spec.ts',
     '!**/node_modules/**',
     '!**/dist/**',
   ],
   coveragePathIgnorePatterns: ['/node_modules/', '/dist/'],
   moduleNameMapper: {
-    '^@afrisinc-notify/common$': '<rootDir>/packages/common/src/index.ts',
-    '^@afrisinc-notify/config$': '<rootDir>/packages/config/src/index.ts',
-    '^@afrisinc-notify/db$': '<rootDir>/packages/db/src/index.ts',
+    '^@shared/common$': '<rootDir>/src/shared/common/src/index.ts',
+    '^@shared/config$': '<rootDir>/src/shared/config/src/index.ts',
+    '^@shared/db$': '<rootDir>/src/shared/db/src/index.ts',
+    '^@services/(.*)$': '<rootDir>/src/services/$1',
   },
   preset: 'ts-jest',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  transform: {
+    '^.+\\.ts$': ['ts-jest', {
+      tsconfig: {
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+      },
+    }],
+  },
 };
 
 export default config;

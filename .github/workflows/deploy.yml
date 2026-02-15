@@ -1,4 +1,4 @@
-name: Build & Deploy All Services
+name: Build & Deploy Monolithic Service
 
 on:
   push:
@@ -14,21 +14,45 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  OWNER: ${{ github.repository_owner }}
+  IMAGE_NAME: afrisinc-notification-service
 
 jobs:
-  # Build and push all 4 services in parallel
-  build-and-push:
+  # Run tests and linting
+  test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service:
-          - api
-          - worker-email
-          - worker-sms
-          - worker-inapp
-      fail-fast: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+
+      - name: Lint code
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm type-check
+
+      # - name: Run tests
+      #   run: pnpm test --passWithNoTests
+
+  # Build and push single monolithic image
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -53,29 +77,29 @@ jobs:
           username: ${{ secrets.GHCR_OWNER }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Extract metadata for ${{ matrix.service }}
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ secrets.GHCR_OWNER }}/notification-${{ matrix.service }}
+          images: ${{ env.REGISTRY }}/${{ secrets.GHCR_OWNER }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=sha
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push ${{ matrix.service }}
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./apps/${{ matrix.service }}/Dockerfile
+          file: ./Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ secrets.GHCR_OWNER }}/notification-${{ matrix.service }}:buildcache,ignore-error=true
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ secrets.GHCR_OWNER }}/notification-${{ matrix.service }}:buildcache,mode=max,ignore-error=true
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ secrets.GHCR_OWNER }}/${{ env.IMAGE_NAME }}:buildcache,ignore-error=true
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ secrets.GHCR_OWNER }}/${{ env.IMAGE_NAME }}:buildcache,mode=max,ignore-error=true
 
-  # Deploy to VPS after all services are built
+  # Deploy to VPS after build succeeds
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
@@ -85,7 +109,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 5: SSH deploy to VPS
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
@@ -95,18 +118,24 @@ jobs:
           port: 22
           timeout: 30s
           command_timeout: 10m
-
-          # 🔐 PASS DEPLOY CREDS TO VPS
-          envs: DEPLOY_GHCR_USERNAME,DEPLOY_GHCR_TOKEN
+          envs: DEPLOY_GHCR_USERNAME,DEPLOY_GHCR_TOKEN,IMAGE_NAME,REGISTRY,GHCR_OWNER
           script: |
             set -e
             APP_PATH="${{ secrets.VPS_APP_PATH }}"
             APP_PATH=${APP_PATH:=/opt/apps/afrisinc/notification-service}
             cd $APP_PATH
 
+            echo "Logging in to GHCR..."
             echo "$DEPLOY_GHCR_TOKEN" | docker login ghcr.io -u "$DEPLOY_GHCR_USERNAME" --password-stdin
 
+            echo "Pulling latest image..."
             docker compose pull
+
+            echo "Starting services with docker-compose..."
             docker compose up -d --remove-orphans
+
+            echo "Cleaning up unused images..."
             docker image prune -af
+
+            echo "Deployment complete. Services status:"
             docker compose ps
