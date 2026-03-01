@@ -5,6 +5,8 @@ export interface TenantResponse {
   id: string;
   code: string;
   name: string;
+  accountId: string;
+  accountType: string;
   status: string;
   createdAt: Date;
   updatedAt: Date;
@@ -29,6 +31,8 @@ export interface TenantListItemResponse {
   id: string;
   code: string;
   name: string;
+  accountId: string;
+  accountType: string;
   status: string;
   createdAt: Date;
   _count: {

@@ -7,7 +7,10 @@
       "Bash(curl:*)",
       "Bash(export DATABASE_URL:*)",
       "Bash(npx prisma migrate status)",
-      "Bash(pnpm prisma migrate dev:*)"
+      "Bash(pnpm prisma migrate dev:*)",
+      "Bash(npx prisma db push --skip-generate)",
+      "Bash(npm install jwt-decode)",
+      "Bash(npm run type-check)"
     ]
   }
 }

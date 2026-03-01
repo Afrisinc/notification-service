@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import pino from 'pino';
+import { seedAuthTemplates } from './seeds/templates.seed';
 
 const prisma = new PrismaClient();
 const logger = pino();
@@ -10,13 +11,19 @@ async function main() {
   try {
     // Clear existing data (for development only)
     logger.info('Clearing existing data...');
-    await prisma.notificationLog.deleteMany({});
-    await prisma.notification.deleteMany({});
-    await prisma.userPreference.deleteMany({});
-    await prisma.template.deleteMany({});
-    await prisma.apiKey.deleteMany({});
-    await prisma.tenant.deleteMany({});
-    logger.info('✅ Cleared existing data');
+    try {
+      await prisma.notificationLog.deleteMany({});
+      await prisma.notification.deleteMany({});
+      await prisma.userPreference.deleteMany({});
+      await prisma.templateVersion.deleteMany({});
+      await prisma.template.deleteMany({});
+      await prisma.apiKey.deleteMany({});
+      await prisma.tenant.deleteMany({});
+      logger.info('✅ Cleared existing data');
+    } catch (error) {
+      // Tables might not exist yet in fresh database
+      logger.info('ℹ️ Database is empty, skipping delete operations');
+    }
 
     // Create test tenants
     logger.info('Creating test tenants...');
@@ -24,6 +31,8 @@ async function main() {
       data: {
         code: 'afrisinc-auth',
         name: 'Afrisinc Auth',
+        accountId: 'acc-001',
+        accountType: 'ORGANIZATION',
         status: 'ACTIVE',
       },
     });
@@ -32,6 +41,8 @@ async function main() {
       data: {
         code: 'afrisinc-internal',
         name: 'Afrisinc Internal',
+        accountId: 'acc-002',
+        accountType: 'ORGANIZATION',
         status: 'ACTIVE',
       },
     });
@@ -40,6 +51,8 @@ async function main() {
       data: {
         code: 'afrisinc-core',
         name: 'Afrisinc Core Tenant',
+        accountId: 'acc-003',
+        accountType: 'INDIVIDUAL',
         status: 'ACTIVE',
       },
     });
@@ -48,6 +61,8 @@ async function main() {
       data: {
         code: 'afrisinc-test',
         name: 'Afrisinc Test Tenant',
+        accountId: 'acc-004',
+        accountType: 'ORGANIZATION',
         status: 'ACTIVE',
       },
     });
@@ -107,6 +122,10 @@ async function main() {
       },
     });
     logger.info('✅ Created sample templates');
+
+    // Seed production AUTH templates
+    logger.info('Seeding production AUTH templates...');
+    await seedAuthTemplates();
 
     // Create sample notifications
     logger.info('Creating sample notifications...');

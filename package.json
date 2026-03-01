@@ -4,23 +4,19 @@
   "description": "Unified notification service with API and workers",
   "main": "dist/services/api/src/server.js",
   "type": "commonjs",
-
   "scripts": {
     "--- SETUP ---": "",
     "prepare": "husky install || true",
-
     "--- DATABASE ---": "",
     "db:generate": "prisma generate --schema=./prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema=./prisma/schema.prisma",
     "db:migrate:prod": "prisma migrate deploy --schema=./prisma/schema.prisma",
     "db:studio": "prisma studio --schema=./prisma/schema.prisma",
     "db:seed": "tsx prisma/seed.ts",
-
     "--- BUILD ---": "",
     "build": "tsc --build",
     "build:watch": "tsc --build --watch",
     "clean": "rimraf dist",
-
     "--- DEVELOPMENT ---": "",
     "dev": "tsx watch src/services/api/src/server.ts",
     "dev:api": "tsx watch src/services/api/src/server.ts",
@@ -28,19 +24,16 @@
     "dev:worker-sms": "tsx watch src/services/worker-sms/src/index.ts",
     "dev:worker-inapp": "tsx watch src/services/worker-inapp/src/index.ts",
     "dev:all": "concurrently \"pnpm dev:api\" \"pnpm dev:worker-email\" \"pnpm dev:worker-sms\" \"pnpm dev:worker-inapp\"",
-
     "--- PRODUCTION ---": "",
     "start": "node -r ./register-paths.js dist/services/api/src/server.js",
     "start:api": "cross-env NODE_ENV=production node -r ./register-paths.js dist/services/api/src/server.js",
     "start:worker-email": "cross-env NODE_ENV=production node -r ./register-paths.js dist/services/worker-email/src/index.js",
     "start:worker-sms": "cross-env NODE_ENV=production node -r ./register-paths.js dist/services/worker-sms/src/index.js",
     "start:worker-inapp": "cross-env NODE_ENV=production node -r ./register-paths.js dist/services/worker-inapp/src/index.js",
-
     "--- TESTING ---": "",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-
     "--- CODE QUALITY ---": "",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
@@ -48,7 +41,6 @@
     "format:check": "prettier --check src",
     "type-check": "tsc --noEmit"
   },
-
   "dependencies": {
     "@fastify/cors": "^8.4.2",
     "@fastify/helmet": "^11.1.1",
@@ -65,6 +57,7 @@
     "fastify": "^4.25.1",
     "handlebars": "^4.7.8",
     "ioredis": "^5.3.2",
+    "jwt-decode": "^4.0.0",
     "nodemailer": "^6.9.7",
     "pino": "^8.17.2",
     "pino-pretty": "^10.3.1",
@@ -73,7 +66,6 @@
     "twilio": "^4.10.0",
     "zod": "^3.22.4"
   },
-
   "devDependencies": {
     "@types/amqplib": "^0.10.4",
     "@types/jest": "^29.5.10",
@@ -95,11 +87,18 @@
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   },
-
-  "keywords": ["notification", "api", "email", "sms", "microservice"],
+  "keywords": [
+    "notification",
+    "api",
+    "email",
+    "sms",
+    "microservice"
+  ],
   "author": "Afrisinc Team",
   "license": "MIT",
-
+  "prisma": {
+    "seed": "tsx src/shared/db/prisma/seed.ts"
+  },
   "lint-staged": {
     "src/**/*.ts": [
       "eslint --fix",

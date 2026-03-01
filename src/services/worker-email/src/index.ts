@@ -1,8 +1,7 @@
-import pino from "pino";
-import { connect } from "amqplib";
-import { getConfig } from "@shared/config";
-import { EmailNotification } from "@shared/common";
-import { EmailProcessor } from "./processor";
+import pino from 'pino';
+import { connect } from 'amqplib';
+import { getConfig } from '@shared/config';
+import { EmailProcessor } from './processor';
 
 const logger = pino();
 
@@ -12,27 +11,34 @@ async function startEmailWorker() {
 
   try {
     const config = getConfig();
-    const rabbitmqUrl = config.RABBITMQ_URL || "amqp://admin:password@localhost:5672";
-    const queueName = "email-notifications";
+    const rabbitmqUrl = config.RABBITMQ_URL || 'amqp://admin:password@localhost:5672';
+    const exchangeName = 'notifications';
+    const routingKey = 'send_message';
+    const queueName = 'notifications.email';
 
-    logger.info({ url: rabbitmqUrl }, "Connecting to RabbitMQ...");
+    logger.info({ url: rabbitmqUrl }, 'Connecting to RabbitMQ...');
 
     // Connect to RabbitMQ
     connection = await connect(rabbitmqUrl);
     channel = await connection.createChannel();
 
+    // Assert exchange
+    await channel.assertExchange(exchangeName, 'direct', {
+      durable: true,
+    });
+
     // Assert queue
     await channel.assertQueue(queueName, {
       durable: true,
-      arguments: {
-        "x-message-ttl": 86400000, // 24 hours
-      },
     });
+
+    // Bind queue to exchange
+    await channel.bindQueue(queueName, exchangeName, routingKey);
 
     // Set prefetch to 1 for fair distribution
     await channel.prefetch(1);
 
-    logger.info({ queueName }, "✅ Email worker connected to RabbitMQ");
+    logger.info({ queueName, exchange: exchangeName, routingKey }, '✅ Email worker connected to RabbitMQ');
 
     // Initialize processor
     const processor = new EmailProcessor(logger);
@@ -44,11 +50,12 @@ async function startEmailWorker() {
       }
 
       try {
-        const emailData = JSON.parse(msg.content.toString()) as EmailNotification;
+        const content = JSON.parse(msg.content.toString());
+        const emailData = content.msg;
 
         logger.info(
-          { notificationId: emailData.id, to: emailData.to },
-          "🔄 Processing email from queue",
+          { notificationId: emailData.notificationId, recipient: emailData.recipient },
+          '🔄 Processing email from queue'
         );
 
         await processor.process(emailData);
@@ -56,35 +63,29 @@ async function startEmailWorker() {
         // Acknowledge message
         channel!.ack(msg);
 
-        logger.info(
-          { notificationId: emailData.id },
-          "✅ Email job completed and acknowledged",
-        );
+        logger.info({ notificationId: emailData.notificationId }, '✅ Email job completed and acknowledged');
       } catch (error) {
-        logger.error(
-          { error, message: msg.content.toString() },
-          "❌ Failed to process email job",
-        );
+        logger.error({ error, message: msg.content.toString() }, '❌ Failed to process email job');
 
         // Reject and requeue message (up to 3 times)
-        const retryCount = ((msg.properties?.headers?.["x-retry-count"] as number) || 0);
+        const retryCount = (msg.properties?.headers?.['x-retry-count'] as number) || 0;
 
         if (retryCount < 3) {
           await channel!.nack(msg, false, true); // Requeue
-          logger.info({ retryCount }, "Message requeued");
+          logger.info({ retryCount }, 'Message requeued');
         } else {
           // Discard after 3 retries
           channel!.nack(msg, false, false);
-          logger.error("Max retries exceeded, message discarded");
+          logger.error('Max retries exceeded, message discarded');
         }
       }
     });
 
-    logger.info("📧 Email worker is listening for messages...");
+    logger.info('📧 Email worker is listening for messages...');
 
     // Graceful shutdown
-    process.on("SIGTERM", async () => {
-      logger.info("SIGTERM received, shutting down gracefully...");
+    process.on('SIGTERM', async () => {
+      logger.info('SIGTERM received, shutting down gracefully...');
 
       if (channel) {
         await channel.close();
@@ -94,12 +95,12 @@ async function startEmailWorker() {
         await connection.close();
       }
 
-      logger.info("✅ Email worker shut down successfully");
+      logger.info('✅ Email worker shut down successfully');
       process.exit(0);
     });
 
-    process.on("SIGINT", async () => {
-      logger.info("SIGINT received, shutting down gracefully...");
+    process.on('SIGINT', async () => {
+      logger.info('SIGINT received, shutting down gracefully...');
 
       if (channel) {
         await channel.close();
@@ -109,11 +110,11 @@ async function startEmailWorker() {
         await connection.close();
       }
 
-      logger.info("✅ Email worker shut down successfully");
+      logger.info('✅ Email worker shut down successfully');
       process.exit(0);
     });
   } catch (error) {
-    logger.error(error, "Failed to start email worker");
+    logger.error(error, 'Failed to start email worker');
     process.exit(1);
   }
 }
