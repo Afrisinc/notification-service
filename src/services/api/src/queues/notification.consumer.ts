@@ -1,0 +1,113 @@
+import { logger } from '../config/logger';
+import { SendNotificationRequest } from '../services/notify.service';
+import { db } from '@shared/db';
+import { Channel } from '@prisma/client';
+
+/**
+ * Notification Consumer
+ * Processes notification messages from RabbitMQ queue
+ * Validates payload and saves to database
+ */
+export class NotificationConsumer {
+  /**
+   * Process notification message from queue
+   */
+  async processNotification(message: any, tenantId: string) {
+    try {
+      const payload = message as SendNotificationRequest;
+
+      // Validate required fields
+      this.validatePayload(payload);
+
+      logger.debug(
+        {
+          tenantId,
+          channel: payload.channel,
+          templateCode: payload.templateCode,
+          recipient: payload.recipient,
+        },
+        'Processing notification from queue'
+      );
+
+      // Save notification to database
+      const notification = await db.notification.create({
+        data: {
+          tenantId,
+          channel: payload.channel as Channel,
+          recipient: payload.recipient,
+          templateCode: payload.templateCode,
+          payload: payload.payload || {},
+          status: 'QUEUED',
+          priority: payload.priority || 'NORMAL',
+        },
+      });
+
+      logger.info({ notificationId: notification.id, tenantId }, 'Notification saved from queue');
+
+      return notification;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, tenantId }, 'Failed to process notification from queue');
+      throw error;
+    }
+  }
+
+  /**
+   * Validate notification payload structure
+   */
+  private validatePayload(payload: any): void {
+    const requiredFields = ['channel', 'recipient', 'templateCode'];
+
+    for (const field of requiredFields) {
+      if (!payload[field]) {
+        throw new Error(`Missing required field: ${field}`);
+      }
+    }
+
+    const validChannels = ['EMAIL', 'SMS', 'IN_APP', 'PUSH', 'WHATSAPP'];
+    if (!validChannels.includes(payload.channel)) {
+      throw new Error(`Invalid channel: ${payload.channel}`);
+    }
+
+    const validPriorities = ['LOW', 'NORMAL', 'HIGH', 'URGENT'];
+    if (payload.priority && !validPriorities.includes(payload.priority)) {
+      throw new Error(`Invalid priority: ${payload.priority}`);
+    }
+
+    if (typeof payload.payload !== 'object' || payload.payload === null) {
+      throw new Error('Payload must be a valid object');
+    }
+  }
+
+  /**
+   * Batch process multiple notifications
+   */
+  async processBatch(messages: any[], tenantId: string) {
+    const results = {
+      processed: 0,
+      failed: 0,
+      errors: [] as Array<{ index: number; error: string }>,
+    };
+
+    for (let i = 0; i < messages.length; i++) {
+      try {
+        await this.processNotification(messages[i], tenantId);
+        results.processed++;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        results.failed++;
+        results.errors.push({ index: i, error: errorMessage });
+        logger.warn({ index: i, error: errorMessage, tenantId }, 'Failed to process notification in batch');
+      }
+    }
+
+    logger.info(
+      { processed: results.processed, failed: results.failed, tenantId },
+      'Batch notification processing completed'
+    );
+
+    return results;
+  }
+}
+
+export const notificationConsumer = new NotificationConsumer();

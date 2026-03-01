@@ -1,5 +1,5 @@
-import { db } from "@shared/db";
-import { logger } from "../config/logger";
+import { db } from '@shared/db';
+import { logger } from '../config/logger';
 
 const prisma = db;
 
@@ -11,6 +11,8 @@ export class TenantRepository {
     id: string;
     code: string;
     name: string;
+    accountId: string;
+    accountType: string;
     status: string;
     createdAt: Date;
     updatedAt: Date;
@@ -20,7 +22,7 @@ export class TenantRepository {
         where: { code },
       });
     } catch (error) {
-      logger.error({ error, code }, "Failed to find tenant by code");
+      logger.error({ error, code }, 'Failed to find tenant by code');
       throw error;
     }
   }
@@ -32,6 +34,8 @@ export class TenantRepository {
     id: string;
     code: string;
     name: string;
+    accountId: string;
+    accountType: string;
     status: string;
     createdAt: Date;
     updatedAt: Date;
@@ -41,7 +45,7 @@ export class TenantRepository {
         where: { id },
       });
     } catch (error) {
-      logger.error({ error, id }, "Failed to find tenant by ID");
+      logger.error({ error, id }, 'Failed to find tenant by ID');
       throw error;
     }
   }
@@ -53,6 +57,8 @@ export class TenantRepository {
     id: string;
     code: string;
     name: string;
+    accountId: string;
+    accountType: string;
     status: string;
     createdAt: Date;
     updatedAt: Date;
@@ -79,7 +85,7 @@ export class TenantRepository {
         },
       });
     } catch (error) {
-      logger.error({ error, id }, "Failed to find tenant with API keys");
+      logger.error({ error, id }, 'Failed to find tenant with API keys');
       throw error;
     }
   }
@@ -91,6 +97,8 @@ export class TenantRepository {
     id: string;
     code: string;
     name: string;
+    accountId: string;
+    accountType: string;
     status: string;
     createdAt: Date;
     updatedAt: Date;
@@ -117,10 +125,7 @@ export class TenantRepository {
         },
       });
     } catch (error) {
-      logger.error(
-        { error, code },
-        "Failed to find tenant by code with API keys",
-      );
+      logger.error({ error, code }, 'Failed to find tenant by code with API keys');
       throw error;
     }
   }
@@ -128,30 +133,29 @@ export class TenantRepository {
   /**
    * Create a new tenant
    */
-  async create(data: { code: string; name: string }): Promise<{
-    id: string;
+  async create(data: {
     code: string;
     name: string;
-    status: string;
-    createdAt: Date;
-    updatedAt: Date;
+    accountId: string;
+    accountType: 'INDIVIDUAL' | 'ORGANIZATION';
+  }): Promise<{
+    id: string;
   }> {
     try {
       const tenant = await prisma.tenant.create({
         data: {
           code: data.code,
           name: data.name,
-          status: "ACTIVE",
+          accountId: data.accountId,
+          accountType: data.accountType,
+          status: 'ACTIVE',
         },
       });
 
-      logger.info(
-        { tenantId: tenant.id, code: tenant.code },
-        "Tenant created in repository",
-      );
-      return tenant;
+      logger.info({ tenantId: tenant.id, code: tenant.code }, 'Tenant created in repository');
+      return { id: tenant.id };
     } catch (error) {
-      logger.error({ error, code: data.code }, "Failed to create tenant");
+      logger.error({ error, code: data.code }, 'Failed to create tenant');
       throw error;
     }
   }
@@ -161,11 +165,13 @@ export class TenantRepository {
    */
   async update(
     id: string,
-    data: { name?: string; status?: "ACTIVE" | "SUSPENDED" },
+    data: { name?: string; status?: 'ACTIVE' | 'SUSPENDED' }
   ): Promise<{
     id: string;
     code: string;
     name: string;
+    accountId: string;
+    accountType: string;
     status: string;
     createdAt: Date;
     updatedAt: Date;
@@ -176,10 +182,10 @@ export class TenantRepository {
         data,
       });
 
-      logger.info({ tenantId: id }, "Tenant updated in repository");
+      logger.info({ tenantId: id }, 'Tenant updated in repository');
       return tenant;
     } catch (error) {
-      logger.error({ error, id }, "Failed to update tenant");
+      logger.error({ error, id }, 'Failed to update tenant');
       throw error;
     }
   }
@@ -189,12 +195,14 @@ export class TenantRepository {
    */
   async findMany(
     limit = 20,
-    offset = 0,
+    offset = 0
   ): Promise<{
     data: Array<{
       id: string;
       code: string;
       name: string;
+      accountId: string;
+      accountType: string;
       status: string;
       createdAt: Date;
       _count: { apiKeys: number; templates: number; notifications: number };
@@ -206,7 +214,7 @@ export class TenantRepository {
         prisma.tenant.findMany({
           skip: offset,
           take: limit,
-          orderBy: { createdAt: "desc" },
+          orderBy: { createdAt: 'desc' },
           include: {
             _count: {
               select: { apiKeys: true, templates: true, notifications: true },
@@ -216,10 +224,10 @@ export class TenantRepository {
         prisma.tenant.count(),
       ]);
 
-      logger.debug({ limit, offset, total }, "Tenants fetched from repository");
+      logger.debug({ limit, offset, total }, 'Tenants fetched from repository');
       return { data, meta: { limit, offset, total } };
     } catch (error) {
-      logger.error({ error, limit, offset }, "Failed to list tenants");
+      logger.error({ error, limit, offset }, 'Failed to list tenants');
       throw error;
     }
   }

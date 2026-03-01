@@ -11,9 +11,9 @@
  * Production: Use this in production environments
  */
 
-import { connect } from "amqplib";
-import { logger } from "../../../config/logger";
-import { IQueuePublisher, QueueMessage } from "../publisher.interface";
+import { connect } from 'amqplib';
+import { logger } from '../../../config/logger';
+import { IQueuePublisher, QueueMessage } from '../publisher.interface';
 
 export class RabbitMQPublisher implements IQueuePublisher {
   private connection: any = null;
@@ -21,7 +21,9 @@ export class RabbitMQPublisher implements IQueuePublisher {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
   private reconnectDelay = 5000; // 5 seconds
-  private queueName = "email-notifications";
+  private exchangeName = 'notifications';
+  private routingKey = 'send_message';
+  private queueName = 'notifications.email';
 
   constructor(private url: string) {}
 
@@ -29,27 +31,34 @@ export class RabbitMQPublisher implements IQueuePublisher {
     try {
       this.connection = await connect(this.url);
       if (!this.connection) {
-        throw new Error("Failed to establish RabbitMQ connection");
+        throw new Error('Failed to establish RabbitMQ connection');
       }
       this.channel = await this.connection.createChannel();
 
-      // Set up queue with options
+      // Set up exchange and queue with options
       if (!this.channel) {
-        throw new Error("Failed to create RabbitMQ channel");
+        throw new Error('Failed to create RabbitMQ channel');
       }
+
+      // Assert exchange
+      await this.channel.assertExchange(this.exchangeName, 'direct', {
+        durable: true,
+      });
+
+      // Assert queue
       await this.channel.assertQueue(this.queueName, {
         durable: true,
-        arguments: {
-          "x-message-ttl": 86400000, // 24 hours
-        },
       });
+
+      // Bind queue to exchange with routing key
+      await this.channel.bindQueue(this.queueName, this.exchangeName, this.routingKey);
 
       // Set prefetch to 1 to ensure fair distribution
       await this.channel.prefetch(1);
 
       logger.info(
-        { url: this.url, queue: this.queueName },
-        "✅ Connected to RabbitMQ",
+        { url: this.url, exchange: this.exchangeName, queue: this.queueName, routingKey: this.routingKey },
+        '✅ Connected to RabbitMQ'
       );
 
       // Reset reconnect attempts on successful connection
@@ -57,18 +66,18 @@ export class RabbitMQPublisher implements IQueuePublisher {
 
       // Handle connection errors
       if (this.connection) {
-        this.connection.on("error", (error: Error) => {
-          logger.error(error, "RabbitMQ connection error");
+        this.connection.on('error', (error: Error) => {
+          logger.error(error, 'RabbitMQ connection error');
           this.handleConnectionError();
         });
 
-        this.connection.on("close", () => {
-          logger.warn("RabbitMQ connection closed, attempting to reconnect...");
+        this.connection.on('close', () => {
+          logger.warn('RabbitMQ connection closed, attempting to reconnect...');
           this.handleConnectionError();
         });
       }
     } catch (error) {
-      logger.error(error, "Failed to connect to RabbitMQ");
+      logger.error(error, 'Failed to connect to RabbitMQ');
       this.handleConnectionError();
       throw error;
     }
@@ -81,37 +90,34 @@ export class RabbitMQPublisher implements IQueuePublisher {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       const delay = this.reconnectDelay * this.reconnectAttempts;
-      logger.info(
-        { attempt: this.reconnectAttempts, delay },
-        "Attempting to reconnect to RabbitMQ...",
-      );
+      logger.info({ attempt: this.reconnectAttempts, delay }, 'Attempting to reconnect to RabbitMQ...');
 
       setTimeout(() => {
         this.connect().catch((error) => {
-          logger.error(error, "Reconnect attempt failed");
+          logger.error(error, 'Reconnect attempt failed');
         });
       }, delay);
     } else {
-      logger.error("Max reconnect attempts reached, giving up");
+      logger.error('Max reconnect attempts reached, giving up');
     }
   }
 
   async publish(message: QueueMessage): Promise<void> {
     if (!this.channel) {
-      throw new Error("RabbitMQ channel not initialized. Call connect() first.");
+      throw new Error('RabbitMQ channel not initialized. Call connect() first.');
     }
 
     try {
-      const messageBuffer = Buffer.from(JSON.stringify(message));
+      const messageBuffer = Buffer.from(JSON.stringify({ msg: message, dateProduced: new Date() }));
 
-      const published = this.channel.sendToQueue(this.queueName, messageBuffer, {
+      const published = this.channel.publish(this.exchangeName, this.routingKey, messageBuffer, {
         persistent: true,
-        contentType: "application/json",
+        contentType: 'application/json',
         timestamp: Date.now(),
       });
 
       if (!published) {
-        throw new Error("Failed to publish message to queue");
+        throw new Error('Failed to publish message to exchange');
       }
 
       logger.info(
@@ -121,14 +127,13 @@ export class RabbitMQPublisher implements IQueuePublisher {
           tenantId: message.tenantId,
           channel: message.channel,
           recipient: message.recipient,
+          exchange: this.exchangeName,
+          routingKey: this.routingKey,
         },
-        "📨 [RABBITMQ] Message published to queue",
+        '📨 [RABBITMQ] Message published to exchange'
       );
     } catch (error) {
-      logger.error(
-        { error, messageId: message.notificationId },
-        "Failed to publish message to RabbitMQ",
-      );
+      logger.error({ error, messageId: message.notificationId }, 'Failed to publish message to RabbitMQ');
       throw error;
     }
   }
@@ -142,13 +147,13 @@ export class RabbitMQPublisher implements IQueuePublisher {
       await this.channel.checkQueue(this.queueName);
       return true;
     } catch (error) {
-      logger.error(error, "RabbitMQ health check failed");
+      logger.error(error, 'RabbitMQ health check failed');
       return false;
     }
   }
 
   getName(): string {
-    return "RabbitMQPublisher";
+    return 'RabbitMQPublisher';
   }
 
   async disconnect(): Promise<void> {
@@ -163,9 +168,9 @@ export class RabbitMQPublisher implements IQueuePublisher {
         this.connection = null;
       }
 
-      logger.info("🔌 [RABBITMQ] Disconnected from RabbitMQ");
+      logger.info('🔌 [RABBITMQ] Disconnected from RabbitMQ');
     } catch (error) {
-      logger.error(error, "Error disconnecting from RabbitMQ");
+      logger.error(error, 'Error disconnecting from RabbitMQ');
     }
   }
 
@@ -178,7 +183,7 @@ export class RabbitMQPublisher implements IQueuePublisher {
     consumerCount: number;
   }> {
     if (!this.channel) {
-      throw new Error("RabbitMQ channel not initialized");
+      throw new Error('RabbitMQ channel not initialized');
     }
 
     const queueInfo = await this.channel.checkQueue(this.queueName);
