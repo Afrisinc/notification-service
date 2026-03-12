@@ -1,0 +1,24 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: TEMPLATES
+// Template version history
+////////////////////////////////////////////////////////////
+
+model TemplateVersion {
+  id                String   @id @default(uuid())
+  templateId        String
+  version           Int
+  subject           String?
+  content           String
+  requiredVariables Json?
+  isActive          Boolean  @default(false)
+  createdBy         String?
+  createdAt         DateTime @default(now())
+
+  // Relations
+  template          Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, version])
+  @@index([templateId, isActive])
+  @@index([templateId, version])
+  @@map("template_versions")
+}

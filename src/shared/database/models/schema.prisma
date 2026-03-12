@@ -1,0 +1,92 @@
+////////////////////////////////////////////////////////////
+// GENERATOR & DATASOURCE
+////////////////////////////////////////////////////////////
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["prismaSchemaFolder"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+////////////////////////////////////////////////////////////
+// ==================== ENUMS ====================
+////////////////////////////////////////////////////////////
+
+// Notification Channel Types
+enum Channel {
+  EMAIL
+  SMS
+  IN_APP
+  PUSH
+  WHATSAPP
+}
+
+// Notification Delivery Status
+enum NotificationStatus {
+  PENDING
+  QUEUED
+  SENT
+  FAILED
+}
+
+// Notification Priority Levels
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+// Template Category for Organization
+enum TemplateCategory {
+  AUTH
+  TRANSACTIONAL
+  MARKETING
+  NOTIFICATION
+}
+
+// Account Type (User or Organization)
+enum AccountType {
+  INDIVIDUAL
+  ORGANIZATION
+}
+
+// User Status
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  DORMANT
+  CLOSED
+  SUSPENDED
+}
+
+// Product Status
+enum ProductStatus {
+  PROVISIONING
+  ACTIVE
+  SUSPENDED
+}
+
+// Product Plan
+enum ProductPlan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+// Organization Member Role
+enum OrganizationMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+////////////////////////////////////////////////////////////
+// ==================== MODELS ====================
+////////////////////////////////////////////////////////////
+// Individual model files are in this directory
+// Prisma will automatically merge them with this schema

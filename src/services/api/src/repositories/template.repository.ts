@@ -1,4 +1,4 @@
-import { db } from '@shared/db';
+import { prismaWrite, prismaRead } from '@shared/database';
 import { logger } from '../config/logger';
 import { transformPrismaError } from '../utils/db-errors';
 
@@ -46,7 +46,7 @@ export class TemplateRepository {
    */
   async findById(tenantId: string, id: string): Promise<any> {
     try {
-      const template = await db.template.findUnique({
+      const template = await prismaRead.template.findUnique({
         where: { id },
         include: {
           versions: {
@@ -77,15 +77,10 @@ export class TemplateRepository {
    * Find template by code, channel, and language
    * Filters for active templates (deletedAt is null)
    */
-  async findByCode(
-    tenantId: string,
-    code: string,
-    channel: string,
-    language: string = 'en',
-  ): Promise<any> {
+  async findByCode(tenantId: string, code: string, channel: string, language: string = 'en'): Promise<any> {
     try {
       // First try to find exact match
-      const template = await db.template.findFirst({
+      const template = await prismaRead.template.findFirst({
         where: {
           tenantId,
           code,
@@ -116,20 +111,14 @@ export class TemplateRepository {
     tenantId: string,
     code: string,
     channel: string,
-    requestedLocale: string = 'en',
+    requestedLocale: string = 'en'
   ): Promise<any> {
     try {
-      logger.debug(
-        { tenantId, code, channel, requestedLocale },
-        'Finding template by code with fallback',
-      );
+      logger.debug({ tenantId, code, channel, requestedLocale }, 'Finding template by code with fallback');
 
       // Try requested locale
       let template = await this.findByCode(tenantId, code, channel, requestedLocale);
-      logger.debug(
-        { found: !!template, locale: requestedLocale },
-        'First locale attempt',
-      );
+      logger.debug({ found: !!template, locale: requestedLocale }, 'First locale attempt');
 
       if (template && template.active) {
         return template;
@@ -138,10 +127,7 @@ export class TemplateRepository {
       // Fallback to English
       if (requestedLocale !== 'en') {
         template = await this.findByCode(tenantId, code, channel, 'en');
-        logger.debug(
-          { found: !!template, locale: 'en' },
-          'Fallback to English',
-        );
+        logger.debug({ found: !!template, locale: 'en' }, 'Fallback to English');
         if (template && template.active) {
           return template;
         }
@@ -149,7 +135,7 @@ export class TemplateRepository {
 
       // Fallback to first available active template
       logger.debug({}, 'Trying first available active template');
-      template = await db.template.findFirst({
+      template = await prismaRead.template.findFirst({
         where: {
           tenantId,
           code,
@@ -167,16 +153,13 @@ export class TemplateRepository {
         orderBy: { createdAt: 'desc' },
       });
 
-      logger.debug(
-        { found: !!template },
-        'First available template result',
-      );
+      logger.debug({ found: !!template }, 'First available template result');
 
       return template || null;
     } catch (error) {
       logger.error(
         { error, tenantId, code, channel, requestedLocale },
-        'Failed to find template by code with fallback',
+        'Failed to find template by code with fallback'
       );
       throw transformPrismaError(error, 'template.repository');
     }
@@ -189,7 +172,7 @@ export class TemplateRepository {
     tenantId: string,
     filters: TemplateFilters = {},
     limit: number = 20,
-    offset: number = 0,
+    offset: number = 0
   ): Promise<{ data: any[]; meta: PaginationMeta }> {
     try {
       const where: any = {
@@ -210,7 +193,7 @@ export class TemplateRepository {
       }
 
       const [data, total] = await Promise.all([
-        db.template.findMany({
+        prismaRead.template.findMany({
           where,
           skip: offset,
           take: Math.min(limit, 100), // Cap at 100
@@ -223,7 +206,7 @@ export class TemplateRepository {
             },
           },
         }),
-        db.template.count({ where }),
+        prismaRead.template.count({ where }),
       ]);
 
       return {
@@ -241,7 +224,7 @@ export class TemplateRepository {
    */
   async create(tenantId: string, data: CreateTemplateData): Promise<any> {
     try {
-      const template = await db.template.create({
+      const template = await prismaWrite.template.create({
         data: {
           tenantId,
           code: data.code,
@@ -281,7 +264,7 @@ export class TemplateRepository {
         throw new Error(`Template not found: ${id}`);
       }
 
-      const updated = await db.template.update({
+      const updated = await prismaWrite.template.update({
         where: { id },
         data: {
           ...(data.subject !== undefined && { subject: data.subject }),
@@ -316,7 +299,7 @@ export class TemplateRepository {
         throw new Error(`Template not found: ${id}`);
       }
 
-      await db.template.update({
+      await prismaWrite.template.update({
         where: { id },
         data: { deletedAt: new Date() },
       });
@@ -338,7 +321,7 @@ export class TemplateRepository {
         throw new Error(`Template not found: ${id}`);
       }
 
-      const activated = await db.template.update({
+      const activated = await prismaWrite.template.update({
         where: { id },
         data: { active: true },
         include: {
@@ -368,7 +351,7 @@ export class TemplateRepository {
         throw new Error(`Template not found: ${id}`);
       }
 
-      const deactivated = await db.template.update({
+      const deactivated = await prismaWrite.template.update({
         where: { id },
         data: { active: false },
         include: {

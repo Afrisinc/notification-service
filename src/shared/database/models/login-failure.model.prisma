@@ -1,0 +1,25 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: AUTH AUDIT
+// Failed login attempts tracking & security monitoring
+////////////////////////////////////////////////////////////
+
+model LoginFailure {
+  id              String    @id @default(uuid())
+  email           String
+  ip_address      String
+  failure_reason  String    // "Invalid password", "Account locked", "MFA failed", "Expired token"
+  user_id         String?
+  session_id      String?
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  user            User?     @relation("LoginFailures", fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([ip_address])
+  @@index([email])
+  @@index([user_id])
+  @@index([ip_address, createdAt])
+  @@index([email, createdAt])
+  @@map("login_failures")
+}

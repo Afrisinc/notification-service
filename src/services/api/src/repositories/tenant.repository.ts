@@ -1,7 +1,5 @@
-import { db } from '@shared/db';
+import { prismaWrite, prismaRead } from '@shared/database';
 import { logger } from '../config/logger';
-
-const prisma = db;
 
 export class TenantRepository {
   /**
@@ -18,7 +16,7 @@ export class TenantRepository {
     updatedAt: Date;
   } | null> {
     try {
-      return await prisma.tenant.findUnique({
+      return await prismaRead.tenant.findUnique({
         where: { code },
       });
     } catch (error) {
@@ -41,7 +39,7 @@ export class TenantRepository {
     updatedAt: Date;
   } | null> {
     try {
-      return await prisma.tenant.findUnique({
+      return await prismaRead.tenant.findUnique({
         where: { id },
       });
     } catch (error) {
@@ -70,7 +68,7 @@ export class TenantRepository {
     }>;
   } | null> {
     try {
-      return await prisma.tenant.findUnique({
+      return await prismaRead.tenant.findUnique({
         where: { id },
         include: {
           apiKeys: {
@@ -110,7 +108,7 @@ export class TenantRepository {
     }>;
   } | null> {
     try {
-      return await prisma.tenant.findUnique({
+      return await prismaRead.tenant.findUnique({
         where: { code },
         include: {
           apiKeys: {
@@ -142,7 +140,7 @@ export class TenantRepository {
     id: string;
   }> {
     try {
-      const tenant = await prisma.tenant.create({
+      const tenant = await prismaWrite.tenant.create({
         data: {
           code: data.code,
           name: data.name,
@@ -177,7 +175,7 @@ export class TenantRepository {
     updatedAt: Date;
   }> {
     try {
-      const tenant = await prisma.tenant.update({
+      const tenant = await prismaWrite.tenant.update({
         where: { id },
         data,
       });
@@ -211,7 +209,7 @@ export class TenantRepository {
   }> {
     try {
       const [data, total] = await Promise.all([
-        prisma.tenant.findMany({
+        prismaRead.tenant.findMany({
           skip: offset,
           take: limit,
           orderBy: { createdAt: 'desc' },
@@ -221,7 +219,7 @@ export class TenantRepository {
             },
           },
         }),
-        prisma.tenant.count(),
+        prismaRead.tenant.count(),
       ]);
 
       logger.debug({ limit, offset, total }, 'Tenants fetched from repository');

@@ -1,8 +1,6 @@
 import { logger } from '../config/logger';
 import { tenantRepository } from '../repositories/tenant.repository';
-import { db } from '@shared/db';
-
-const prisma = db;
+import { prismaWrite } from '@shared/database';
 
 export class ProvisioningService {
   /**
@@ -87,7 +85,7 @@ export class ProvisioningService {
       ];
 
       for (const template of defaultTemplates) {
-        await prisma.template.create({
+        await prismaWrite.template.create({
           data: {
             tenantId,
             code: template.code,

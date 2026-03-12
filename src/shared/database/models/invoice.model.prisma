@@ -1,0 +1,27 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: BILLING & INVOICES
+// Monthly invoices for subscriptions
+////////////////////////////////////////////////////////////
+
+model Invoice {
+  id                String    @id @default(uuid())
+  subscription_id   String
+  invoice_number    String    @unique
+  amount            Float
+  currency          String    @default("USD")
+  status            String    // draft | sent | paid | overdue | canceled
+  issued_at         DateTime  @default(now())
+  due_at            DateTime
+  paid_at           DateTime?
+  provider_id       String?   // external provider invoice ID
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  subscription      Subscription @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
+
+  @@index([subscription_id])
+  @@index([status])
+  @@index([issued_at])
+  @@map("invoices")
+}

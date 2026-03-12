@@ -1,0 +1,39 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: TEMPLATES
+// Email/notification templates with versioning
+////////////////////////////////////////////////////////////
+
+model Template {
+  id                String            @id @default(uuid())
+  account_id        String
+  created_by_user_id String
+  code              String
+  channel           Channel
+  category          TemplateCategory  @default(TRANSACTIONAL)
+  subject           String?
+  content           String
+  language          String            @default("en")
+  version           Int               @default(1)
+  active            Boolean           @default(true)
+  requiredVariables Json?
+  description       String?
+  visibility        String            @default("private") // private | account | marketplace
+  is_public         Boolean           @default(false)
+  price             Float?
+  deletedAt         DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relations
+  account           Account           @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  createdBy         User              @relation("CreatedBy", fields: [created_by_user_id], references: [id], onDelete: Restrict)
+  versions          TemplateVersion[]
+  appTemplates      AppTemplate[]
+
+  @@unique([account_id, code, channel, language])
+  @@index([account_id, active])
+  @@index([account_id, category])
+  @@index([account_id, code, channel, active])
+  @@index([account_id, deletedAt])
+  @@map("templates")
+}

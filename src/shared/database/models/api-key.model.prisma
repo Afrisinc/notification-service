@@ -1,0 +1,19 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: AUTH
+// Service-to-service authentication
+////////////////////////////////////////////////////////////
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  keyHash    String    @unique
+  name       String
+  revoked    Boolean   @default(false)
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  account_id String
+  account    Account   @relation(fields: [account_id], references: [id], onDelete: Cascade)
+
+  @@index([account_id])
+  @@map("api_keys")
+}

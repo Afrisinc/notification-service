@@ -1,0 +1,23 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: BILLING & USAGE
+// Usage tracking for billing purposes
+////////////////////////////////////////////////////////////
+
+model UsageRecord {
+  id                String    @id @default(uuid())
+  account_id        String
+  app_id            String
+  metric            String    // e.g., "emails_sent", "api_calls"
+  quantity          Int
+  timestamp         DateTime  @default(now())
+
+  // Relations
+  account           Account @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  app               App @relation(fields: [app_id], references: [id], onDelete: Cascade)
+
+  @@index([account_id])
+  @@index([app_id])
+  @@index([timestamp])
+  @@index([metric])
+  @@map("usage_records")
+}

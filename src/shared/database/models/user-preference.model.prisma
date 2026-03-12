@@ -1,0 +1,21 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: PREFERENCES
+// User notification channel preferences
+////////////////////////////////////////////////////////////
+
+model UserPreference {
+  id         String   @id @default(uuid())
+  account_id String
+  user_id    String
+  channel    Channel
+  enabled    Boolean  @default(true)
+  dndStart   String?
+  dndEnd     String?
+
+  // Relations
+  account    Account  @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([account_id, user_id, channel])
+  @@map("user_preferences")
+}

@@ -1,6 +1,6 @@
 import { logger } from '../config/logger';
 import { SendNotificationRequest } from '../services/notify.service';
-import { db } from '@shared/db';
+import { prismaWrite } from '@shared/database';
 import { Channel } from '@prisma/client';
 
 /**
@@ -30,7 +30,7 @@ export class NotificationConsumer {
       );
 
       // Save notification to database
-      const notification = await db.notification.create({
+      const notification = await prismaWrite.notification.create({
         data: {
           tenantId,
           channel: payload.channel as Channel,

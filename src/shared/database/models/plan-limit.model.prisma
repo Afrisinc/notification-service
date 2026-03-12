@@ -1,0 +1,21 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: BILLING & PLAN LIMITS
+// Usage limits per plan
+////////////////////////////////////////////////////////////
+
+model PlanLimit {
+  id                String    @id @default(uuid())
+  plan_id           String
+  metric            String    // e.g., "emails_per_month", "api_calls_per_minute"
+  limit_value       Int
+  period            String    // monthly | yearly | daily | unlimited
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  plan              Plan @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+
+  @@index([plan_id])
+  @@unique([plan_id, metric])
+  @@map("plan_limits")
+}

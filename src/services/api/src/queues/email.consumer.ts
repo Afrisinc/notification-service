@@ -10,7 +10,7 @@ import { Message, Channel } from 'amqplib';
 import { logger } from '../config/logger';
 import { RabbitMQExchange } from '../utils/rabbitmq';
 import { notificationConsumer } from './notification.consumer';
-import { db } from '@shared/db';
+import { prismaWrite, prismaRead } from '@shared/database';
 
 /**
  * RabbitMQ Configuration for Email Notifications
@@ -199,14 +199,14 @@ const validateEmailMessage = (emailData: any): void => {
 const resolveTenant = async (): Promise<string> => {
   try {
     // Try to get or create default Afrisinc Auth tenant
-    let tenant = await db.tenant.findUnique({
+    let tenant = await prismaRead.tenant.findUnique({
       where: { code: 'afrisinc-auth' },
       select: { id: true },
     });
 
     if (!tenant) {
       logger.info('Creating default Afrisinc Auth tenant for notifications...');
-      tenant = await db.tenant.create({
+      tenant = await prismaWrite.tenant.create({
         data: {
           code: 'afrisinc-auth',
           name: 'Afrisinc Auth',

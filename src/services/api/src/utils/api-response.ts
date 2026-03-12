@@ -1,4 +1,4 @@
-import type { FastifyReply } from "fastify";
+import type { FastifyReply } from 'fastify';
 
 /**
  * Afrisinc API Response Codes
@@ -89,7 +89,7 @@ export class ApiResponseHelper {
     message: string,
     data?: T,
     respCode: number = ResponseCode.SUCCESS,
-    httpCode: number = 200,
+    httpCode: number = 200
   ): FastifyReply {
     const response: ApiResponse<T> = {
       success: true,
@@ -101,16 +101,42 @@ export class ApiResponseHelper {
   }
 
   /**
+   * Send a success response for list/array data with metadata
+   * Flattens data and meta to root level instead of nesting under data
+   * @param reply FastifyReply object
+   * @param message Human-readable message
+   * @param data Array of items
+   * @param meta Pagination or metadata
+   * @param respCode Internal response code (default: 1000)
+   * @param httpCode HTTP status code (default: 200)
+   */
+  static successList<T = any>(
+    reply: FastifyReply,
+    message: string,
+    data: T[],
+    meta?: Record<string, any>,
+    respCode: number = ResponseCode.SUCCESS,
+    httpCode: number = 200
+  ): FastifyReply {
+    const response: any = {
+      success: true,
+      resp_msg: message,
+      resp_code: respCode,
+      data: data ?? [],
+    };
+    if (meta) {
+      response.meta = meta;
+    }
+    return reply.status(httpCode).send(response);
+  }
+
+  /**
    * Send a created (201) response
    * @param reply FastifyReply object
    * @param message Human-readable message
    * @param data Created resource data
    */
-  static created<T = any>(
-    reply: FastifyReply,
-    message: string,
-    data?: T,
-  ): FastifyReply {
+  static created<T = any>(reply: FastifyReply, message: string, data?: T): FastifyReply {
     return this.success(reply, message, data, ResponseCode.CREATED, 201);
   }
 
@@ -120,11 +146,7 @@ export class ApiResponseHelper {
    * @param message Human-readable message
    * @param data Response payload
    */
-  static accepted<T = any>(
-    reply: FastifyReply,
-    message: string,
-    data?: T,
-  ): FastifyReply {
+  static accepted<T = any>(reply: FastifyReply, message: string, data?: T): FastifyReply {
     return this.success(reply, message, data, ResponseCode.ACCEPTED, 202);
   }
 
@@ -134,11 +156,7 @@ export class ApiResponseHelper {
    * @param message Human-readable message
    * @param data Updated resource data
    */
-  static updated<T = any>(
-    reply: FastifyReply,
-    message: string,
-    data?: T,
-  ): FastifyReply {
+  static updated<T = any>(reply: FastifyReply, message: string, data?: T): FastifyReply {
     return this.success(reply, message, data, ResponseCode.UPDATED, 200);
   }
 
@@ -147,10 +165,7 @@ export class ApiResponseHelper {
    * @param reply FastifyReply object
    * @param message Human-readable message
    */
-  static deleted(
-    reply: FastifyReply,
-    message: string = "Resource deleted successfully",
-  ): FastifyReply {
+  static deleted(reply: FastifyReply, message: string = 'Resource deleted successfully'): FastifyReply {
     const response: ApiResponse = {
       success: true,
       resp_msg: message,
@@ -170,7 +185,7 @@ export class ApiResponseHelper {
     reply: FastifyReply,
     message: string,
     respCode: number = ResponseCode.INVALID_REQUEST,
-    httpCode: number = 400,
+    httpCode: number = 400
   ): FastifyReply {
     const response: ApiResponse = {
       success: false,
@@ -185,60 +200,42 @@ export class ApiResponseHelper {
   /**
    * 400 Bad Request - Invalid request payload
    */
-  static badRequest(
-    reply: FastifyReply,
-    message: string = "Invalid request payload",
-  ): FastifyReply {
+  static badRequest(reply: FastifyReply, message: string = 'Invalid request payload'): FastifyReply {
     return this.error(reply, message, ResponseCode.INVALID_REQUEST, 400);
   }
 
   /**
    * 400 Bad Request - Missing required fields
    */
-  static missingFields(
-    reply: FastifyReply,
-    message: string = "Missing required fields",
-  ): FastifyReply {
+  static missingFields(reply: FastifyReply, message: string = 'Missing required fields'): FastifyReply {
     return this.error(reply, message, ResponseCode.MISSING_FIELDS, 400);
   }
 
   /**
    * 400 Bad Request - Invalid field format
    */
-  static invalidFormat(
-    reply: FastifyReply,
-    message: string = "Invalid field format",
-  ): FastifyReply {
+  static invalidFormat(reply: FastifyReply, message: string = 'Invalid field format'): FastifyReply {
     return this.error(reply, message, ResponseCode.INVALID_FORMAT, 400);
   }
 
   /**
    * 409 Conflict - Duplicate entry
    */
-  static duplicate(
-    reply: FastifyReply,
-    message: string = "Resource already exists",
-  ): FastifyReply {
+  static duplicate(reply: FastifyReply, message: string = 'Resource already exists'): FastifyReply {
     return this.error(reply, message, ResponseCode.DUPLICATE_ENTRY, 409);
   }
 
   /**
    * 404 Not Found - Resource not found
    */
-  static notFound(
-    reply: FastifyReply,
-    message: string = "Resource not found",
-  ): FastifyReply {
+  static notFound(reply: FastifyReply, message: string = 'Resource not found'): FastifyReply {
     return this.error(reply, message, ResponseCode.NOT_FOUND, 404);
   }
 
   /**
    * 405 Method Not Allowed - Unsupported action
    */
-  static unsupported(
-    reply: FastifyReply,
-    message: string = "Operation not supported",
-  ): FastifyReply {
+  static unsupported(reply: FastifyReply, message: string = 'Operation not supported'): FastifyReply {
     return this.error(reply, message, ResponseCode.UNSUPPORTED_ACTION, 405);
   }
 
@@ -247,50 +244,35 @@ export class ApiResponseHelper {
   /**
    * 401 Unauthorized - Authentication required
    */
-  static unauthorized(
-    reply: FastifyReply,
-    message: string = "Authentication required",
-  ): FastifyReply {
+  static unauthorized(reply: FastifyReply, message: string = 'Authentication required'): FastifyReply {
     return this.error(reply, message, ResponseCode.AUTH_REQUIRED, 401);
   }
 
   /**
    * 401 Unauthorized - Invalid credentials
    */
-  static invalidCredentials(
-    reply: FastifyReply,
-    message: string = "Invalid credentials",
-  ): FastifyReply {
+  static invalidCredentials(reply: FastifyReply, message: string = 'Invalid credentials'): FastifyReply {
     return this.error(reply, message, ResponseCode.INVALID_CREDENTIALS, 401);
   }
 
   /**
    * 401 Unauthorized - Token expired
    */
-  static tokenExpired(
-    reply: FastifyReply,
-    message: string = "Token has expired",
-  ): FastifyReply {
+  static tokenExpired(reply: FastifyReply, message: string = 'Token has expired'): FastifyReply {
     return this.error(reply, message, ResponseCode.TOKEN_EXPIRED, 401);
   }
 
   /**
    * 401 Unauthorized - Invalid token
    */
-  static tokenInvalid(
-    reply: FastifyReply,
-    message: string = "Invalid token",
-  ): FastifyReply {
+  static tokenInvalid(reply: FastifyReply, message: string = 'Invalid token'): FastifyReply {
     return this.error(reply, message, ResponseCode.TOKEN_INVALID, 401);
   }
 
   /**
    * 403 Forbidden - Access denied
    */
-  static forbidden(
-    reply: FastifyReply,
-    message: string = "Access denied",
-  ): FastifyReply {
+  static forbidden(reply: FastifyReply, message: string = 'Access denied'): FastifyReply {
     return this.error(reply, message, ResponseCode.ACCESS_DENIED, 403);
   }
 
@@ -299,46 +281,29 @@ export class ApiResponseHelper {
   /**
    * 400 Bad Request - Operation not allowed
    */
-  static operationNotAllowed(
-    reply: FastifyReply,
-    message: string = "Operation not allowed",
-  ): FastifyReply {
+  static operationNotAllowed(reply: FastifyReply, message: string = 'Operation not allowed'): FastifyReply {
     return this.error(reply, message, ResponseCode.OPERATION_NOT_ALLOWED, 400);
   }
 
   /**
    * 409 Conflict - Business rule violation
    */
-  static conflict(
-    reply: FastifyReply,
-    message: string = "Operation conflict",
-  ): FastifyReply {
+  static conflict(reply: FastifyReply, message: string = 'Operation conflict'): FastifyReply {
     return this.error(reply, message, ResponseCode.CONFLICT, 409);
   }
 
   /**
    * 429 Too Many Requests - Quota exceeded
    */
-  static quotaExceeded(
-    reply: FastifyReply,
-    message: string = "Quota limit exceeded",
-  ): FastifyReply {
+  static quotaExceeded(reply: FastifyReply, message: string = 'Quota limit exceeded'): FastifyReply {
     return this.error(reply, message, ResponseCode.QUOTA_EXCEEDED, 429);
   }
 
   /**
    * 400 Bad Request - Business rule violation
    */
-  static businessRuleViolation(
-    reply: FastifyReply,
-    message: string = "Business rule violation",
-  ): FastifyReply {
-    return this.error(
-      reply,
-      message,
-      ResponseCode.BUSINESS_RULE_VIOLATION,
-      400,
-    );
+  static businessRuleViolation(reply: FastifyReply, message: string = 'Business rule violation'): FastifyReply {
+    return this.error(reply, message, ResponseCode.BUSINESS_RULE_VIOLATION, 400);
   }
 
   // ============= Server Error Responses (5xx) =============
@@ -346,60 +311,42 @@ export class ApiResponseHelper {
   /**
    * 500 Internal Server Error
    */
-  static internalError(
-    reply: FastifyReply,
-    message: string = "Internal server error",
-  ): FastifyReply {
+  static internalError(reply: FastifyReply, message: string = 'Internal server error'): FastifyReply {
     return this.error(reply, message, ResponseCode.INTERNAL_ERROR, 500);
   }
 
   /**
    * 500 Internal Server Error - Database error
    */
-  static databaseError(
-    reply: FastifyReply,
-    message: string = "Database error",
-  ): FastifyReply {
+  static databaseError(reply: FastifyReply, message: string = 'Database error'): FastifyReply {
     return this.error(reply, message, ResponseCode.DATABASE_ERROR, 500);
   }
 
   /**
    * 503 Service Unavailable
    */
-  static serviceUnavailable(
-    reply: FastifyReply,
-    message: string = "Service unavailable",
-  ): FastifyReply {
+  static serviceUnavailable(reply: FastifyReply, message: string = 'Service unavailable'): FastifyReply {
     return this.error(reply, message, ResponseCode.SERVICE_UNAVAILABLE, 503);
   }
 
   /**
    * 504 Gateway Timeout
    */
-  static timeout(
-    reply: FastifyReply,
-    message: string = "Request timeout",
-  ): FastifyReply {
+  static timeout(reply: FastifyReply, message: string = 'Request timeout'): FastifyReply {
     return this.error(reply, message, ResponseCode.TIMEOUT, 504);
   }
 
   /**
    * 500 Internal Server Error - Unexpected error
    */
-  static unexpectedError(
-    reply: FastifyReply,
-    message: string = "Unexpected error occurred",
-  ): FastifyReply {
+  static unexpectedError(reply: FastifyReply, message: string = 'Unexpected error occurred'): FastifyReply {
     return this.error(reply, message, ResponseCode.UNEXPECTED_ERROR, 500);
   }
 
   /**
    * 503 Service Unavailable - External service error
    */
-  static externalServiceError(
-    reply: FastifyReply,
-    message: string = "External service error",
-  ): FastifyReply {
+  static externalServiceError(reply: FastifyReply, message: string = 'External service error'): FastifyReply {
     return this.error(reply, message, ResponseCode.EXTERNAL_SERVICE_ERROR, 503);
   }
 
@@ -408,40 +355,28 @@ export class ApiResponseHelper {
   /**
    * 500 Internal Server Error - System failure
    */
-  static systemFailure(
-    reply: FastifyReply,
-    message: string = "System failure",
-  ): FastifyReply {
+  static systemFailure(reply: FastifyReply, message: string = 'System failure'): FastifyReply {
     return this.error(reply, message, ResponseCode.SYSTEM_FAILURE, 500);
   }
 
   /**
    * 500 Internal Server Error - Data corruption
    */
-  static dataCorruption(
-    reply: FastifyReply,
-    message: string = "Data corruption detected",
-  ): FastifyReply {
+  static dataCorruption(reply: FastifyReply, message: string = 'Data corruption detected'): FastifyReply {
     return this.error(reply, message, ResponseCode.DATA_CORRUPTION, 500);
   }
 
   /**
    * 401 Unauthorized - Security incident
    */
-  static securityIncident(
-    reply: FastifyReply,
-    message: string = "Security incident detected",
-  ): FastifyReply {
+  static securityIncident(reply: FastifyReply, message: string = 'Security incident detected'): FastifyReply {
     return this.error(reply, message, ResponseCode.SECURITY_INCIDENT, 401);
   }
 
   /**
    * 503 Service Unavailable - Infrastructure outage
    */
-  static infrastructureOutage(
-    reply: FastifyReply,
-    message: string = "Infrastructure outage",
-  ): FastifyReply {
+  static infrastructureOutage(reply: FastifyReply, message: string = 'Infrastructure outage'): FastifyReply {
     return this.error(reply, message, ResponseCode.INFRASTRUCTURE_OUTAGE, 503);
   }
 }

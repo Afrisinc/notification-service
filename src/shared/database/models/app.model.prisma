@@ -1,0 +1,24 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: BILLING & APPS
+// Application management and billing
+////////////////////////////////////////////////////////////
+
+model App {
+  id                String    @id @default(uuid())
+  account_id        String
+  name              String
+  environment       String    // production | staging | dev
+  api_key           String    @unique
+  status            String    @default("active")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  account           Account @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  appTemplates      AppTemplate[]
+  usageRecords      UsageRecord[]
+
+  @@index([account_id])
+  @@index([api_key])
+  @@map("apps")
+}

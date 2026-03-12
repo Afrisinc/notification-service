@@ -1,4 +1,4 @@
-import { db } from '@shared/db';
+import { prismaWrite, prismaRead } from '@shared/database';
 import { logger } from '../config/logger';
 import { transformPrismaError } from '../utils/db-errors';
 
@@ -22,7 +22,7 @@ export class TemplateVersionRepository {
    */
   async findById(id: string): Promise<any> {
     try {
-      return await db.templateVersion.findUnique({
+      return await prismaRead.templateVersion.findUnique({
         where: { id },
       });
     } catch (error) {
@@ -36,7 +36,7 @@ export class TemplateVersionRepository {
    */
   async findByTemplateId(templateId: string): Promise<any[]> {
     try {
-      return await db.templateVersion.findMany({
+      return await prismaRead.templateVersion.findMany({
         where: { templateId },
         orderBy: { version: 'desc' },
       });
@@ -51,7 +51,7 @@ export class TemplateVersionRepository {
    */
   async findActiveVersion(templateId: string): Promise<any> {
     try {
-      return await db.templateVersion.findFirst({
+      return await prismaRead.templateVersion.findFirst({
         where: {
           templateId,
           isActive: true,
@@ -68,7 +68,7 @@ export class TemplateVersionRepository {
    */
   async findByVersion(templateId: string, version: number): Promise<any> {
     try {
-      return await db.templateVersion.findUnique({
+      return await prismaRead.templateVersion.findUnique({
         where: {
           templateId_version: {
             templateId,
@@ -87,7 +87,7 @@ export class TemplateVersionRepository {
    */
   async create(templateId: string, version: number, data: CreateVersionData): Promise<any> {
     try {
-      const newVersion = await db.templateVersion.create({
+      const newVersion = await prismaWrite.templateVersion.create({
         data: {
           templateId,
           version,
@@ -99,10 +99,7 @@ export class TemplateVersionRepository {
         },
       });
 
-      logger.info(
-        { templateId, version: newVersion.version },
-        'Template version created',
-      );
+      logger.info({ templateId, version: newVersion.version }, 'Template version created');
 
       return newVersion;
     } catch (error) {
@@ -119,12 +116,12 @@ export class TemplateVersionRepository {
       // Start transaction: deactivate all, then activate this one
       const [activated] = await Promise.all([
         // Activate this version
-        db.templateVersion.update({
+        prismaWrite.templateVersion.update({
           where: { id },
           data: { isActive: true },
         }),
         // Deactivate all other versions
-        db.templateVersion.updateMany({
+        prismaWrite.templateVersion.updateMany({
           where: {
             templateId,
             id: { not: id },
@@ -133,10 +130,7 @@ export class TemplateVersionRepository {
         }),
       ]);
 
-      logger.info(
-        { templateId, versionId: id, version: activated.version },
-        'Template version activated',
-      );
+      logger.info({ templateId, versionId: id, version: activated.version }, 'Template version activated');
 
       return activated;
     } catch (error) {
@@ -150,7 +144,7 @@ export class TemplateVersionRepository {
    */
   async getNextVersion(templateId: string): Promise<number> {
     try {
-      const latestVersion = await db.templateVersion.findFirst({
+      const latestVersion = await prismaRead.templateVersion.findFirst({
         where: { templateId },
         orderBy: { version: 'desc' },
         select: { version: true },

@@ -1,5 +1,5 @@
 import pino from 'pino';
-import { db } from '@shared/db';
+import { db } from '@shared/database';
 import { getConfig } from '@shared/config';
 import { SMTPProvider } from './providers/smtp';
 import { SendGridProvider } from './providers/sendgrid';
