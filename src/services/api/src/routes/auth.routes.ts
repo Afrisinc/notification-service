@@ -13,6 +13,7 @@ import {
   LoginRouteSchema,
   RegisterRouteSchema,
   ResetPasswordRouteSchema,
+  VerifyEmailRouteSchema,
   VerifyRouteSchema,
   OAuthExchangeRouteSchema,
 } from '../schemas';
@@ -87,20 +88,10 @@ export async function authRoutes(app: FastifyInstance) {
     '/auth/verify-email',
     {
       schema: {
+        ...VerifyEmailRouteSchema,
         tags: ['Authentication'],
         summary: 'Verify email address',
         description: 'Verify user email with token',
-        querystring: {
-          type: 'object',
-          properties: {
-            token: { type: 'string', description: 'Email verification token' },
-          },
-          required: ['token'],
-        },
-        response: {
-          200: { type: 'object', description: 'Email verified successfully' },
-          400: { type: 'object', description: 'Invalid or expired token' },
-        },
       },
     },
     verifyEmail

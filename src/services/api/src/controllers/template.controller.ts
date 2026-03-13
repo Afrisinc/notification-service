@@ -1,7 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../config/logger';
 import { templateService, CreateTemplateRequest, UpdateTemplateRequest } from '../services/template.service';
-import { tenantService } from '../services/tenant.service';
 import { ApiResponseHelper } from '../utils';
 import { appTemplateRepository } from '../repositories/template-installation.repository';
 import { prismaRead } from '@shared/database';
@@ -9,10 +8,14 @@ import { prismaRead } from '@shared/database';
 export class TemplateController {
   async createTemplate(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const tenant = await tenantService.resolveTenant(request);
+      const accountId = request.headers['x-account-id'] as string;
       const body = request.body as CreateTemplateRequest;
 
-      const template = await templateService.createTemplate(tenant.id, body);
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'No account access');
+      }
+
+      const template = await templateService.createTemplate(accountId, body);
 
       logger.info(
         {
@@ -198,11 +201,15 @@ export class TemplateController {
 
   async updateTemplate(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const tenant = await tenantService.resolveTenant(request);
+      const accountId = request.headers['x-account-id'] as string;
       const { id } = request.params as { id: string };
       const body = request.body as UpdateTemplateRequest;
 
-      const template = await templateService.updateTemplate(tenant.id, id, body);
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'No account access');
+      }
+
+      const template = await templateService.updateTemplate(accountId, id, body);
 
       logger.info({ templateId: id, correlationId: request.id }, 'Template updated');
 
@@ -235,10 +242,14 @@ export class TemplateController {
 
   async deleteTemplate(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const tenant = await tenantService.resolveTenant(request);
+      const accountId = request.headers['x-account-id'] as string;
       const { id } = request.params as { id: string };
 
-      await templateService.deleteTemplate(tenant.id, id);
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'No account access');
+      }
+
+      await templateService.deleteTemplate(accountId, id);
 
       logger.info({ templateId: id, correlationId: request.id }, 'Template deleted');
 
@@ -261,11 +272,15 @@ export class TemplateController {
 
   async createVersion(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const tenant = await tenantService.resolveTenant(request);
+      const accountId = request.headers['x-account-id'] as string;
       const { id: templateId } = request.params as { id: string };
       const body = request.body as any;
 
-      const version = await templateService.createVersion(tenant.id, templateId, {
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'No account access');
+      }
+
+      const version = await templateService.createVersion(accountId, templateId, {
         subject: body.subject,
         content: body.content,
         createdBy: body.createdBy,
@@ -302,13 +317,17 @@ export class TemplateController {
 
   async activateVersion(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const tenant = await tenantService.resolveTenant(request);
+      const accountId = request.headers['x-account-id'] as string;
       const { id: templateId, versionId } = request.params as {
         id: string;
         versionId: string;
       };
 
-      const activated = await templateService.activateVersion(tenant.id, templateId, versionId);
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'No account access');
+      }
+
+      const activated = await templateService.activateVersion(accountId, templateId, versionId);
 
       logger.info(
         {
@@ -340,11 +359,15 @@ export class TemplateController {
 
   async previewTemplate(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const tenant = await tenantService.resolveTenant(request);
+      const accountId = request.headers['x-account-id'] as string;
       const body = request.body as any;
 
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'No account access');
+      }
+
       const result = await templateService.previewTemplate(
-        tenant.id,
+        accountId,
         body.templateCode,
         body.channel,
         body.locale || 'en',

@@ -5,7 +5,6 @@
 
 import { FastifyInstance } from 'fastify';
 import { registerHealthRoutes } from './health.routes';
-import { registerTenantRoutes } from './tenant.routes';
 import { registerNotifyRoutes } from './notify.routes';
 import { registerTemplateRoutes } from './template.routes';
 import { registerProjectRoutes } from './project.routes';
@@ -16,10 +15,6 @@ import { authRoutes } from './auth.routes';
 export async function v1Routes(fastify: FastifyInstance) {
   await fastify.register(registerHealthRoutes, {
     prefix: '/health',
-  });
-
-  await fastify.register(registerTenantRoutes, {
-    prefix: '/admin',
   });
 
   await fastify.register(authRoutes, {

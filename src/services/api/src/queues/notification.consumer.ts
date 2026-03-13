@@ -12,7 +12,7 @@ export class NotificationConsumer {
   /**
    * Process notification message from queue
    */
-  async processNotification(message: any, tenantId: string) {
+  async processNotification(message: any, accountId: string) {
     try {
       const payload = message as SendNotificationRequest;
 
@@ -21,7 +21,7 @@ export class NotificationConsumer {
 
       logger.debug(
         {
-          tenantId,
+          accountId,
           channel: payload.channel,
           templateCode: payload.templateCode,
           recipient: payload.recipient,
@@ -32,7 +32,7 @@ export class NotificationConsumer {
       // Save notification to database
       const notification = await prismaWrite.notification.create({
         data: {
-          tenantId,
+          account_id: accountId,
           channel: payload.channel as Channel,
           recipient: payload.recipient,
           templateCode: payload.templateCode,
@@ -42,12 +42,12 @@ export class NotificationConsumer {
         },
       });
 
-      logger.info({ notificationId: notification.id, tenantId }, 'Notification saved from queue');
+      logger.info({ notificationId: notification.id, accountId }, 'Notification saved from queue');
 
       return notification;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error({ error: errorMessage, tenantId }, 'Failed to process notification from queue');
+      logger.error({ error: errorMessage, accountId }, 'Failed to process notification from queue');
       throw error;
     }
   }

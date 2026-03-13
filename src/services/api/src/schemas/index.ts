@@ -38,6 +38,7 @@ export {
   OAuthExchangeResponseSchema,
   ForgotPasswordResponseSchema,
   ResetPasswordResponseSchema,
+  VerifyEmailResponseSchema,
   VerifyResponseSchema,
 } from './responses/auth.schema';
 
@@ -56,6 +57,7 @@ import {
   OAuthExchangeResponseSchema,
   ForgotPasswordResponseSchema,
   ResetPasswordResponseSchema,
+  VerifyEmailResponseSchema,
   VerifyResponseSchema,
 } from './responses/auth.schema';
 
@@ -96,6 +98,20 @@ export const ResetPasswordRouteSchema = {
   },
   response: {
     200: ResetPasswordResponseSchema,
+    400: errorResponse,
+  },
+} as const;
+
+export const VerifyEmailRouteSchema = {
+  querystring: {
+    type: 'object',
+    properties: {
+      token: { type: 'string', description: 'Email verification token' },
+    },
+    required: ['token'],
+  },
+  response: {
+    200: VerifyEmailResponseSchema,
     400: errorResponse,
   },
 } as const;

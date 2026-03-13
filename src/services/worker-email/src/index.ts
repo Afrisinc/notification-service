@@ -1,6 +1,7 @@
 import pino from 'pino';
 import { connect } from 'amqplib';
 import { getConfig } from '@shared/config';
+import { verifyDbConnections, closeDbConnections } from '@shared/database';
 import { EmailProcessor } from './processor';
 
 const logger = pino();
@@ -15,6 +16,15 @@ async function startEmailWorker() {
     const exchangeName = 'notifications';
     const routingKey = 'send_message';
     const queueName = 'notifications.email';
+
+    // Connect to database
+    logger.info('Verifying database connection...');
+    const dbConnected = await verifyDbConnections();
+    if (!dbConnected) {
+      logger.error('Failed to connect to database');
+      process.exit(1);
+    }
+    logger.info('✅ Database connection verified');
 
     logger.info({ url: rabbitmqUrl }, 'Connecting to RabbitMQ...');
 
@@ -95,6 +105,7 @@ async function startEmailWorker() {
         await connection.close();
       }
 
+      await closeDbConnections();
       logger.info('✅ Email worker shut down successfully');
       process.exit(0);
     });
@@ -110,6 +121,7 @@ async function startEmailWorker() {
         await connection.close();
       }
 
+      await closeDbConnections();
       logger.info('✅ Email worker shut down successfully');
       process.exit(0);
     });

@@ -1,5 +1,4 @@
 import { logger } from '../config/logger';
-import { tenantService, Tenant } from './tenant.service';
 import { templateService } from './template.service';
 import { prismaWrite } from '@shared/database';
 import { IQueuePublisher, QueueMessage, QueuePublisherFactory, QueuePublisherConfig } from './queue';
@@ -18,16 +17,16 @@ export interface SendNotificationRequest {
 
 export interface Notification {
   id: string;
-  tenantId: string;
+  account_id: string;
   channel: Channel;
   recipient: string;
   templateCode: string;
   status: NotificationStatus;
   priority: Priority;
   payload: Record<string, any>;
-  retryCount: number;
-  scheduledAt: Date | null;
-  sentAt: Date | null;
+  retryCount?: number;
+  scheduledAt?: Date | null;
+  sentAt?: Date | null;
   createdAt: Date;
 }
 
@@ -48,20 +47,13 @@ const notifications: Map<string, Notification> = new Map();
 let queuePublisher: IQueuePublisher;
 
 export class NotifyService {
-  async sendNotification(tenantId: string, request: SendNotificationRequest): Promise<Notification> {
-    const tenant = await tenantService.getTenantById(tenantId);
-    if (!tenant) {
-      const error = new Error(`Tenant not found: ${tenantId}`);
-      logger.error({ tenantId }, 'Tenant not found for notification');
-      throw error;
-    }
-
+  async sendNotification(accountId: string, request: SendNotificationRequest): Promise<Notification> {
     // Validate template exists
-    const template = await templateService.getTemplateByCode(tenantId, request.templateCode, request.channel);
+    const template = await templateService.getTemplateByCode(accountId, request.templateCode, request.channel);
 
     if (!template) {
       const error = new Error(`Template not found: ${request.templateCode}`);
-      logger.warn({ tenantId, templateCode: request.templateCode }, 'Template not found');
+      logger.warn({ accountId, templateCode: request.templateCode }, 'Template not found');
       throw error;
     }
 
@@ -88,7 +80,7 @@ export class NotifyService {
     // Create notification record in database
     const notification = await prismaWrite.notification.create({
       data: {
-        tenantId,
+        account_id: accountId,
         channel: request.channel as any,
         recipient: request.recipient,
         templateCode: request.templateCode,
@@ -101,7 +93,7 @@ export class NotifyService {
     // Publish to queue with rendered content
     await queuePublisher.publish({
       notificationId: notification.id,
-      tenantId,
+      tenantId: accountId, // Using tenantId field for backwards compatibility, contains account ID
       channel: request.channel,
       recipient: request.recipient,
       templateCode: request.templateCode,
@@ -121,7 +113,7 @@ export class NotifyService {
     logger.info(
       {
         notificationId: notification.id,
-        tenantId,
+        accountId,
         channel: request.channel,
       },
       'Notification enqueued'
@@ -151,16 +143,9 @@ export class NotifyService {
   }
 
   async bulkSend(
-    tenantId: string,
+    accountId: string,
     requests: SendNotificationRequest[]
   ): Promise<{ notifications: Notification[]; response: BulkSendResponse }> {
-    const tenant = await tenantService.getTenantById(tenantId);
-    if (!tenant) {
-      const error = new Error(`Tenant not found: ${tenantId}`);
-      logger.error({ tenantId }, 'Tenant not found for bulk send');
-      throw error;
-    }
-
     const results: Notification[] = [];
     const errors: Array<{ index: number; error: string }> = [];
     let accepted = 0;
@@ -168,7 +153,7 @@ export class NotifyService {
 
     for (let i = 0; i < requests.length; i++) {
       try {
-        const notification = await this.sendNotification(tenantId, requests[i]);
+        const notification = await this.sendNotification(accountId, requests[i]);
         results.push(notification);
         accepted++;
       } catch (error) {
@@ -189,7 +174,7 @@ export class NotifyService {
     };
   }
 
-  async getNotificationStatus(tenantId: string, notificationId: string): Promise<Notification> {
+  async getNotificationStatus(accountId: string, notificationId: string): Promise<Notification> {
     const notification = notifications.get(notificationId);
 
     if (!notification) {
@@ -198,10 +183,10 @@ export class NotifyService {
       throw error;
     }
 
-    // Verify tenant access
-    if (notification.tenantId !== tenantId) {
+    // Verify account access
+    if (notification.account_id !== accountId) {
       const error = new Error('Access denied');
-      logger.warn({ notificationId, tenantId }, 'Tenant access denied');
+      logger.warn({ notificationId, accountId }, 'Account access denied');
       throw error;
     }
 
@@ -209,7 +194,7 @@ export class NotifyService {
   }
 
   async listNotifications(
-    tenantId: string,
+    accountId: string,
     filters: {
       channel?: Channel;
       status?: NotificationStatus;
@@ -223,7 +208,7 @@ export class NotifyService {
     const limit = Math.min(filters.limit || 20, 100);
     const offset = filters.offset || 0;
 
-    let results = Array.from(notifications.values()).filter((n) => n.tenantId === tenantId);
+    let results = Array.from(notifications.values()).filter((n) => n.account_id === accountId);
 
     if (filters.channel) {
       results = results.filter((n) => n.channel === filters.channel);

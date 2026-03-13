@@ -34,32 +34,73 @@ const WELCOME_EMAIL: TemplateDefinition = {
 };
 
 /**
- * VERIFICATION_EMAIL - Email verification template
+ * AUTH_VERIFY_EMAIL - Email verification template
+ * Variables sent by auth.service: firstName, verificationUrl, companyName, supportEmail
  */
 const VERIFICATION_EMAIL: TemplateDefinition = {
-  code: 'VERIFICATION_EMAIL',
+  code: 'AUTH_VERIFY_EMAIL',
   category: 'AUTH',
   channel: 'EMAIL',
   subject: 'Verify your email address',
-  description: 'Email verification code template',
-  requiredVariables: ['user_name', 'verification_code', 'verification_link'],
-  content: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a;">
-  <h1 style="font-size: 24px; margin: 0 0 16px 0;">Verify Your Email</h1>
-  <p style="margin: 0 0 12px 0; line-height: 1.6;">Hi {{user_name}},</p>
-  <p style="margin: 0 0 16px 0; line-height: 1.6;">Please use the following code to verify your email:</p>
-  <div style="background: #f3f4f6; padding: 16px; border-radius: 6px; margin: 20px 0; text-align: center;">
-    <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px;">{{verification_code}}</span>
+  description: 'Email verification link template for new user registration',
+  requiredVariables: ['firstName', 'verificationUrl', 'companyName', 'supportEmail'],
+  content: `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; color: #1a1a1a;">
+  <!-- Header -->
+  <div style="text-align: center; margin-bottom: 32px;">
+    <h1 style="font-size: 28px; margin: 0; font-weight: 700; color: #0f172a;">Welcome to {{companyName}}</h1>
   </div>
-  <p style="margin: 0 0 12px 0; line-height: 1.6;">Or click the link below:</p>
-  <a href="{{verification_link}}" style="display: inline-block; background-color: #0ea5e9; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 500;">Verify Email</a>
+
+  <!-- Main Content -->
+  <div style="background: #ffffff; border-radius: 8px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+    <p style="margin: 0 0 16px 0; font-size: 16px; line-height: 1.6;">Hi {{firstName}},</p>
+
+    <p style="margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: #4b5563;">
+      Thank you for signing up! We're excited to have you on board. To get started, please verify your email address by clicking the button below:
+    </p>
+
+    <!-- CTA Button -->
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="{{verificationUrl}}" style="display: inline-block; background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%); color: white; padding: 14px 32px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 15px; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);">
+        Verify Email Address
+      </a>
+    </div>
+
+    <!-- Alternative Link -->
+    <p style="margin: 24px 0 0 0; font-size: 13px; line-height: 1.6; text-align: center; color: #6b7280;">
+      Or copy and paste this link in your browser:<br/>
+      <span style="word-break: break-all; color: #2563eb;">{{verificationUrl}}</span>
+    </p>
+
+    <!-- Footer -->
+    <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+      <p style="margin: 0 0 8px 0; font-size: 12px; color: #6b7280;">
+        <strong>Note:</strong> This link will expire in 24 hours.
+      </p>
+      <p style="margin: 0; font-size: 12px; color: #6b7280;">
+        If you didn't create an account, please ignore this email.
+      </p>
+    </div>
+
+    <!-- Support -->
+    <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center;">
+      <p style="margin: 0; font-size: 12px; color: #6b7280;">
+        Need help? Contact us at <a href="mailto:{{supportEmail}}" style="color: #2563eb; text-decoration: none;">{{supportEmail}}</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- Footer Text -->
+  <p style="margin: 24px 0 0 0; font-size: 12px; text-align: center; color: #9ca3af;">
+    © {{companyName}} 2026. All rights reserved.
+  </p>
 </div>`,
 };
 
 /**
- * PASSWORD_RESET - Password reset template
+ * AUTH_PASSWORD_RESET - Password reset template
  */
 const PASSWORD_RESET: TemplateDefinition = {
-  code: 'PASSWORD_RESET',
+  code: 'AUTH_PASSWORD_RESET',
   category: 'AUTH',
   channel: 'EMAIL',
   subject: 'Reset your password',
@@ -76,10 +117,10 @@ const PASSWORD_RESET: TemplateDefinition = {
 };
 
 /**
- * OTP_CODE - One-time password template
+ * AUTH_LOGIN_OTP - One-time password template
  */
 const OTP_CODE: TemplateDefinition = {
-  code: 'OTP_CODE',
+  code: 'AUTH_LOGIN_OTP',
   category: 'AUTH',
   channel: 'SMS',
   description: 'One-time password delivery via SMS',

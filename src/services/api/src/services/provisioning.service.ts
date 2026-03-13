@@ -1,5 +1,4 @@
 import { logger } from '../config/logger';
-import { tenantRepository } from '../repositories/tenant.repository';
 import { prismaWrite } from '@shared/database';
 
 export class ProvisioningService {
@@ -12,35 +11,16 @@ export class ProvisioningService {
     accountType: 'INDIVIDUAL' | 'ORGANIZATION';
   }): Promise<{ resource_id: string }> {
     try {
-      // Generate tenant code from account ID
-      const tenantCode = `tenant-${data.accountId}`;
+      // Create templates for the account
+      // Note: Tenant creation is handled by auth-service during account creation
 
-      // Check if tenant already exists
-      const existingTenant = await tenantRepository.findByCode(tenantCode);
-      if (existingTenant) {
-        throw new Error(`Tenant with account_id ${data.accountId} already exists`);
-      }
+      // Seed default templates for this account
+      await this.seedDefaultTemplates(data.accountId);
 
-      // Create tenant
-      const tenant = await tenantRepository.create({
-        code: tenantCode,
-        name: `Tenant ${data.accountId}`,
-        accountId: data.accountId,
-        accountType: data.accountType,
-      });
-
-      logger.info({ tenantId: tenant.id, accountId: data.accountId }, 'Tenant created during provisioning');
-
-      // Seed default templates
-      await this.seedDefaultTemplates(tenant.id);
-
-      // Seed default roles (if roles table exists)
-      await this.seedDefaultRoles(tenant.id);
-
-      logger.info({ tenantId: tenant.id }, 'Provisioning completed with default templates and roles');
+      logger.info({ accountId: data.accountId }, 'Provisioning completed with default templates');
 
       return {
-        resource_id: tenant.id,
+        resource_id: data.accountId,
       };
     } catch (error) {
       logger.error({ error, accountId: data.accountId }, 'Failed to provision tenant');
@@ -49,9 +29,9 @@ export class ProvisioningService {
   }
 
   /**
-   * Seed default templates for tenant
+   * Seed default templates for account
    */
-  private async seedDefaultTemplates(tenantId: string): Promise<void> {
+  private async seedDefaultTemplates(accountId: string): Promise<void> {
     try {
       const defaultTemplates = [
         {
@@ -85,39 +65,30 @@ export class ProvisioningService {
       ];
 
       for (const template of defaultTemplates) {
-        await prismaWrite.template.create({
-          data: {
-            tenantId,
-            code: template.code,
-            channel: template.channel,
-            subject: template.subject,
-            content: template.content,
-            language: template.language,
-            active: true,
-            version: 1,
-          },
-        });
+        try {
+          await prismaWrite.template.create({
+            data: {
+              account_id: accountId,
+              created_by_user_id: 'system', // System-created templates
+              code: template.code,
+              channel: template.channel,
+              subject: template.subject,
+              content: template.content,
+              language: template.language,
+              active: true,
+              version: 1,
+            },
+          });
+        } catch (error) {
+          logger.warn({ accountId, code: template.code, error }, 'Failed to create default template');
+          // Continue with next template
+        }
       }
 
-      logger.info({ tenantId, count: defaultTemplates.length }, 'Default templates seeded');
+      logger.info({ accountId, count: defaultTemplates.length }, 'Default templates seeded');
     } catch (error) {
-      logger.error({ error, tenantId }, 'Failed to seed default templates');
+      logger.error({ error, accountId }, 'Failed to seed default templates');
       // Don't throw - continue provisioning even if template seeding fails
-    }
-  }
-
-  /**
-   * Seed default roles for tenant
-   * Placeholder for future role-based access control
-   */
-  private async seedDefaultRoles(tenantId: string): Promise<void> {
-    try {
-      // Placeholder: Add role seeding logic here when role model exists
-      // Default roles: ADMIN, USER, VIEWER
-      logger.debug({ tenantId }, 'Default roles seeding skipped (role model not yet implemented)');
-    } catch (error) {
-      logger.error({ error, tenantId }, 'Failed to seed default roles');
-      // Don't throw - continue provisioning even if role seeding fails
     }
   }
 }

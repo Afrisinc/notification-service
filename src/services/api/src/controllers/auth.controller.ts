@@ -10,7 +10,7 @@ const service = new AuthService();
 export async function registerUser(req: FastifyRequest, reply: FastifyReply) {
   try {
     const request = req.body as SignupPayload;
-    const result = await service.register(request, req.server);
+    const result = await service.register(request);
     return ApiResponseHelper.created(reply, 'User registered successfully', result);
   } catch (err: unknown) {
     console.log('Registration error:', getErrorMessage(err));

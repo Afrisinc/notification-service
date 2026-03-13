@@ -13,11 +13,7 @@ export class AccountRepository {
     return prismaRead.account.findUnique({
       where: { id },
       include: {
-        products: {
-          include: {
-            product: true,
-          },
-        },
+        subscription: true,
       },
     });
   }
@@ -37,11 +33,7 @@ export class AccountRepository {
         owner_user_id: userId,
       },
       include: {
-        products: {
-          include: {
-            product: true,
-          },
-        },
+        subscription: true,
       },
     });
   }
@@ -68,17 +60,7 @@ export class AccountRepository {
             lastName: true,
           },
         },
-        products: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                code: true,
-              },
-            },
-          },
-        },
+        subscription: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -105,11 +87,7 @@ export class AccountRepository {
         owner_user_id: userId,
       },
       include: {
-        products: {
-          include: {
-            product: true,
-          },
-        },
+        subscription: true,
       },
     });
   }

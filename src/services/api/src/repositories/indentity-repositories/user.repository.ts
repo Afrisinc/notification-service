@@ -16,8 +16,9 @@ export class UserRepository {
     });
   }
 
-  async findById(id: string) {
-    return prismaRead.user.findUnique({ where: { id } });
+  async findById(id: string, useWriteDb: boolean = false) {
+    const db = useWriteDb ? prismaWrite : prismaRead;
+    return db.user.findUnique({ where: { id } });
   }
 
   async findMany(skip: number, take: number, search?: string, status?: string) {

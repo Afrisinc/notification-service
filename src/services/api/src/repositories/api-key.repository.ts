@@ -5,11 +5,11 @@ export class ApiKeyRepository {
   /**
    * Create a new API key
    */
-  async create(data: { keyHash: string; name: string; tenantId: string }): Promise<{
+  async create(data: { keyHash: string; name: string; account_id: string }): Promise<{
     id: string;
     keyHash: string;
     name: string;
-    tenantId: string;
+    account_id: string;
     revoked: boolean;
     createdAt: Date;
     lastUsedAt: Date | null;
@@ -19,17 +19,17 @@ export class ApiKeyRepository {
         data: {
           keyHash: data.keyHash,
           name: data.name,
-          tenantId: data.tenantId,
+          account_id: data.account_id,
         },
       });
 
       logger.info(
-        { apiKeyId: apiKey.id, tenantId: data.tenantId, keyName: data.name },
+        { apiKeyId: apiKey.id, account_id: data.account_id, keyName: data.name },
         'API key created in repository'
       );
       return apiKey;
     } catch (error) {
-      logger.error({ error, tenantId: data.tenantId }, 'Failed to create API key');
+      logger.error({ error, account_id: data.account_id }, 'Failed to create API key');
       throw error;
     }
   }
@@ -41,7 +41,7 @@ export class ApiKeyRepository {
     id: string;
     keyHash: string;
     name: string;
-    tenantId: string;
+    account_id: string;
     revoked: boolean;
     createdAt: Date;
     lastUsedAt: Date | null;
@@ -63,7 +63,7 @@ export class ApiKeyRepository {
     id: string;
     keyHash: string;
     name: string;
-    tenantId: string;
+    account_id: string;
     revoked: boolean;
     createdAt: Date;
     lastUsedAt: Date | null;
@@ -79,10 +79,10 @@ export class ApiKeyRepository {
   }
 
   /**
-   * Find many API keys for a tenant
+   * Find many API keys for an account
    */
-  async findByTenantId(
-    tenantId: string,
+  async findByAccountId(
+    account_id: string,
     includeRevoked = false
   ): Promise<
     Array<{
@@ -96,7 +96,7 @@ export class ApiKeyRepository {
     try {
       const apiKeys = await prismaRead.apiKey.findMany({
         where: {
-          tenantId,
+          account_id,
           ...(includeRevoked ? {} : { revoked: false }),
         },
         select: {
@@ -109,10 +109,10 @@ export class ApiKeyRepository {
         orderBy: { createdAt: 'desc' },
       });
 
-      logger.debug({ tenantId, count: apiKeys.length }, 'API keys fetched from repository');
+      logger.debug({ account_id, count: apiKeys.length }, 'API keys fetched from repository');
       return apiKeys;
     } catch (error) {
-      logger.error({ error, tenantId }, 'Failed to find API keys by tenant');
+      logger.error({ error, account_id }, 'Failed to find API keys by account');
       throw error;
     }
   }
@@ -127,7 +127,7 @@ export class ApiKeyRepository {
     id: string;
     keyHash: string;
     name: string;
-    tenantId: string;
+    account_id: string;
     revoked: boolean;
     createdAt: Date;
     lastUsedAt: Date | null;
@@ -153,7 +153,7 @@ export class ApiKeyRepository {
     id: string;
     keyHash: string;
     name: string;
-    tenantId: string;
+    account_id: string;
     revoked: boolean;
     createdAt: Date;
     lastUsedAt: Date | null;

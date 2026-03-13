@@ -1,52 +1,40 @@
-import { FastifyRequest, FastifyReply } from "fastify";
-import { logger } from "../config/logger";
-import {
-  notifyService,
-  SendNotificationRequest,
-  BulkSendRequest,
-} from "../services/notify.service";
-import { tenantService } from "../services/tenant.service";
-import { ApiResponseHelper } from "../utils";
+import { FastifyRequest, FastifyReply } from 'fastify';
+import { logger } from '../config/logger';
+import { notifyService, SendNotificationRequest, BulkSendRequest } from '../services/notify.service';
+import { ApiResponseHelper } from '../utils';
 
 export class NotifyController {
   async sendNotification(request: FastifyRequest, reply: FastifyReply) {
-    console.log("Received send notification request with body:", request.body);
+    console.log('Received send notification request with body:', request.body);
     try {
-      const tenant = await tenantService.resolveTenant(request);
       const body = request.body as SendNotificationRequest;
+      // Extract account ID from JWT token (first account in the list)
+      const accountIds = (request as any).user?.account_ids || [];
+      const accountId = accountIds[0];
 
-      const notification = await notifyService.sendNotification(
-        tenant.id,
-        body,
-      );
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'No account access');
+      }
 
-      console.log("Notification created with ID:", notification);
+      const notification = await notifyService.sendNotification(accountId, body);
 
-      logger.info(
-        { notificationId: notification.id, correlationId: request.id },
-        "Notification sent successfully",
-      );
+      console.log('Notification created with ID:', notification);
 
-      ApiResponseHelper.accepted(reply, "Notification queued for processing", {
+      logger.info({ notificationId: notification.id, correlationId: request.id }, 'Notification sent successfully');
+
+      ApiResponseHelper.accepted(reply, 'Notification queued for processing', {
         notificationId: notification.id,
         status: notification.status,
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      logger.error(
-        { error: errorMessage, correlationId: request.id },
-        "Failed to send notification",
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to send notification');
 
-      if (errorMessage.includes("not found")) {
+      if (errorMessage.includes('not found')) {
         return ApiResponseHelper.notFound(reply, errorMessage);
       }
 
-      if (
-        errorMessage.includes("Missing") ||
-        errorMessage.includes("inactive")
-      ) {
+      if (errorMessage.includes('Missing') || errorMessage.includes('inactive')) {
         return ApiResponseHelper.unauthorized(reply, errorMessage);
       }
 
@@ -56,13 +44,15 @@ export class NotifyController {
 
   async bulkSend(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const tenant = await tenantService.resolveTenant(request);
       const body = request.body as BulkSendRequest;
+      const accountIds = (request as any).user?.account_ids || [];
+      const accountId = accountIds[0];
 
-      const { notifications, response } = await notifyService.bulkSend(
-        tenant.id,
-        body.notifications,
-      );
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'No account access');
+      }
+
+      const { response } = await notifyService.bulkSend(accountId, body.notifications);
 
       logger.info(
         {
@@ -70,26 +60,15 @@ export class NotifyController {
           rejected: response.rejected,
           correlationId: request.id,
         },
-        "Bulk notifications processed",
+        'Bulk notifications processed'
       );
 
-      ApiResponseHelper.accepted(
-        reply,
-        "Bulk notifications queued for processing",
-        response,
-      );
+      ApiResponseHelper.accepted(reply, 'Bulk notifications queued for processing', response);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      logger.error(
-        { error: errorMessage, correlationId: request.id },
-        "Failed to send bulk notifications",
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to send bulk notifications');
 
-      if (
-        errorMessage.includes("Missing") ||
-        errorMessage.includes("inactive")
-      ) {
+      if (errorMessage.includes('Missing') || errorMessage.includes('inactive')) {
         return ApiResponseHelper.unauthorized(reply, errorMessage);
       }
 
@@ -99,20 +78,19 @@ export class NotifyController {
 
   async getNotificationStatus(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const tenant = await tenantService.resolveTenant(request);
       const { id } = request.params as { id: string };
+      const accountIds = (request as any).user?.account_ids || [];
+      const accountId = accountIds[0];
 
-      const notification = await notifyService.getNotificationStatus(
-        tenant.id,
-        id,
-      );
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'No account access');
+      }
 
-      logger.debug(
-        { notificationId: id, correlationId: request.id },
-        "Fetched notification status",
-      );
+      const notification = await notifyService.getNotificationStatus(accountId, id);
 
-      ApiResponseHelper.success(reply, "Notification status retrieved", {
+      logger.debug({ notificationId: id, correlationId: request.id }, 'Fetched notification status');
+
+      ApiResponseHelper.success(reply, 'Notification status retrieved', {
         id: notification.id,
         channel: notification.channel,
         recipient: notification.recipient,
@@ -120,18 +98,14 @@ export class NotifyController {
         createdAt: notification.createdAt.toISOString(),
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      logger.error(
-        { error: errorMessage, correlationId: request.id },
-        "Failed to fetch notification status",
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to fetch notification status');
 
-      if (errorMessage.includes("not found")) {
+      if (errorMessage.includes('not found')) {
         return ApiResponseHelper.notFound(reply, errorMessage);
       }
 
-      if (errorMessage.includes("Access denied")) {
+      if (errorMessage.includes('Access denied')) {
         return ApiResponseHelper.forbidden(reply, errorMessage);
       }
 
@@ -141,15 +115,20 @@ export class NotifyController {
 
   async listNotifications(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const tenant = await tenantService.resolveTenant(request);
       const { channel, status, limit, offset } = request.query as {
         channel?: string;
         status?: string;
         limit?: string;
         offset?: string;
       };
+      const accountIds = (request as any).user?.account_ids || [];
+      const accountId = accountIds[0];
 
-      const result = await notifyService.listNotifications(tenant.id, {
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'No account access');
+      }
+
+      const result = await notifyService.listNotifications(accountId, {
         channel: channel as any,
         status: status as any,
         limit: limit ? parseInt(limit, 10) : 20,
@@ -162,10 +141,10 @@ export class NotifyController {
           total: result.meta.total,
           correlationId: request.id,
         },
-        "Listed notifications",
+        'Listed notifications'
       );
 
-      ApiResponseHelper.success(reply, "Notifications listed", {
+      ApiResponseHelper.success(reply, 'Notifications listed', {
         data: result.data.map((n) => ({
           id: n.id,
           channel: n.channel,
@@ -176,17 +155,10 @@ export class NotifyController {
         meta: result.meta,
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      logger.error(
-        { error: errorMessage, correlationId: request.id },
-        "Failed to list notifications",
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to list notifications');
 
-      if (
-        errorMessage.includes("Missing") ||
-        errorMessage.includes("inactive")
-      ) {
+      if (errorMessage.includes('Missing') || errorMessage.includes('inactive')) {
         return ApiResponseHelper.unauthorized(reply, errorMessage);
       }
 

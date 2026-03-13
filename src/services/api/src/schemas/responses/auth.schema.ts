@@ -34,12 +34,11 @@ export const LoginResponseSchema = {
           items: { type: 'string' },
           description: 'List of account IDs user owns',
         },
-        code: { type: 'string', description: 'Authorization code (short-lived, 10 minutes)' },
-        redirect: { type: 'boolean', description: 'Whether a redirect is required' },
-        callback: { type: 'string', description: 'Callback URL with authorization code for OAuth redirect' },
-        productCount: { type: 'number', description: 'Number of products user is enrolled in' },
+        token: { type: 'string', description: 'JWT authentication token (base token)' },
+        token_type: { type: 'string', example: 'Bearer', description: 'Token type' },
+        expires_in: { type: 'number', example: 604800, description: 'Token expiration time in seconds' },
       },
-      required: ['user_id', 'email', 'account_ids', 'code', 'redirect', 'callback'],
+      required: ['user_id', 'email', 'account_ids', 'token', 'token_type', 'expires_in'],
     },
   },
   required: ['success', 'resp_msg', 'resp_code', 'data'],
@@ -103,6 +102,25 @@ export const ResetPasswordResponseSchema = {
         message: { type: 'string', example: 'Password reset successfully' },
       },
       required: ['message'],
+    },
+  },
+  required: ['success', 'resp_msg', 'resp_code', 'data'],
+} as const;
+
+export const VerifyEmailResponseSchema = {
+  type: 'object',
+  properties: {
+    success: { type: 'boolean', example: true },
+    resp_msg: { type: 'string', example: 'Email verified successfully' },
+    resp_code: { type: 'number', example: 1005 },
+    data: {
+      type: 'object',
+      properties: {
+        user_id: { type: 'string', description: 'User ID' },
+        email: { type: 'string', description: 'Verified email address' },
+        message: { type: 'string', example: 'Email verified successfully' },
+      },
+      required: ['user_id', 'email'],
     },
   },
   required: ['success', 'resp_msg', 'resp_code', 'data'],

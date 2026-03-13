@@ -1,5 +1,5 @@
 import pino from 'pino';
-import { db } from '@shared/database';
+import { prismaRead } from '@shared/database';
 import { getConfig } from '@shared/config';
 import { SMTPProvider } from './providers/smtp';
 import { SendGridProvider } from './providers/sendgrid';
@@ -36,12 +36,23 @@ export class EmailProcessor {
       // If body/subject not provided, fetch and render template
       if (!body || !subject) {
         try {
-          const template = await db.template.findFirst({
+          // Try to fetch template from user's account first, then system account
+          let template = await prismaRead.template.findFirst({
             where: {
               code: templateCode,
-              tenantId: tenantId,
+              account_id: tenantId,
             },
           });
+
+          // Fallback to system/shared template account if not found in user account
+          if (!template) {
+            template = await prismaRead.template.findFirst({
+              where: {
+                code: templateCode,
+                account_id: 'afrisinc-notify-account',
+              },
+            });
+          }
 
           if (template) {
             // Render template with payload variables
@@ -87,36 +98,10 @@ export class EmailProcessor {
         throw new Error('No email provider configured');
       }
 
-      // Update notification status to sent (if notification ID is available)
-      if (emailId) {
-        await db.notification.update({
-          where: { id: emailId },
-          data: {
-            status: 'SENT',
-            sentAt: new Date(),
-          },
-        });
-      }
-
       this.logger.info({ emailId, messageId: result.messageId }, 'Email sent successfully');
     } catch (error) {
       const emailId = email?.id || email?.notificationId;
       this.logger.error({ error, emailId }, 'Failed to process email');
-
-      // Update notification status to failed
-      try {
-        if (emailId) {
-          await db.notification.update({
-            where: { id: emailId },
-            data: {
-              status: 'FAILED',
-            },
-          });
-        }
-      } catch (updateError) {
-        this.logger.error(updateError, 'Failed to update notification status');
-      }
-
       throw error;
     }
   }

@@ -1,4 +1,3 @@
-import type { FastifyInstance } from 'fastify';
 import { UserRepository } from '../repositories/indentity-repositories/user.repository';
 import { AccountRepository } from '../repositories/indentity-repositories/account.repository';
 import { AuthorizationCodeRepository } from '../repositories/indentity-repositories/authorization-code.repository';
@@ -12,11 +11,13 @@ import {
   getAuthCodeExpiresAt,
 } from '../utils/auth-utils';
 import { env } from '../config/env';
-import { prismaWrite, prismaRead } from '@shared/database';
+import { prismaWrite } from '@shared/database';
 import { recordLoginFailure } from '../utils/securityRecorder';
 import type { LoginUserRequest, SignupPayload } from '../../../../types/auth';
 import { AccountService } from './account.service';
-import { QUEUE_CONFIG, NOTIFICATION_TEMPLATES, NOTIFICATION_CHANNELS } from '../config/constants';
+import { NOTIFICATION_TEMPLATES, NOTIFICATION_CHANNELS } from '../config/constants';
+import { logger } from '../config/logger';
+import { getQueuePublisher } from './notify.service';
 
 const userRepo = new UserRepository();
 const accountRepo = new AccountRepository();
@@ -24,7 +25,7 @@ const authCodeRepo = new AuthorizationCodeRepository();
 const accountService = new AccountService();
 
 export class AuthService {
-  async register(data: SignupPayload, fastify?: FastifyInstance) {
+  async register(data: SignupPayload) {
     try {
       const existing = await userRepo.findByEmail(data.email);
       if (existing) {
@@ -105,35 +106,40 @@ export class AuthService {
       }
 
       // Publish email verification message to notify service
-      if (fastify) {
-        try {
-          const rabbit = (fastify as any).rabbit;
-          if (rabbit) {
-            // Generate verification token and URL
-            const verificationToken = generateResetToken(result.user.id, result.user.email);
-            const verificationUrl = `${env.WEBAPP_URL}/verify-email?token=${verificationToken}`;
+      try {
+        // Generate verification token and URL
+        console.log('User registered successfully:', { userId: result.user.id, email: result });
 
-            const notificationPayload = {
-              tenantId: env.ACCOUNT_ID || 'default',
-              channel: NOTIFICATION_CHANNELS.EMAIL,
-              recipient: result.user.email,
-              templateCode: NOTIFICATION_TEMPLATES.AUTH_VERIFY_EMAIL,
-              payload: {
-                firstName: result.user.firstName,
-                verificationUrl,
-                companyName: env.COMPANY_NAME,
-                supportEmail: env.SUPPORT_EMAIL,
-              },
-            };
+        const verificationToken = generateResetToken(result.user.id, result.user.email);
+        const verificationUrl = `${env.WEBAPP_URL}/verify-email?token=${verificationToken}`;
 
-            const publisher = await rabbit.messagePublisher(QUEUE_CONFIG.EXCHANGE_NAME);
-            publisher(QUEUE_CONFIG.ROUTING_KEY, notificationPayload as any);
-          }
-        } catch {
-          // Silently fail if email publish fails - don't block registration
-        }
+        // Publish verification email notification via queue
+        const queuePublisher = getQueuePublisher();
+        const notificationId = `verif-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+
+        await queuePublisher.publish({
+          notificationId,
+          tenantId: result.account.id,
+          channel: NOTIFICATION_CHANNELS.EMAIL as 'EMAIL',
+          recipient: result.user.email,
+          templateCode: NOTIFICATION_TEMPLATES.AUTH_VERIFY_EMAIL,
+          payload: {
+            firstName: result.user.firstName,
+            verificationUrl,
+            companyName: env.COMPANY_NAME,
+            supportEmail: env.SUPPORT_EMAIL,
+          },
+          priority: 'HIGH',
+          timestamp: new Date(),
+        });
+
+        logger.info({ userId: result.user.id, email: result.user.email }, 'Verification email published');
+      } catch (emailError) {
+        // Log but don't block registration - user can request verification email again
+        const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
+        logger.warn({ error: errorMessage, userId: result.user.id }, 'Failed to publish verification email');
       }
-
+      console.log('User registered successfully:', { userId: result.user.id, email: result });
       const token = generateBaseToken(result.user.id, result.user.email, [result.account.id]);
 
       const response: any = {
@@ -179,59 +185,16 @@ export class AuthService {
     // Record successful login
     await userRepo.recordLoginEvent(user.id, ipAddress || 'unknown');
 
-    // Determine redirect URL based on subscription status
-    let redirectUrl = env.APP_URL;
-    let productCount = 0;
-
-    // Check user's subscriptions
-    if (accountIds.length > 0) {
-      const subscriptions = await prismaRead.subscription.findMany({
-        where: {
-          account_id: { in: accountIds },
-          status: 'active',
-        },
-        include: {
-          plan: true,
-        },
-      });
-
-      productCount = subscriptions.length;
-
-      if (subscriptions.length > 0) {
-        // User has active subscriptions - redirect to dashboard
-        redirectUrl = env.APP_URL + '/dashboard';
-      } else {
-        // No active subscriptions - redirect to product/plan selector
-        redirectUrl = env.APP_URL + '/plans';
-      }
-    } else {
-      // No accounts: redirect to onboarding
-      redirectUrl = env.APP_URL + '/get-started';
-    }
-
-    // Generate authorization code instead of returning token directly (OAuth Secure Redirect Pattern)
-    const authCode = generateAuthorizationCode();
-    const expiresAt = getAuthCodeExpiresAt();
-
-    await authCodeRepo.create({
-      code: authCode,
-      user_id: user.id,
-      product_code: data.product_code,
-      redirect_uri: redirectUrl,
-      expires_at: expiresAt,
-    });
-
-    // Append code to redirect URL as query parameter for OAuth callback
-    const callbackUrl = `${redirectUrl}${redirectUrl.includes('?') ? '&' : '?'}code=${authCode}`;
+    // Generate JWT token
+    const token = generateBaseToken(user.id, user.email, accountIds);
 
     return {
       user_id: user.id,
       email: user.email,
       account_ids: accountIds,
-      redirect: true,
-      callback: callbackUrl,
-      code: authCode,
-      productCount,
+      token,
+      token_type: 'Bearer',
+      expires_in: 604800, // 7 days in seconds
     };
   }
 
@@ -351,7 +314,11 @@ export class AuthService {
       throw new Error('Invalid token payload');
     }
 
-    const user = await userRepo.findById(userId);
+    console.log('Decoded token data:', userData);
+
+    const user = await userRepo.findById(userId, true);
+    console.log('Found user:', user);
+
     if (!user) {
       throw new Error('User not found');
     }

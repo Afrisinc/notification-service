@@ -24,7 +24,7 @@ export const env = cleanEnv(process.env, {
   APP_URL: url({ default: 'http://localhost:3000' }),
 
   // Tenant & Company Info
-  ACCOUNT_ID: str({ default: 'default-account' }),
+  ACCOUNT_ID: str({ default: 'afrisinc-notify-account' }),
   COMPANY_NAME: str({ default: 'Afrisinc' }),
   SUPPORT_EMAIL: str({ default: 'support@afrisinc.com' }),
 
