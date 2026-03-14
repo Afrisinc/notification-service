@@ -32,7 +32,11 @@
       "@afrisinc-notify/db": ["packages/db/src"],
       "@afrisinc-notify/db/*": ["packages/db/src/*"],
       "@afrisinc-notify/config": ["packages/config/src"],
-      "@afrisinc-notify/config/*": ["packages/config/src/*"]
+      "@afrisinc-notify/config/*": ["packages/config/src/*"],
+      "@shared/database": ["src/shared/database"],
+      "@shared/database/*": ["src/shared/database/*"],
+      "@shared/config": ["src/shared/config"],
+      "@shared/config/*": ["src/shared/config/*"]
     }
   },
   "include": [

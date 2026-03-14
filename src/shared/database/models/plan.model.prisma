@@ -1,0 +1,21 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: BILLING & PLANS
+// Subscription plans and pricing
+////////////////////////////////////////////////////////////
+
+model Plan {
+  id                String    @id @default(uuid())
+  name              String    @unique // Free | Pro | Business
+  price_monthly     Float
+  price_yearly      Float
+  currency          String    @default("USD")
+  active            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  limits            PlanLimit[]
+  subscriptions     Subscription[]
+
+  @@map("plans")
+}

@@ -25,8 +25,8 @@ RUN CI=true pnpm install --frozen-lockfile
 
 # Copy source code and configuration
 COPY tsconfig.json ./
+COPY tsconfig.runtime.json ./
 COPY register-paths.js ./
-COPY prisma ./prisma
 COPY src ./src
 
 # Generate Prisma Client
@@ -58,7 +58,6 @@ RUN groupadd -g 1001 nodejs && \
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/package.json ./package.json
-COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nodejs:nodejs /app/register-paths.js ./register-paths.js
 
 USER nodejs

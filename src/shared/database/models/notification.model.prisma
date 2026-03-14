@@ -1,0 +1,30 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: NOTIFICATIONS
+// Core notification records
+////////////////////////////////////////////////////////////
+
+model Notification {
+  id           String               @id @default(uuid())
+  account_id   String
+  app_id       String?
+  channel      Channel
+  recipient    String
+  templateCode String
+  payload      Json
+  status       NotificationStatus   @default(PENDING)
+  priority     NotificationPriority @default(NORMAL)
+  retryCount   Int                  @default(0)
+  scheduledAt  DateTime?
+  sentAt       DateTime?
+  createdAt    DateTime             @default(now())
+
+  // Relations
+  account      Account              @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  app          App?                 @relation(fields: [app_id], references: [id], onDelete: SetNull)
+  logs         NotificationLog[]
+
+  @@index([account_id, status])
+  @@index([app_id, status])
+  @@index([createdAt])
+  @@map("notifications")
+}

@@ -16,9 +16,10 @@
     "baseUrl": ".",
     "paths": {
       "@shared/*": ["src/shared/*"],
+      "@shared/database": ["src/shared/database"],
+      "@shared/database/*": ["src/shared/database/*"],
       "@shared/common": ["src/shared/common/src"],
       "@shared/config": ["src/shared/config/src"],
-      "@shared/db": ["src/shared/db/src"],
       "@services/*": ["src/services/*"]
     },
     "types": ["node", "jest"],

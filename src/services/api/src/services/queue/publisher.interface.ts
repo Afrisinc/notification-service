@@ -8,7 +8,7 @@
 
 export interface QueueMessage {
   notificationId: string;
-  tenantId: string;
+  tenantId: string; // Account ID (for backwards compatibility, called tenantId in message)
   channel: 'EMAIL' | 'SMS' | 'IN_APP' | 'PUSH' | 'WHATSAPP';
   recipient: string;
   templateCode: string;

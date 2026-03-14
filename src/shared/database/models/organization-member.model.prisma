@@ -1,0 +1,20 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: ORGANIZATIONS
+// Organization member relationships & roles
+////////////////////////////////////////////////////////////
+
+model OrganizationMember {
+  id                String    @id @default(uuid())
+  organization_id   String
+  user_id           String
+  role              OrganizationMemberRole
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  organization      Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  user              User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([organization_id, user_id])
+  @@map("organization_members")
+}

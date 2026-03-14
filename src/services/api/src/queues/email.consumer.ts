@@ -10,7 +10,7 @@ import { Message, Channel } from 'amqplib';
 import { logger } from '../config/logger';
 import { RabbitMQExchange } from '../utils/rabbitmq';
 import { notificationConsumer } from './notification.consumer';
-import { db } from '@shared/db';
+import { prismaWrite, prismaRead } from '@shared/database';
 
 /**
  * RabbitMQ Configuration for Email Notifications
@@ -190,38 +190,64 @@ const validateEmailMessage = (emailData: any): void => {
 };
 
 /**
- * Resolve tenant for notification processing
- * Uses default Afrisinc Auth tenant if not specified
+ * Resolve account for notification processing
+ * Uses default Afrisinc Auth account if not specified
  *
- * @returns Tenant ID
- * @throws Error if tenant cannot be resolved
+ * @returns Account ID
+ * @throws Error if account cannot be resolved
  */
 const resolveTenant = async (): Promise<string> => {
   try {
-    // Try to get or create default Afrisinc Auth tenant
-    let tenant = await db.tenant.findUnique({
-      where: { code: 'afrisinc-auth' },
+    // Get or create default Afrisinc system account
+    let account = await prismaRead.account.findUnique({
+      where: { id: 'afrisinc-auth-account' },
       select: { id: true },
     });
 
-    if (!tenant) {
-      logger.info('Creating default Afrisinc Auth tenant for notifications...');
-      tenant = await db.tenant.create({
-        data: {
-          code: 'afrisinc-auth',
-          name: 'Afrisinc Auth',
-          accountId: 'system-afrisinc',
-          accountType: 'ORGANIZATION',
+    if (!account) {
+      logger.info('Creating default Afrisinc Auth account for notifications...');
+
+      // Ensure system user exists
+      const systemUser = await prismaWrite.user.upsert({
+        where: { email: 'system@afrisinc.com' },
+        update: {},
+        create: {
+          email: 'system@afrisinc.com',
+          password_hash: 'system',
+          firstName: 'System',
+          lastName: 'Auth',
           status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+
+      // Ensure organization exists
+      const org = await prismaWrite.organization.upsert({
+        where: { id: 'afrisinc-auth-org' },
+        update: {},
+        create: {
+          id: 'afrisinc-auth-org',
+          name: 'Afrisinc Auth System',
+          country: 'NG',
+        },
+        select: { id: true },
+      });
+
+      account = await prismaWrite.account.create({
+        data: {
+          id: 'afrisinc-auth-account',
+          type: 'ORGANIZATION',
+          owner_user_id: systemUser.id,
+          organization_id: org.id,
         },
         select: { id: true },
       });
     }
 
-    return tenant.id;
+    return account.id;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error({ error: errorMessage }, 'Failed to resolve tenant for notifications');
-    throw new Error('Tenant resolution failed');
+    logger.error({ error: errorMessage }, 'Failed to resolve account for notifications');
+    throw new Error('Account resolution failed');
   }
 };

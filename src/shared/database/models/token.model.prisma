@@ -1,0 +1,21 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: TOKENS
+// Access & refresh tokens management
+////////////////////////////////////////////////////////////
+
+model Token {
+  id              String    @id @default(uuid())
+  user_id         String
+  token_type      String    // "access", "refresh", "api_key"
+  issued_at       DateTime  @default(now())
+  expires_at      DateTime?
+  revoked_at      DateTime?
+
+  // Relations
+  user            User      @relation("Tokens", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([issued_at])
+  @@index([user_id, issued_at])
+  @@map("tokens")
+}

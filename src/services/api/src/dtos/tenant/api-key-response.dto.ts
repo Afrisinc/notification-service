@@ -17,7 +17,7 @@ export interface GetApiKeyResponse {
   id: string;
   keyHash: string;
   name: string;
-  tenantId: string;
+  account_id: string;
   revoked: boolean;
   createdAt: Date;
   lastUsedAt: Date | null;
@@ -41,7 +41,7 @@ export interface RevokeApiKeyResponse {
   id: string;
   keyHash: string;
   name: string;
-  tenantId: string;
+  account_id: string;
   revoked: boolean;
   createdAt: Date;
   lastUsedAt: Date | null;
@@ -51,6 +51,6 @@ export interface RevokeApiKeyResponse {
  * Validate API Key Response DTO
  */
 export interface ValidateApiKeyResponse {
-  tenantId: string;
+  account_id: string;
   keyId: string;
 }

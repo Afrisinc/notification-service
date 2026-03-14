@@ -52,24 +52,25 @@ export class TemplateService {
   /**
    * Create a new template with initial version
    */
-  async createTemplate(
-    tenantId: string,
-    request: CreateTemplateRequest,
-  ): Promise<Template> {
+  async createTemplate(accountId: string, userId: string, request: CreateTemplateRequest): Promise<Template> {
     try {
       // Extract required variables from content
       const requiredVariables = extractRequiredVariables(request.content);
 
-      // Create template in database
-      const template = await templateRepository.create(tenantId, {
-        code: request.code,
-        channel: request.channel,
-        subject: request.subject,
-        content: request.content,
-        language: request.language,
-        requiredVariables: requiredVariables.length > 0 ? requiredVariables : null,
-        description: request.description,
-      });
+      // Create template in database with userId
+      const template = await templateRepository.create(
+        accountId,
+        {
+          code: request.code,
+          channel: request.channel,
+          subject: request.subject,
+          content: request.content,
+          language: request.language,
+          requiredVariables: requiredVariables.length > 0 ? requiredVariables : null,
+          description: request.description,
+        },
+        userId
+      );
 
       // Create initial version (v1)
       await templateVersionRepository.create(template.id, 1, {
@@ -79,14 +80,14 @@ export class TemplateService {
       });
 
       logger.info(
-        { tenantId, templateId: template.id, code: request.code },
-        'Template created with initial version',
+        { accountId, templateId: template.id, code: request.code, userId },
+        'Template created with initial version'
       );
 
       return template;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error({ error: errorMessage, tenantId, code: request.code }, 'Failed to create template');
+      logger.error({ error: errorMessage, accountId, code: request.code, userId }, 'Failed to create template');
       throw error;
     }
   }
@@ -94,10 +95,7 @@ export class TemplateService {
   /**
    * Get template by ID
    */
-  async getTemplate(
-    tenantId: string,
-    templateId: string,
-  ): Promise<Template | null> {
+  async getTemplate(tenantId: string, templateId: string): Promise<Template | null> {
     try {
       return await templateRepository.findById(tenantId, templateId);
     } catch (error) {
@@ -115,26 +113,15 @@ export class TemplateService {
     tenantId: string,
     code: string,
     channel: string,
-    locale: string = 'en',
+    locale: string = 'en'
   ): Promise<Template | null> {
     try {
-      logger.debug(
-        { tenantId, code, channel, locale },
-        'Looking up template by code',
-      );
+      logger.debug({ tenantId, code, channel, locale }, 'Looking up template by code');
 
       // First, try to get template from database
-      const template = await templateRepository.findByCodeWithFallback(
-        tenantId,
-        code,
-        channel,
-        locale,
-      );
+      const template = await templateRepository.findByCodeWithFallback(tenantId, code, channel, locale);
 
-      logger.debug(
-        { found: !!template, active: template?.active, source: 'database' },
-        'Template lookup result',
-      );
+      logger.debug({ found: !!template, active: template?.active, source: 'database' }, 'Template lookup result');
 
       if (template && template.active) {
         return template;
@@ -144,10 +131,7 @@ export class TemplateService {
       if (hasDefaultTemplate(code)) {
         const defaultTemplate = getDefaultTemplate(code);
         if (defaultTemplate) {
-          logger.info(
-            { code, channel, source: 'default' },
-            'Using default fallback template',
-          );
+          logger.info({ code, channel, source: 'default' }, 'Using default fallback template');
 
           // Convert default template to Template interface
           const fallbackTemplate: Template = {
@@ -172,10 +156,7 @@ export class TemplateService {
       return null;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(
-        { error: errorMessage, tenantId, code, channel },
-        'Failed to get template by code',
-      );
+      logger.error({ error: errorMessage, tenantId, code, channel }, 'Failed to get template by code');
       throw error;
     }
   }
@@ -191,7 +172,7 @@ export class TemplateService {
       active?: boolean;
       limit?: number;
       offset?: number;
-    },
+    }
   ): Promise<{
     data: Template[];
     meta: { limit: number; offset: number; total: number };
@@ -205,7 +186,7 @@ export class TemplateService {
           active: filters?.active,
         },
         filters?.limit || 20,
-        filters?.offset || 0,
+        filters?.offset || 0
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -217,11 +198,7 @@ export class TemplateService {
   /**
    * Update template
    */
-  async updateTemplate(
-    tenantId: string,
-    templateId: string,
-    request: UpdateTemplateRequest,
-  ): Promise<Template> {
+  async updateTemplate(tenantId: string, templateId: string, request: UpdateTemplateRequest): Promise<Template> {
     try {
       const template = await this.getTemplate(tenantId, templateId);
 
@@ -239,11 +216,7 @@ export class TemplateService {
       const updated = await templateRepository.update(tenantId, templateId, {
         subject: request.subject,
         content: request.content,
-        requiredVariables: requiredVariables
-          ? requiredVariables.length > 0
-            ? requiredVariables
-            : null
-          : undefined,
+        requiredVariables: requiredVariables ? (requiredVariables.length > 0 ? requiredVariables : null) : undefined,
       });
 
       logger.info({ tenantId, templateId }, 'Template updated');
@@ -279,11 +252,7 @@ export class TemplateService {
    * Create new version of a template
    * Never overwrites active versions
    */
-  async createVersion(
-    tenantId: string,
-    templateId: string,
-    request: CreateVersionRequest,
-  ): Promise<any> {
+  async createVersion(tenantId: string, templateId: string, request: CreateVersionRequest): Promise<any> {
     try {
       const template = await this.getTemplate(tenantId, templateId);
 
@@ -308,18 +277,12 @@ export class TemplateService {
       // Update template's version field
       await templateRepository.update(tenantId, templateId, {});
 
-      logger.info(
-        { tenantId, templateId, version: nextVersion },
-        'Template version created',
-      );
+      logger.info({ tenantId, templateId, version: nextVersion }, 'Template version created');
 
       return version;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(
-        { error: errorMessage, tenantId, templateId },
-        'Failed to create template version',
-      );
+      logger.error({ error: errorMessage, tenantId, templateId }, 'Failed to create template version');
       throw error;
     }
   }
@@ -327,11 +290,7 @@ export class TemplateService {
   /**
    * Activate a specific version
    */
-  async activateVersion(
-    tenantId: string,
-    templateId: string,
-    versionId: string,
-  ): Promise<any> {
+  async activateVersion(tenantId: string, templateId: string, versionId: string): Promise<any> {
     try {
       const template = await this.getTemplate(tenantId, templateId);
 
@@ -349,17 +308,14 @@ export class TemplateService {
       // Activate version
       const activated = await templateVersionRepository.activate(versionId, templateId);
 
-      logger.info(
-        { tenantId, templateId, versionId, version: activated.version },
-        'Template version activated',
-      );
+      logger.info({ tenantId, templateId, versionId, version: activated.version }, 'Template version activated');
 
       return activated;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error(
         { error: errorMessage, tenantId, templateId, versionId: versionId },
-        'Failed to activate template version',
+        'Failed to activate template version'
       );
       throw error;
     }
@@ -374,7 +330,7 @@ export class TemplateService {
       channel?: string;
       locale?: string;
       active?: boolean;
-    },
+    }
   ): Promise<Template[]> {
     try {
       const result = await templateRepository.findMany(
@@ -385,7 +341,7 @@ export class TemplateService {
           active: filters?.active,
         },
         10000, // High limit for all results
-        0,
+        0
       );
       return result.data;
     } catch (error) {
@@ -404,7 +360,7 @@ export class TemplateService {
     templateCode: string,
     channel: string,
     locale: string,
-    variables: Record<string, any>,
+    variables: Record<string, any>
   ): Promise<RenderResult> {
     try {
       const template = await this.getTemplateByCode(tenantId, templateCode, channel, locale);
@@ -421,10 +377,7 @@ export class TemplateService {
       return templateRenderer.render(template as any, variables);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(
-        { error: errorMessage, tenantId, templateCode, channel },
-        'Failed to preview template',
-      );
+      logger.error({ error: errorMessage, tenantId, templateCode, channel }, 'Failed to preview template');
       throw error;
     }
   }
@@ -433,16 +386,18 @@ export class TemplateService {
    * List all available default templates
    * Returns metadata for fallback templates
    */
-  async listDefaultTemplates(): Promise<Array<{
-    code: string;
-    name: string;
-    description: string;
-    channel: string;
-    requiredVariables: string[];
-  }>> {
+  async listDefaultTemplates(): Promise<
+    Array<{
+      code: string;
+      name: string;
+      description: string;
+      channel: string;
+      requiredVariables: string[];
+    }>
+  > {
     try {
       const defaults = listDefaults();
-      return defaults.map(template => ({
+      return defaults.map((template) => ({
         code: template.code,
         name: template.name,
         description: template.description,
@@ -485,6 +440,19 @@ export class TemplateService {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error({ error: errorMessage, code }, 'Failed to get default template');
+      throw error;
+    }
+  }
+
+  /**
+   * Get all templates created by accounts in an organization
+   */
+  async getTemplatesByOrganization(organizationId: string): Promise<any[]> {
+    try {
+      return await templateRepository.findByOrganizationId(organizationId);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, organizationId }, 'Failed to get templates for organization');
       throw error;
     }
   }

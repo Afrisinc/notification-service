@@ -5,10 +5,13 @@
 
 import { FastifyInstance } from 'fastify';
 import { registerHealthRoutes } from './health.routes';
-import { registerTenantRoutes } from './tenant.routes';
 import { registerNotifyRoutes } from './notify.routes';
 import { registerTemplateRoutes } from './template.routes';
+import { registerProjectRoutes } from './project.routes';
 import { registerInternalRoutes } from './internal.routes';
+import { authRoutes } from './auth.routes';
+import { registerAppRoutes } from './app.routes';
+import { registerOrganizationRoutes } from './organization.routes';
 
 //  Register all API v1 routes
 export async function v1Routes(fastify: FastifyInstance) {
@@ -16,8 +19,12 @@ export async function v1Routes(fastify: FastifyInstance) {
     prefix: '/health',
   });
 
-  await fastify.register(registerTenantRoutes, {
-    prefix: '/admin',
+  await fastify.register(authRoutes, {
+    prefix: '/api',
+  });
+
+  await fastify.register(registerAppRoutes, {
+    prefix: '/api',
   });
 
   await fastify.register(registerNotifyRoutes, {
@@ -25,6 +32,14 @@ export async function v1Routes(fastify: FastifyInstance) {
   });
 
   await fastify.register(registerTemplateRoutes, {
+    prefix: '/api',
+  });
+
+  await fastify.register(registerProjectRoutes, {
+    prefix: '/api',
+  });
+
+  await fastify.register(registerOrganizationRoutes, {
     prefix: '/api',
   });
 

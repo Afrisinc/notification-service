@@ -1,0 +1,25 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: ORGANIZATIONS
+// Organization account management
+////////////////////////////////////////////////////////////
+
+model Organization {
+  id                String    @id @default(uuid())
+  name              String
+  slug              String?   @unique
+  legal_name        String?
+  country           String?
+  tax_id            String?
+  org_email         String?
+  org_phone         String?
+  location          String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  members           OrganizationMember[]
+  accounts          Account[]
+  apps              App[]
+
+  @@map("organizations")
+}

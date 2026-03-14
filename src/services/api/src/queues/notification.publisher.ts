@@ -298,14 +298,14 @@ export class NotificationPublisher {
    * Create message envelope with metadata
    *
    * @param messageId - Unique message ID
-   * @param tenantId - Tenant identifier
+   * @param tenantId - Tenant/Account identifier
    * @param notification - Notification payload
    * @returns Message envelope
    */
   private createEnvelope(messageId: string, tenantId: string, notification: SendNotificationRequest) {
     return {
-      id: messageId,
-      tenantId,
+      notificationId: messageId,
+      accountId: tenantId,
       timestamp: new Date().toISOString(),
       version: '1.0',
       ...notification,

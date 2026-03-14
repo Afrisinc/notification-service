@@ -1,0 +1,30 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: USERS & AUTH
+// User account management
+////////////////////////////////////////////////////////////
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  password_hash     String
+  firstName         String?
+  lastName          String?
+  phone             String?
+  location          String?
+  status            UserStatus    @default(ACTIVE)
+  email_verified    Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  accounts          Account[]
+  organizationMembers OrganizationMember[]
+  userPreferences   UserPreference[]
+  loginEvents       LoginEvent[]
+  loginFailures     LoginFailure[]    @relation("LoginFailures")
+  tokens            Token[]           @relation("Tokens")
+  authorizationCodes AuthorizationCode[]
+  templates         Template[]        @relation("CreatedBy")
+
+  @@map("users")
+}

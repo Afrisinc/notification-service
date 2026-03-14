@@ -1,44 +1,37 @@
-import { db } from "@shared/db";
-import { logger } from "../config/logger";
-
-const prisma = db;
+import { prismaWrite, prismaRead } from '@shared/database';
+import { logger } from '../config/logger';
 
 export class ApiKeyRepository {
   /**
    * Create a new API key
    */
-  async create(data: {
-    keyHash: string;
-    name: string;
-    tenantId: string;
-  }): Promise<{
+  async create(data: { keyHash: string; name: string; account_id: string; app_id: string }): Promise<{
     id: string;
     keyHash: string;
     name: string;
-    tenantId: string;
+    account_id: string;
+    app_id: string;
     revoked: boolean;
     createdAt: Date;
     lastUsedAt: Date | null;
   }> {
     try {
-      const apiKey = await prisma.apiKey.create({
+      const apiKey = await prismaWrite.apiKey.create({
         data: {
           keyHash: data.keyHash,
           name: data.name,
-          tenantId: data.tenantId,
+          account_id: data.account_id,
+          app_id: data.app_id,
         },
       });
 
       logger.info(
-        { apiKeyId: apiKey.id, tenantId: data.tenantId, keyName: data.name },
-        "API key created in repository",
+        { apiKeyId: apiKey.id, account_id: data.account_id, keyName: data.name },
+        'API key created in repository'
       );
       return apiKey;
     } catch (error) {
-      logger.error(
-        { error, tenantId: data.tenantId },
-        "Failed to create API key",
-      );
+      logger.error({ error, account_id: data.account_id }, 'Failed to create API key');
       throw error;
     }
   }
@@ -50,17 +43,18 @@ export class ApiKeyRepository {
     id: string;
     keyHash: string;
     name: string;
-    tenantId: string;
+    account_id: string;
+    app_id: string;
     revoked: boolean;
     createdAt: Date;
     lastUsedAt: Date | null;
   } | null> {
     try {
-      return await prisma.apiKey.findUnique({
+      return await prismaRead.apiKey.findUnique({
         where: { keyHash },
       });
     } catch (error) {
-      logger.error({ error }, "Failed to find API key by hash");
+      logger.error({ error }, 'Failed to find API key by hash');
       throw error;
     }
   }
@@ -72,27 +66,28 @@ export class ApiKeyRepository {
     id: string;
     keyHash: string;
     name: string;
-    tenantId: string;
+    account_id: string;
+    app_id: string;
     revoked: boolean;
     createdAt: Date;
     lastUsedAt: Date | null;
   } | null> {
     try {
-      return await prisma.apiKey.findUnique({
+      return await prismaRead.apiKey.findUnique({
         where: { id },
       });
     } catch (error) {
-      logger.error({ error, id }, "Failed to find API key by ID");
+      logger.error({ error, id }, 'Failed to find API key by ID');
       throw error;
     }
   }
 
   /**
-   * Find many API keys for a tenant
+   * Find many API keys for an account
    */
-  async findByTenantId(
-    tenantId: string,
-    includeRevoked = false,
+  async findByAccountId(
+    account_id: string,
+    includeRevoked = false
   ): Promise<
     Array<{
       id: string;
@@ -103,9 +98,9 @@ export class ApiKeyRepository {
     }>
   > {
     try {
-      const apiKeys = await prisma.apiKey.findMany({
+      const apiKeys = await prismaRead.apiKey.findMany({
         where: {
-          tenantId,
+          account_id,
           ...(includeRevoked ? {} : { revoked: false }),
         },
         select: {
@@ -115,16 +110,13 @@ export class ApiKeyRepository {
           createdAt: true,
           lastUsedAt: true,
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
       });
 
-      logger.debug(
-        { tenantId, count: apiKeys.length },
-        "API keys fetched from repository",
-      );
+      logger.debug({ account_id, count: apiKeys.length }, 'API keys fetched from repository');
       return apiKeys;
     } catch (error) {
-      logger.error({ error, tenantId }, "Failed to find API keys by tenant");
+      logger.error({ error, account_id }, 'Failed to find API keys by account');
       throw error;
     }
   }
@@ -134,26 +126,27 @@ export class ApiKeyRepository {
    */
   async update(
     id: string,
-    data: { lastUsedAt?: Date; revoked?: boolean },
+    data: { lastUsedAt?: Date; revoked?: boolean }
   ): Promise<{
     id: string;
     keyHash: string;
     name: string;
-    tenantId: string;
+    account_id: string;
+    app_id: string;
     revoked: boolean;
     createdAt: Date;
     lastUsedAt: Date | null;
   }> {
     try {
-      const apiKey = await prisma.apiKey.update({
+      const apiKey = await prismaWrite.apiKey.update({
         where: { id },
         data,
       });
 
-      logger.info({ apiKeyId: id }, "API key updated in repository");
+      logger.info({ apiKeyId: id }, 'API key updated in repository');
       return apiKey;
     } catch (error) {
-      logger.error({ error, id }, "Failed to update API key");
+      logger.error({ error, id }, 'Failed to update API key');
       throw error;
     }
   }
@@ -165,21 +158,22 @@ export class ApiKeyRepository {
     id: string;
     keyHash: string;
     name: string;
-    tenantId: string;
+    account_id: string;
+    app_id: string;
     revoked: boolean;
     createdAt: Date;
     lastUsedAt: Date | null;
   }> {
     try {
-      const apiKey = await prisma.apiKey.update({
+      const apiKey = await prismaWrite.apiKey.update({
         where: { id },
         data: { revoked: true },
       });
 
-      logger.info({ apiKeyId: id }, "API key revoked in repository");
+      logger.info({ apiKeyId: id }, 'API key revoked in repository');
       return apiKey;
     } catch (error) {
-      logger.error({ error, id }, "Failed to revoke API key");
+      logger.error({ error, id }, 'Failed to revoke API key');
       throw error;
     }
   }

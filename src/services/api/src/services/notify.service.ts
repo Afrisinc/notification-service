@@ -1,17 +1,11 @@
-import { logger } from "../config/logger";
-import { tenantService, Tenant } from "./tenant.service";
-import { templateService } from "./template.service";
-import { db } from "@shared/db";
-import {
-  IQueuePublisher,
-  QueueMessage,
-  QueuePublisherFactory,
-  QueuePublisherConfig,
-} from "./queue";
+import { logger } from '../config/logger';
+import { templateService } from './template.service';
+import { prismaWrite } from '@shared/database';
+import { IQueuePublisher, QueueMessage, QueuePublisherFactory, QueuePublisherConfig } from './queue';
 
-export type Channel = "EMAIL" | "SMS" | "IN_APP" | "PUSH" | "WHATSAPP";
-export type NotificationStatus = "PENDING" | "QUEUED" | "SENT" | "FAILED";
-export type Priority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+export type Channel = 'EMAIL' | 'SMS' | 'IN_APP' | 'PUSH' | 'WHATSAPP';
+export type NotificationStatus = 'PENDING' | 'QUEUED' | 'SENT' | 'FAILED';
+export type Priority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
 
 export interface SendNotificationRequest {
   channel: Channel;
@@ -23,16 +17,16 @@ export interface SendNotificationRequest {
 
 export interface Notification {
   id: string;
-  tenantId: string;
+  account_id: string;
   channel: Channel;
   recipient: string;
   templateCode: string;
   status: NotificationStatus;
   priority: Priority;
   payload: Record<string, any>;
-  retryCount: number;
-  scheduledAt: Date | null;
-  sentAt: Date | null;
+  retryCount?: number;
+  scheduledAt?: Date | null;
+  sentAt?: Date | null;
   createdAt: Date;
 }
 
@@ -53,30 +47,13 @@ const notifications: Map<string, Notification> = new Map();
 let queuePublisher: IQueuePublisher;
 
 export class NotifyService {
-  async sendNotification(
-    tenantId: string,
-    request: SendNotificationRequest,
-  ): Promise<Notification> {
-    const tenant = await tenantService.getTenantById(tenantId);
-    if (!tenant) {
-      const error = new Error(`Tenant not found: ${tenantId}`);
-      logger.error({ tenantId }, "Tenant not found for notification");
-      throw error;
-    }
-
+  async sendNotification(accountId: string, request: SendNotificationRequest): Promise<Notification> {
     // Validate template exists
-    const template = await templateService.getTemplateByCode(
-      tenantId,
-      request.templateCode,
-      request.channel,
-    );
+    const template = await templateService.getTemplateByCode(accountId, request.templateCode, request.channel);
 
     if (!template) {
       const error = new Error(`Template not found: ${request.templateCode}`);
-      logger.warn(
-        { tenantId, templateCode: request.templateCode },
-        "Template not found",
-      );
+      logger.warn({ accountId, templateCode: request.templateCode }, 'Template not found');
       throw error;
     }
 
@@ -94,21 +71,21 @@ export class NotifyService {
       } catch (renderError) {
         logger.warn(
           { templateCode: request.templateCode, error: renderError },
-          "Template rendering failed, using raw template",
+          'Template rendering failed, using raw template'
         );
         // Continue with unrendered template
       }
     }
 
     // Create notification record in database
-    const notification = await db.notification.create({
+    const notification = await prismaWrite.notification.create({
       data: {
-        tenantId,
+        account_id: accountId,
         channel: request.channel as any,
         recipient: request.recipient,
         templateCode: request.templateCode,
-        status: "PENDING",
-        priority: request.priority || "NORMAL",
+        status: 'PENDING',
+        priority: request.priority || 'NORMAL',
         payload: request.payload,
       },
     });
@@ -116,30 +93,30 @@ export class NotifyService {
     // Publish to queue with rendered content
     await queuePublisher.publish({
       notificationId: notification.id,
-      tenantId,
+      tenantId: accountId, // Using tenantId field for backwards compatibility, contains account ID
       channel: request.channel,
       recipient: request.recipient,
       templateCode: request.templateCode,
       subject: renderedSubject,
       body: renderedContent,
       payload: request.payload,
-      priority: request.priority || "NORMAL",
+      priority: request.priority || 'NORMAL',
       timestamp: new Date(),
     });
 
     // Update status to QUEUED
-    await db.notification.update({
+    await prismaWrite.notification.update({
       where: { id: notification.id },
-      data: { status: "QUEUED" },
+      data: { status: 'QUEUED' },
     });
 
     logger.info(
       {
         notificationId: notification.id,
-        tenantId,
+        accountId,
         channel: request.channel,
       },
-      "Notification enqueued",
+      'Notification enqueued'
     );
 
     return {
@@ -166,16 +143,9 @@ export class NotifyService {
   }
 
   async bulkSend(
-    tenantId: string,
-    requests: SendNotificationRequest[],
+    accountId: string,
+    requests: SendNotificationRequest[]
   ): Promise<{ notifications: Notification[]; response: BulkSendResponse }> {
-    const tenant = await tenantService.getTenantById(tenantId);
-    if (!tenant) {
-      const error = new Error(`Tenant not found: ${tenantId}`);
-      logger.error({ tenantId }, "Tenant not found for bulk send");
-      throw error;
-    }
-
     const results: Notification[] = [];
     const errors: Array<{ index: number; error: string }> = [];
     let accepted = 0;
@@ -183,18 +153,14 @@ export class NotifyService {
 
     for (let i = 0; i < requests.length; i++) {
       try {
-        const notification = await this.sendNotification(tenantId, requests[i]);
+        const notification = await this.sendNotification(accountId, requests[i]);
         results.push(notification);
         accepted++;
       } catch (error) {
         rejected++;
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         errors.push({ index: i, error: errorMessage });
-        logger.warn(
-          { index: i, error: errorMessage },
-          "Failed to process notification in bulk",
-        );
+        logger.warn({ index: i, error: errorMessage }, 'Failed to process notification in bulk');
       }
     }
 
@@ -208,22 +174,19 @@ export class NotifyService {
     };
   }
 
-  async getNotificationStatus(
-    tenantId: string,
-    notificationId: string,
-  ): Promise<Notification> {
+  async getNotificationStatus(accountId: string, notificationId: string): Promise<Notification> {
     const notification = notifications.get(notificationId);
 
     if (!notification) {
       const error = new Error(`Notification not found: ${notificationId}`);
-      logger.warn({ notificationId }, "Notification not found");
+      logger.warn({ notificationId }, 'Notification not found');
       throw error;
     }
 
-    // Verify tenant access
-    if (notification.tenantId !== tenantId) {
-      const error = new Error("Access denied");
-      logger.warn({ notificationId, tenantId }, "Tenant access denied");
+    // Verify account access
+    if (notification.account_id !== accountId) {
+      const error = new Error('Access denied');
+      logger.warn({ notificationId, accountId }, 'Account access denied');
       throw error;
     }
 
@@ -231,13 +194,13 @@ export class NotifyService {
   }
 
   async listNotifications(
-    tenantId: string,
+    accountId: string,
     filters: {
       channel?: Channel;
       status?: NotificationStatus;
       limit?: number;
       offset?: number;
-    },
+    }
   ): Promise<{
     data: Notification[];
     meta: { limit: number; offset: number; total: number };
@@ -245,9 +208,7 @@ export class NotifyService {
     const limit = Math.min(filters.limit || 20, 100);
     const offset = filters.offset || 0;
 
-    let results = Array.from(notifications.values()).filter(
-      (n) => n.tenantId === tenantId,
-    );
+    let results = Array.from(notifications.values()).filter((n) => n.account_id === accountId);
 
     if (filters.channel) {
       results = results.filter((n) => n.channel === filters.channel);
@@ -258,9 +219,7 @@ export class NotifyService {
     }
 
     const total = results.length;
-    const data = results
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      .slice(offset, offset + limit);
+    const data = results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(offset, offset + limit);
 
     return {
       data,
@@ -270,9 +229,9 @@ export class NotifyService {
 }
 
 function generateId(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 }
@@ -283,24 +242,19 @@ export const notifyService = new NotifyService();
  * Initialize the NotifyService with a queue publisher
  * Must be called during application startup
  */
-export async function initializeNotifyService(
-  config?: QueuePublisherConfig,
-): Promise<void> {
+export async function initializeNotifyService(config?: QueuePublisherConfig): Promise<void> {
   const queueConfig = config || QueuePublisherFactory.getDefaultConfig();
 
   // Validate configuration
   const errors = QueuePublisherFactory.validateConfig(queueConfig);
   if (errors.length > 0) {
-    throw new Error(`Invalid queue configuration: ${errors.join(", ")}`);
+    throw new Error(`Invalid queue configuration: ${errors.join(', ')}`);
   }
 
   // Create and initialize queue publisher
   queuePublisher = await QueuePublisherFactory.createPublisher(queueConfig);
 
-  logger.info(
-    { provider: queueConfig.provider },
-    "✅ NotifyService initialized with queue publisher",
-  );
+  logger.info({ provider: queueConfig.provider }, '✅ NotifyService initialized with queue publisher');
 }
 
 /**
@@ -308,9 +262,7 @@ export async function initializeNotifyService(
  */
 export function getQueuePublisher(): IQueuePublisher {
   if (!queuePublisher) {
-    throw new Error(
-      "Queue publisher not initialized. Call initializeNotifyService first.",
-    );
+    throw new Error('Queue publisher not initialized. Call initializeNotifyService first.');
   }
   return queuePublisher;
 }

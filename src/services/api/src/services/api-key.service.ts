@@ -1,57 +1,44 @@
-import { randomBytes, createHash } from "crypto";
-import { logger } from "../config/logger";
-import { apiKeyRepository } from "../repositories/api-key.repository";
-import { tenantRepository } from "../repositories/tenant.repository";
+import { randomBytes, createHash } from 'crypto';
+import { logger } from '../config/logger';
+import { apiKeyRepository } from '../repositories/api-key.repository';
 import {
   CreateApiKeyResponse,
   GetApiKeyResponse,
   ListApiKeysItemResponse,
   RevokeApiKeyResponse,
   ValidateApiKeyResponse,
-} from "../dtos";
+} from '../dtos';
 
 export class ApiKeyService {
   /**
    * Generate a new API key (returns plaintext once)
    */
   private generateApiKey(): string {
-    return `sk_${randomBytes(32).toString("hex")}`;
+    return `sk_${randomBytes(32).toString('hex')}`;
   }
 
   /**
    * Hash API key for storage
    */
   private hashApiKey(apiKey: string): string {
-    return createHash("sha256").update(apiKey).digest("hex");
+    return createHash('sha256').update(apiKey).digest('hex');
   }
 
   /**
-   * Create API key for tenant
+   * Create API key for app
    */
-  async createApiKey(
-    tenantId: string,
-    name: string,
-  ): Promise<CreateApiKeyResponse> {
-    // Verify tenant exists
-    const tenant = await tenantRepository.findById(tenantId);
-
-    if (!tenant) {
-      throw new Error(`Tenant not found: ${tenantId}`);
-    }
-
+  async createApiKey(account_id: string, app_id: string, name: string): Promise<CreateApiKeyResponse> {
     const plainKey = this.generateApiKey();
     const keyHash = this.hashApiKey(plainKey);
 
     const apiKey = await apiKeyRepository.create({
       keyHash,
       name,
-      tenantId,
+      account_id,
+      app_id,
     });
 
-    logger.info(
-      { apiKeyId: apiKey.id, tenantId, keyName: name },
-      "API key created",
-    );
+    logger.info({ apiKeyId: apiKey.id, account_id, keyName: name }, 'API key created');
 
     // Return plaintext key only once (user must save it)
     return {
@@ -59,68 +46,57 @@ export class ApiKeyService {
       plainKey,
       name: apiKey.name,
       createdAt: apiKey.createdAt,
-      message: "Save this key securely. You will not be able to see it again.",
+      message: 'Save this key securely. You will not be able to see it again.',
     };
   }
 
   /**
    * Get API key details (without plaintext)
    */
-  async getApiKey(
-    apiKeyId: string,
-    tenantId: string,
-  ): Promise<GetApiKeyResponse> {
+  async getApiKey(apiKeyId: string, account_id: string): Promise<GetApiKeyResponse> {
     const apiKey = await apiKeyRepository.findById(apiKeyId);
 
     if (!apiKey) {
       throw new Error(`API key not found: ${apiKeyId}`);
     }
 
-    if (apiKey.tenantId !== tenantId) {
-      throw new Error("Access denied");
+    if (apiKey.account_id !== account_id) {
+      throw new Error('Access denied');
     }
 
     return apiKey;
   }
 
   /**
-   * List API keys for tenant
+   * List API keys for account
    */
-  async listApiKeys(
-    tenantId: string,
-    includeRevoked = false,
-  ): Promise<ListApiKeysItemResponse[]> {
-    return apiKeyRepository.findByTenantId(tenantId, includeRevoked);
+  async listApiKeys(account_id: string, includeRevoked = false): Promise<ListApiKeysItemResponse[]> {
+    return apiKeyRepository.findByAccountId(account_id, includeRevoked);
   }
 
   /**
    * Revoke API key
    */
-  async revokeApiKey(
-    apiKeyId: string,
-    tenantId: string,
-  ): Promise<RevokeApiKeyResponse> {
+  async revokeApiKey(apiKeyId: string, account_id: string): Promise<RevokeApiKeyResponse> {
     const apiKey = await apiKeyRepository.findById(apiKeyId);
 
     if (!apiKey) {
       throw new Error(`API key not found: ${apiKeyId}`);
     }
 
-    if (apiKey.tenantId !== tenantId) {
-      throw new Error("Access denied");
+    if (apiKey.account_id !== account_id) {
+      throw new Error('Access denied');
     }
 
     const revoked = await apiKeyRepository.revoke(apiKeyId);
-    logger.info({ apiKeyId }, "API key revoked");
+    logger.info({ apiKeyId }, 'API key revoked');
     return revoked;
   }
 
   /**
    * Verify and validate API key
    */
-  async validateApiKey(
-    plainKey: string,
-  ): Promise<ValidateApiKeyResponse | null> {
+  async validateApiKey(plainKey: string): Promise<ValidateApiKeyResponse | null> {
     const keyHash = this.hashApiKey(plainKey);
 
     const apiKey = await apiKeyRepository.findByHash(keyHash);
@@ -133,7 +109,7 @@ export class ApiKeyService {
     await apiKeyRepository.update(apiKey.id, { lastUsedAt: new Date() });
 
     return {
-      tenantId: apiKey.tenantId,
+      account_id: apiKey.account_id,
       keyId: apiKey.id,
     };
   }

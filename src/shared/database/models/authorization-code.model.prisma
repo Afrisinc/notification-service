@@ -1,0 +1,25 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: OAUTH
+// OAuth authorization codes for OAuth 2.0 flow
+////////////////////////////////////////////////////////////
+
+model AuthorizationCode {
+  id              String    @id @default(uuid())
+  code            String    @unique
+  user_id         String
+  product_code    String?
+  redirect_uri    String?
+  scope           String?   // Comma-separated scopes
+  issued_at       DateTime  @default(now())
+  expires_at      DateTime
+  used_at         DateTime?
+
+  // Relations
+  user            User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([code])
+  @@index([user_id])
+  @@index([expires_at])
+  @@index([used_at])
+  @@map("authorization_codes")
+}

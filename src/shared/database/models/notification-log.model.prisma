@@ -1,0 +1,19 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: NOTIFICATIONS
+// Notification delivery logs & audit trail
+////////////////////////////////////////////////////////////
+
+model NotificationLog {
+  id             String   @id @default(uuid())
+  notificationId String
+  provider       String
+  status         NotificationStatus
+  response       Json
+  createdAt      DateTime @default(now())
+
+  // Relations
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId])
+  @@map("notification_logs")
+}

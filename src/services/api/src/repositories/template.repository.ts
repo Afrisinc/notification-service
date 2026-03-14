@@ -1,4 +1,4 @@
-import { db } from '@shared/db';
+import { prismaWrite, prismaRead } from '@shared/database';
 import { logger } from '../config/logger';
 import { transformPrismaError } from '../utils/db-errors';
 
@@ -41,12 +41,12 @@ export interface PaginationMeta {
  */
 export class TemplateRepository {
   /**
-   * Find template by ID with tenant isolation
+   * Find template by ID with account isolation
    * Returns null if template is soft-deleted
    */
-  async findById(tenantId: string, id: string): Promise<any> {
+  async findById(accountId: string, id: string): Promise<any> {
     try {
-      const template = await db.template.findUnique({
+      const template = await prismaRead.template.findUnique({
         where: { id },
         include: {
           versions: {
@@ -57,8 +57,8 @@ export class TemplateRepository {
         },
       });
 
-      // Verify tenant ownership and not soft-deleted
-      if (template && template.tenantId !== tenantId) {
+      // Verify account ownership and not soft-deleted
+      if (template && template.account_id !== accountId) {
         return null;
       }
 
@@ -68,7 +68,7 @@ export class TemplateRepository {
 
       return template;
     } catch (error) {
-      logger.error({ error, tenantId, id }, 'Failed to find template by ID');
+      logger.error({ error, accountId, id }, 'Failed to find template by ID');
       throw transformPrismaError(error, 'template.repository');
     }
   }
@@ -77,17 +77,12 @@ export class TemplateRepository {
    * Find template by code, channel, and language
    * Filters for active templates (deletedAt is null)
    */
-  async findByCode(
-    tenantId: string,
-    code: string,
-    channel: string,
-    language: string = 'en',
-  ): Promise<any> {
+  async findByCode(accountId: string, code: string, channel: string, language: string = 'en'): Promise<any> {
     try {
       // First try to find exact match
-      const template = await db.template.findFirst({
+      const template = await prismaRead.template.findFirst({
         where: {
-          tenantId,
+          account_id: accountId,
           code,
           channel: channel as any,
           language,
@@ -103,7 +98,7 @@ export class TemplateRepository {
       });
       return template;
     } catch (error) {
-      logger.error({ error, tenantId, code, channel, language }, 'Failed to find template by code');
+      logger.error({ error, accountId, code, channel, language }, 'Failed to find template by code');
       throw transformPrismaError(error, 'template.repository');
     }
   }
@@ -113,23 +108,17 @@ export class TemplateRepository {
    * Tries: requested locale → 'en' → first available
    */
   async findByCodeWithFallback(
-    tenantId: string,
+    accountId: string,
     code: string,
     channel: string,
-    requestedLocale: string = 'en',
+    requestedLocale: string = 'en'
   ): Promise<any> {
     try {
-      logger.debug(
-        { tenantId, code, channel, requestedLocale },
-        'Finding template by code with fallback',
-      );
+      logger.debug({ accountId, code, channel, requestedLocale }, 'Finding template by code with fallback');
 
       // Try requested locale
-      let template = await this.findByCode(tenantId, code, channel, requestedLocale);
-      logger.debug(
-        { found: !!template, locale: requestedLocale },
-        'First locale attempt',
-      );
+      let template = await this.findByCode(accountId, code, channel, requestedLocale);
+      logger.debug({ found: !!template, locale: requestedLocale }, 'First locale attempt');
 
       if (template && template.active) {
         return template;
@@ -137,11 +126,8 @@ export class TemplateRepository {
 
       // Fallback to English
       if (requestedLocale !== 'en') {
-        template = await this.findByCode(tenantId, code, channel, 'en');
-        logger.debug(
-          { found: !!template, locale: 'en' },
-          'Fallback to English',
-        );
+        template = await this.findByCode(accountId, code, channel, 'en');
+        logger.debug({ found: !!template, locale: 'en' }, 'Fallback to English');
         if (template && template.active) {
           return template;
         }
@@ -149,9 +135,9 @@ export class TemplateRepository {
 
       // Fallback to first available active template
       logger.debug({}, 'Trying first available active template');
-      template = await db.template.findFirst({
+      template = await prismaRead.template.findFirst({
         where: {
-          tenantId,
+          account_id: accountId,
           code,
           channel: channel as any,
           active: true,
@@ -167,16 +153,13 @@ export class TemplateRepository {
         orderBy: { createdAt: 'desc' },
       });
 
-      logger.debug(
-        { found: !!template },
-        'First available template result',
-      );
+      logger.debug({ found: !!template }, 'First available template result');
 
       return template || null;
     } catch (error) {
       logger.error(
-        { error, tenantId, code, channel, requestedLocale },
-        'Failed to find template by code with fallback',
+        { error, accountId, code, channel, requestedLocale },
+        'Failed to find template by code with fallback'
       );
       throw transformPrismaError(error, 'template.repository');
     }
@@ -186,14 +169,14 @@ export class TemplateRepository {
    * List templates with filtering and pagination
    */
   async findMany(
-    tenantId: string,
+    accountId: string,
     filters: TemplateFilters = {},
     limit: number = 20,
-    offset: number = 0,
+    offset: number = 0
   ): Promise<{ data: any[]; meta: PaginationMeta }> {
     try {
       const where: any = {
-        tenantId,
+        account_id: accountId,
         deletedAt: filters.includeDeleted ? undefined : null,
       };
 
@@ -210,7 +193,7 @@ export class TemplateRepository {
       }
 
       const [data, total] = await Promise.all([
-        db.template.findMany({
+        prismaRead.template.findMany({
           where,
           skip: offset,
           take: Math.min(limit, 100), // Cap at 100
@@ -223,7 +206,7 @@ export class TemplateRepository {
             },
           },
         }),
-        db.template.count({ where }),
+        prismaRead.template.count({ where }),
       ]);
 
       return {
@@ -231,7 +214,7 @@ export class TemplateRepository {
         meta: { limit: Math.min(limit, 100), offset, total },
       };
     } catch (error) {
-      logger.error({ error, tenantId, filters, limit, offset }, 'Failed to list templates');
+      logger.error({ error, accountId, filters, limit, offset }, 'Failed to list templates');
       throw transformPrismaError(error, 'template.repository');
     }
   }
@@ -239,11 +222,12 @@ export class TemplateRepository {
   /**
    * Create new template
    */
-  async create(tenantId: string, data: CreateTemplateData): Promise<any> {
+  async create(accountId: string, data: CreateTemplateData, createdByUserId: string = 'system'): Promise<any> {
     try {
-      const template = await db.template.create({
+      const template = await prismaWrite.template.create({
         data: {
-          tenantId,
+          account_id: accountId,
+          created_by_user_id: createdByUserId,
           code: data.code,
           channel: data.channel,
           subject: data.subject,
@@ -263,10 +247,10 @@ export class TemplateRepository {
         },
       });
 
-      logger.info({ tenantId, templateId: template.id, code: data.code }, 'Template created');
+      logger.info({ accountId, templateId: template.id, code: data.code }, 'Template created');
       return template;
     } catch (error) {
-      logger.error({ error, tenantId, data }, 'Failed to create template');
+      logger.error({ error, accountId, data }, 'Failed to create template');
       throw transformPrismaError(error, 'template.repository');
     }
   }
@@ -274,14 +258,14 @@ export class TemplateRepository {
   /**
    * Update template
    */
-  async update(tenantId: string, id: string, data: Partial<CreateTemplateData>): Promise<any> {
+  async update(accountId: string, id: string, data: Partial<CreateTemplateData>): Promise<any> {
     try {
-      const template = await this.findById(tenantId, id);
+      const template = await this.findById(accountId, id);
       if (!template) {
         throw new Error(`Template not found: ${id}`);
       }
 
-      const updated = await db.template.update({
+      const updated = await prismaWrite.template.update({
         where: { id },
         data: {
           ...(data.subject !== undefined && { subject: data.subject }),
@@ -298,10 +282,10 @@ export class TemplateRepository {
         },
       });
 
-      logger.info({ tenantId, templateId: id }, 'Template updated');
+      logger.info({ accountId, templateId: id }, 'Template updated');
       return updated;
     } catch (error) {
-      logger.error({ error, tenantId, id }, 'Failed to update template');
+      logger.error({ error, accountId, id }, 'Failed to update template');
       throw transformPrismaError(error, 'template.repository');
     }
   }
@@ -309,21 +293,21 @@ export class TemplateRepository {
   /**
    * Soft delete template (set deletedAt)
    */
-  async softDelete(tenantId: string, id: string): Promise<void> {
+  async softDelete(accountId: string, id: string): Promise<void> {
     try {
-      const template = await this.findById(tenantId, id);
+      const template = await this.findById(accountId, id);
       if (!template) {
         throw new Error(`Template not found: ${id}`);
       }
 
-      await db.template.update({
+      await prismaWrite.template.update({
         where: { id },
         data: { deletedAt: new Date() },
       });
 
-      logger.info({ tenantId, templateId: id }, 'Template soft deleted');
+      logger.info({ accountId, templateId: id }, 'Template soft deleted');
     } catch (error) {
-      logger.error({ error, tenantId, id }, 'Failed to soft delete template');
+      logger.error({ error, accountId, id }, 'Failed to soft delete template');
       throw transformPrismaError(error, 'template.repository');
     }
   }
@@ -331,14 +315,14 @@ export class TemplateRepository {
   /**
    * Activate template (set active = true)
    */
-  async activate(tenantId: string, id: string): Promise<any> {
+  async activate(accountId: string, id: string): Promise<any> {
     try {
-      const template = await this.findById(tenantId, id);
+      const template = await this.findById(accountId, id);
       if (!template) {
         throw new Error(`Template not found: ${id}`);
       }
 
-      const activated = await db.template.update({
+      const activated = await prismaWrite.template.update({
         where: { id },
         data: { active: true },
         include: {
@@ -350,10 +334,10 @@ export class TemplateRepository {
         },
       });
 
-      logger.info({ tenantId, templateId: id }, 'Template activated');
+      logger.info({ accountId, templateId: id }, 'Template activated');
       return activated;
     } catch (error) {
-      logger.error({ error, tenantId, id }, 'Failed to activate template');
+      logger.error({ error, accountId, id }, 'Failed to activate template');
       throw transformPrismaError(error, 'template.repository');
     }
   }
@@ -361,14 +345,14 @@ export class TemplateRepository {
   /**
    * Deactivate template (set active = false)
    */
-  async deactivate(tenantId: string, id: string): Promise<any> {
+  async deactivate(accountId: string, id: string): Promise<any> {
     try {
-      const template = await this.findById(tenantId, id);
+      const template = await this.findById(accountId, id);
       if (!template) {
         throw new Error(`Template not found: ${id}`);
       }
 
-      const deactivated = await db.template.update({
+      const deactivated = await prismaWrite.template.update({
         where: { id },
         data: { active: false },
         include: {
@@ -380,10 +364,67 @@ export class TemplateRepository {
         },
       });
 
-      logger.info({ tenantId, templateId: id }, 'Template deactivated');
+      logger.info({ accountId, templateId: id }, 'Template deactivated');
       return deactivated;
     } catch (error) {
-      logger.error({ error, tenantId, id }, 'Failed to deactivate template');
+      logger.error({ error, accountId, id }, 'Failed to deactivate template');
+      throw transformPrismaError(error, 'template.repository');
+    }
+  }
+
+  /**
+   * Find all templates by organization
+   * Gets templates from all accounts in the organization
+   */
+  async findByOrganizationId(organizationId: string): Promise<any[]> {
+    try {
+      // Get all accounts belonging to the organization
+      const accounts = await prismaRead.account.findMany({
+        where: { organization_id: organizationId },
+        select: { id: true },
+      });
+
+      if (accounts.length === 0) {
+        logger.info({ organizationId }, 'No accounts found for organization');
+        return [];
+      }
+
+      const accountIds = accounts.map((a) => a.id);
+
+      // Get all active templates from those accounts
+      const templates = await prismaRead.template.findMany({
+        where: {
+          account_id: { in: accountIds },
+          active: true,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          account_id: true,
+          code: true,
+          channel: true,
+          category: true,
+          subject: true,
+          content: true,
+          language: true,
+          version: true,
+          active: true,
+          requiredVariables: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      logger.info(
+        { organizationId, accountCount: accountIds.length, templateCount: templates.length },
+        'Retrieved templates for organization'
+      );
+
+      return templates;
+    } catch (error) {
+      logger.error({ error, organizationId }, 'Failed to get templates for organization');
       throw transformPrismaError(error, 'template.repository');
     }
   }
