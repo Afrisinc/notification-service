@@ -5,11 +5,12 @@ export class ApiKeyRepository {
   /**
    * Create a new API key
    */
-  async create(data: { keyHash: string; name: string; account_id: string }): Promise<{
+  async create(data: { keyHash: string; name: string; account_id: string; app_id: string }): Promise<{
     id: string;
     keyHash: string;
     name: string;
     account_id: string;
+    app_id: string;
     revoked: boolean;
     createdAt: Date;
     lastUsedAt: Date | null;
@@ -20,6 +21,7 @@ export class ApiKeyRepository {
           keyHash: data.keyHash,
           name: data.name,
           account_id: data.account_id,
+          app_id: data.app_id,
         },
       });
 
@@ -42,6 +44,7 @@ export class ApiKeyRepository {
     keyHash: string;
     name: string;
     account_id: string;
+    app_id: string;
     revoked: boolean;
     createdAt: Date;
     lastUsedAt: Date | null;
@@ -64,6 +67,7 @@ export class ApiKeyRepository {
     keyHash: string;
     name: string;
     account_id: string;
+    app_id: string;
     revoked: boolean;
     createdAt: Date;
     lastUsedAt: Date | null;
@@ -128,6 +132,7 @@ export class ApiKeyRepository {
     keyHash: string;
     name: string;
     account_id: string;
+    app_id: string;
     revoked: boolean;
     createdAt: Date;
     lastUsedAt: Date | null;
@@ -154,6 +159,7 @@ export class ApiKeyRepository {
     keyHash: string;
     name: string;
     account_id: string;
+    app_id: string;
     revoked: boolean;
     createdAt: Date;
     lastUsedAt: Date | null;

@@ -107,3 +107,69 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     'JWT token validated - account context set'
   );
 }
+
+/**
+ * Validate base JWT token for auth endpoints
+ *
+ * Functionality:
+ * - Validates base tokens from auth-service
+ * - Does NOT require product scope
+ * - Extracts user info from token payload
+ * - Sets context for downstream handlers
+ * - Used for /auth/profile, /auth/organizations endpoints
+ */
+export async function validateBaseToken(request: FastifyRequest, reply: FastifyReply) {
+  const authHeader = request.headers.authorization;
+
+  if (!authHeader) {
+    logger.warn({ requestId: request.id }, 'Missing authorization header');
+    return ApiResponseHelper.unauthorized(reply, 'Missing authorization header');
+  }
+
+  // Handle both "Bearer token" and plain "token" formats
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+
+  if (!token) {
+    logger.warn({ requestId: request.id }, 'Missing bearer token');
+    return ApiResponseHelper.unauthorized(reply, 'Missing bearer token');
+  }
+
+  // Verify JWT token
+  const payload = verifyToken(token);
+
+  if (!payload) {
+    logger.warn({ requestId: request.id }, 'Invalid JWT signature or format');
+    return ApiResponseHelper.unauthorized(reply, 'Invalid or malformed token');
+  }
+
+  // Check token expiration
+  if (isTokenExpired(payload)) {
+    logger.warn({ requestId: request.id, userId: payload.userId || payload.sub }, 'Token has expired');
+    return ApiResponseHelper.tokenExpired(reply, 'Token has expired');
+  }
+
+  const userId = payload.userId || payload.sub;
+  if (!userId) {
+    logger.error({ requestId: request.id, payload }, 'Token missing userId');
+    return ApiResponseHelper.unauthorized(reply, 'Token missing required claims');
+  }
+
+  // Set context for downstream handlers
+  request.headers['x-user-id'] = userId;
+  request.headers['x-user-email'] = payload.email || '';
+
+  // Attach user info to request
+  (request as any).user = {
+    id: userId,
+    email: payload.email,
+  };
+
+  logger.debug(
+    {
+      requestId: request.id,
+      userId,
+      userEmail: payload.email,
+    },
+    'Base token validated'
+  );
+}

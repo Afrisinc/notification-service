@@ -4,21 +4,26 @@
 ////////////////////////////////////////////////////////////
 
 model App {
-  id                String    @id @default(uuid())
+  id                String       @id @default(uuid())
   account_id        String
+  organization_id   String?
   name              String
-  environment       String    // production | staging | dev
-  api_key           String    @unique
-  status            String    @default("active")
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  environment       Environment  @default(production)
+  api_key           String       @unique
+  status            String       @default("active")
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
   // Relations
-  account           Account @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  account           Account         @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  organization      Organization?   @relation(fields: [organization_id], references: [id], onDelete: SetNull)
   appTemplates      AppTemplate[]
+  notifications     Notification[]
   usageRecords      UsageRecord[]
+  apiKeys           ApiKey[]
 
   @@index([account_id])
+  @@index([organization_id])
   @@index([api_key])
   @@map("apps")
 }

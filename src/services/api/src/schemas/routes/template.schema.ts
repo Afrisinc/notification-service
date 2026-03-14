@@ -236,3 +236,77 @@ export const ActivateVersionRouteSchema = activateVersionSchema;
 
 // Template preview operation
 export const PreviewTemplateRouteSchema = previewTemplateSchema;
+
+// Get templates by organization
+export const GetTemplatesByOrganizationRouteSchema = {
+  description: 'Get all templates created by accounts in an organization',
+  tags: ['Templates'],
+  headers: templateHeaders,
+  params: {
+    type: 'object',
+    properties: {
+      orgId: {
+        type: 'string',
+        description: 'Organization ID',
+      },
+    },
+    required: ['orgId'],
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', format: 'uuid', description: 'Template ID' },
+              accountId: { type: 'string', description: 'Account ID that created template' },
+              code: { type: 'string', description: 'Template code' },
+              channel: {
+                type: 'string',
+                enum: ['EMAIL', 'SMS', 'IN_APP', 'PUSH', 'WHATSAPP'],
+                description: 'Notification channel',
+              },
+              category: {
+                type: 'string',
+                enum: ['AUTH', 'TRANSACTIONAL', 'MARKETING', 'NOTIFICATION'],
+                description: 'Template category',
+              },
+              subject: { type: 'string', description: 'Template subject (for email)' },
+              content: { type: 'string', description: 'Template content' },
+              language: { type: 'string', description: 'Template language' },
+              version: { type: 'number', description: 'Template version' },
+              active: { type: 'boolean', description: 'Is template active' },
+              requiredVariables: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                },
+                description: 'Variables required for template rendering',
+              },
+              description: { type: 'string', description: 'Template description' },
+              createdAt: { type: 'string', format: 'date-time', description: 'Template creation timestamp' },
+              updatedAt: { type: 'string', format: 'date-time', description: 'Last update timestamp' },
+            },
+            required: ['id', 'accountId', 'code', 'channel', 'content'],
+          },
+          description: 'List of templates from organization accounts',
+        },
+        meta: {
+          type: 'object',
+          properties: {
+            total: {
+              type: 'integer',
+              description: 'Total number of templates',
+            },
+          },
+        },
+      },
+    },
+  },
+};

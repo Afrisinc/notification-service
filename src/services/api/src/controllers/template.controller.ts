@@ -9,13 +9,18 @@ export class TemplateController {
   async createTemplate(request: FastifyRequest, reply: FastifyReply) {
     try {
       const accountId = request.headers['x-account-id'] as string;
+      const userId = (request as any).user?.id;
       const body = request.body as CreateTemplateRequest;
 
       if (!accountId) {
         return ApiResponseHelper.unauthorized(reply, 'No account access');
       }
 
-      const template = await templateService.createTemplate(accountId, body);
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User information not found');
+      }
+
+      const template = await templateService.createTemplate(accountId, userId, body);
 
       logger.info(
         {
@@ -702,6 +707,54 @@ export class TemplateController {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to get template analytics');
+
+      ApiResponseHelper.badRequest(reply, errorMessage);
+    }
+  }
+
+  async getTemplatesByOrganization(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { orgId } = request.params as { orgId: string };
+
+      if (!orgId) {
+        return ApiResponseHelper.badRequest(reply, 'Organization ID is required');
+      }
+
+      const templates = await templateService.getTemplatesByOrganization(orgId);
+
+      logger.debug(
+        {
+          organizationId: orgId,
+          templateCount: templates.length,
+          correlationId: request.id,
+        },
+        'Retrieved templates for organization'
+      );
+
+      ApiResponseHelper.successList(
+        reply,
+        'Organization templates retrieved',
+        templates.map((t) => ({
+          id: t.id,
+          accountId: t.account_id,
+          code: t.code,
+          channel: t.channel,
+          category: t.category,
+          subject: t.subject,
+          content: t.content,
+          language: t.language,
+          version: t.version,
+          active: t.active,
+          requiredVariables: t.requiredVariables || [],
+          description: t.description,
+          createdAt: t.createdAt,
+          updatedAt: t.updatedAt,
+        })),
+        { total: templates.length }
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to get organization templates');
 
       ApiResponseHelper.badRequest(reply, errorMessage);
     }

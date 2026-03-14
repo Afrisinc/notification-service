@@ -2,12 +2,16 @@ import type { FastifyInstance } from 'fastify';
 import {
   exchangeCodeForToken,
   forgotPassword,
+  getProfile,
+  getOrganizationsByUserId,
+  getUserApps,
   loginUser,
   registerUser,
   resetPassword,
   verifyAuth,
   verifyEmail,
 } from '../controllers/auth.controller';
+import { validateBaseToken } from '../middlewares/auth.middleware';
 import {
   ForgotPasswordRouteSchema,
   LoginRouteSchema,
@@ -16,6 +20,9 @@ import {
   VerifyEmailRouteSchema,
   VerifyRouteSchema,
   OAuthExchangeRouteSchema,
+  ProfileRouteSchema,
+  OrganizationsRouteSchema,
+  UserAppsRouteSchema,
 } from '../schemas';
 
 export async function authRoutes(app: FastifyInstance) {
@@ -108,5 +115,48 @@ export async function authRoutes(app: FastifyInstance) {
       },
     },
     verifyAuth
+  );
+
+  app.get(
+    '/auth/profile',
+    {
+      onRequest: [validateBaseToken],
+      schema: {
+        ...ProfileRouteSchema,
+        tags: ['Authentication'],
+        summary: 'Get user profile',
+        description: 'Retrieve authenticated user profile information',
+      },
+    },
+    getProfile
+  );
+
+  app.get(
+    '/auth/organizations',
+    {
+      onRequest: [validateBaseToken],
+      schema: {
+        ...OrganizationsRouteSchema,
+        tags: ['Authentication'],
+        summary: 'Get user organizations with apps',
+        description: 'Retrieve all organizations owned by the user and their associated applications',
+      },
+    },
+    getOrganizationsByUserId
+  );
+
+  app.get(
+    '/auth/apps',
+    {
+      onRequest: [validateBaseToken],
+      schema: {
+        ...UserAppsRouteSchema,
+        tags: ['Authentication'],
+        summary: 'Get user apps with metrics',
+        description:
+          'Retrieve all apps owned by the user with detailed metrics including template count, API keys, and notifications sent',
+      },
+    },
+    getUserApps
   );
 }

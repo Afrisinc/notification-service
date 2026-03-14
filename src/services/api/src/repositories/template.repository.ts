@@ -371,6 +371,63 @@ export class TemplateRepository {
       throw transformPrismaError(error, 'template.repository');
     }
   }
+
+  /**
+   * Find all templates by organization
+   * Gets templates from all accounts in the organization
+   */
+  async findByOrganizationId(organizationId: string): Promise<any[]> {
+    try {
+      // Get all accounts belonging to the organization
+      const accounts = await prismaRead.account.findMany({
+        where: { organization_id: organizationId },
+        select: { id: true },
+      });
+
+      if (accounts.length === 0) {
+        logger.info({ organizationId }, 'No accounts found for organization');
+        return [];
+      }
+
+      const accountIds = accounts.map((a) => a.id);
+
+      // Get all active templates from those accounts
+      const templates = await prismaRead.template.findMany({
+        where: {
+          account_id: { in: accountIds },
+          active: true,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          account_id: true,
+          code: true,
+          channel: true,
+          category: true,
+          subject: true,
+          content: true,
+          language: true,
+          version: true,
+          active: true,
+          requiredVariables: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      logger.info(
+        { organizationId, accountCount: accountIds.length, templateCount: templates.length },
+        'Retrieved templates for organization'
+      );
+
+      return templates;
+    } catch (error) {
+      logger.error({ error, organizationId }, 'Failed to get templates for organization');
+      throw transformPrismaError(error, 'template.repository');
+    }
+  }
 }
 
 // Export singleton instance

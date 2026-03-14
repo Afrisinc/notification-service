@@ -14,6 +14,10 @@ model ApiKey {
   account_id String
   account    Account   @relation(fields: [account_id], references: [id], onDelete: Cascade)
 
+  app_id     String
+  app        App       @relation(fields: [app_id], references: [id], onDelete: Cascade)
+
   @@index([account_id])
+  @@index([app_id])
   @@map("api_keys")
 }

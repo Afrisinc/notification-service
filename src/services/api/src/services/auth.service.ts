@@ -56,11 +56,20 @@ export class AuthService {
         });
 
         if (data.account_type === 'personal') {
-          // Create individual account for personal users
+          // Create personal organization
+          const personalOrg = await tx.organization.create({
+            data: {
+              name: 'Personal',
+              slug: `personal-${user.id.slice(0, 8)}`,
+            },
+          });
+
+          // Create individual account linked to personal organization
           const account = await tx.account.create({
             data: {
               type: 'INDIVIDUAL',
               owner_user_id: user.id,
+              organization_id: personalOrg.id,
             },
           });
 
@@ -330,6 +339,126 @@ export class AuthService {
       message: 'Email verified successfully',
       user_id: user.id,
       email: user.email,
+    };
+  }
+
+  async getProfile(userId: string) {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
+    const user = await userRepo.findById(userId, true);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Get user's accounts
+    const accounts = await accountRepo.getUserAccounts(userId);
+
+    return {
+      user_id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      location: user.location,
+      email_verified: user.email_verified,
+      status: user.status,
+      createdAt: user.createdAt,
+      accounts: accounts.map((account) => ({
+        id: account.id,
+        type: account.type,
+        organizationId: account.organization_id,
+        createdAt: account.createdAt,
+      })),
+    };
+  }
+
+  async getOrganizationsByUserId(userId: string) {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
+    // Get user's accounts with their apps and organization info
+    const accounts = await accountRepo.getUserAccountsWithAppsAndOrganization(userId);
+
+    // Group by organization
+    const organizationsMap = new Map();
+    accounts.forEach((account) => {
+      const orgId = account.organization_id || 'personal';
+      if (!organizationsMap.has(orgId)) {
+        organizationsMap.set(orgId, {
+          id: orgId,
+          name: account.organization?.name || 'Personal',
+          slug: account.organization?.slug || 'personal',
+          plan: account.subscription?.plan?.name?.toLowerCase() || 'free',
+          createdAt: account.organization?.createdAt || account.createdAt,
+          apps: [],
+        });
+      }
+      const org = organizationsMap.get(orgId);
+      org.apps.push(
+        ...account.apps.map((app) => ({
+          id: app.id,
+          name: app.name,
+          environment: app.environment,
+          api_key: app.api_key,
+          status: app.status,
+          createdAt: app.createdAt,
+        }))
+      );
+    });
+
+    return {
+      user_id: userId,
+      organizations: Array.from(organizationsMap.values()),
+    };
+  }
+
+  async getUserApps(userId: string) {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
+    // Get user's accounts with their apps
+    const accounts = await accountRepo.getUserAccountsWithAppsAndOrganization(userId);
+
+    // Flatten apps with organization info and get additional metrics
+    const apps = [];
+    for (const account of accounts) {
+      for (const app of account.apps) {
+        // Count templates for this app
+        const templateCount = await prismaWrite.appTemplate.count({
+          where: { app_id: app.id },
+        });
+
+        // Count API keys for this app
+        const apiKeyCount = await prismaWrite.apiKey.count({
+          where: { account_id: account.id }, // API keys are per account, not per app
+        });
+
+        // Count notifications sent for this app
+        const notificationCount = await prismaWrite.notification.count({
+          where: { account_id: account.id }, // Notifications are per account, not per app
+        });
+
+        apps.push({
+          id: app.id,
+          orgId: account.organization_id || 'personal',
+          name: app.name,
+          environment: app.environment,
+          description: null, // App model doesn't have description yet
+          createdAt: app.createdAt,
+          templateCount,
+          apiKeyCount,
+          notificationsSent: notificationCount,
+        });
+      }
+    }
+
+    return {
+      user_id: userId,
+      apps: apps.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     };
   }
 }

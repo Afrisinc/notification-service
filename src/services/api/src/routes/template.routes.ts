@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { TemplateController } from '../controllers/template.controller';
 import { asyncWrapper } from '../middlewares/async_wrapper.middleware';
-import { authMiddleware } from '../middlewares/auth.middleware';
+import { validateBaseToken } from '../middlewares/auth.middleware';
 import {
   CreateTemplateRouteSchema,
   ListTemplatesRouteSchema,
@@ -30,14 +30,14 @@ export async function registerTemplateRoutes(fastify: FastifyInstance) {
   // Preview template rendering (specific path BEFORE generic params)
   fastify.post(
     '/templates/preview',
-    { onRequest: [authMiddleware], schema: PreviewTemplateRouteSchema },
+    { onRequest: [validateBaseToken], schema: PreviewTemplateRouteSchema },
     asyncWrapper(controller.previewTemplate.bind(controller))
   );
 
   // Create new template
   fastify.post(
     '/templates',
-    { onRequest: [authMiddleware], schema: CreateTemplateRouteSchema },
+    { onRequest: [validateBaseToken], schema: CreateTemplateRouteSchema },
     asyncWrapper(controller.createTemplate.bind(controller))
   );
 
@@ -58,35 +58,35 @@ export async function registerTemplateRoutes(fastify: FastifyInstance) {
   // Create new version
   fastify.post(
     '/templates/:id/versions',
-    { onRequest: [authMiddleware], schema: CreateVersionRouteSchema },
+    { onRequest: [validateBaseToken], schema: CreateVersionRouteSchema },
     asyncWrapper(controller.createVersion.bind(controller))
   );
 
   // Activate version
   fastify.post(
     '/templates/:id/versions/:versionId/activate',
-    { onRequest: [authMiddleware], schema: ActivateVersionRouteSchema },
+    { onRequest: [validateBaseToken], schema: ActivateVersionRouteSchema },
     asyncWrapper(controller.activateVersion.bind(controller))
   );
 
   // Install template in project (specific path BEFORE generic :id) - PROTECTED
   fastify.post(
     '/templates/:id/install',
-    { onRequest: [authMiddleware], schema: CreateTemplateRouteSchema },
+    { onRequest: [validateBaseToken], schema: CreateTemplateRouteSchema },
     asyncWrapper(controller.installTemplate.bind(controller))
   );
 
   // Get template installation status (specific path BEFORE generic :id) - PROTECTED
   fastify.get(
     '/templates/:id/status',
-    { onRequest: [authMiddleware], schema: GetTemplateRouteSchema },
+    { onRequest: [validateBaseToken], schema: GetTemplateRouteSchema },
     asyncWrapper(controller.getInstallationStatus.bind(controller))
   );
 
   // Get template analytics (specific path BEFORE generic :id) - PROTECTED
   fastify.get(
     '/templates/:id/analytics',
-    { onRequest: [authMiddleware], schema: GetTemplateRouteSchema },
+    { onRequest: [validateBaseToken], schema: GetTemplateRouteSchema },
     asyncWrapper(controller.getTemplateAnalytics.bind(controller))
   );
 
@@ -100,14 +100,14 @@ export async function registerTemplateRoutes(fastify: FastifyInstance) {
   // Update template
   fastify.put(
     '/templates/:id',
-    { onRequest: [authMiddleware], schema: UpdateTemplateRouteSchema },
+    { onRequest: [validateBaseToken], schema: UpdateTemplateRouteSchema },
     asyncWrapper(controller.updateTemplate.bind(controller))
   );
 
   // Delete template
   fastify.delete(
     '/templates/:id',
-    { onRequest: [authMiddleware], schema: DeleteTemplateRouteSchema },
+    { onRequest: [validateBaseToken], schema: DeleteTemplateRouteSchema },
     asyncWrapper(controller.deleteTemplate.bind(controller))
   );
 }

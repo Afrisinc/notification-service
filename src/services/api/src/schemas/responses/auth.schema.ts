@@ -145,3 +145,144 @@ export const VerifyResponseSchema = {
   },
   required: ['success', 'resp_msg', 'resp_code', 'data'],
 } as const;
+
+export const ProfileResponseSchema = {
+  type: 'object',
+  properties: {
+    success: { type: 'boolean', example: true },
+    resp_msg: { type: 'string', example: 'Profile retrieved successfully' },
+    resp_code: { type: 'number', example: 1006 },
+    data: {
+      type: 'object',
+      properties: {
+        user_id: { type: 'string', description: 'User ID' },
+        email: { type: 'string', description: 'User email' },
+        firstName: { type: 'string', description: 'First name' },
+        lastName: { type: 'string', description: 'Last name' },
+        phone: { type: ['string', 'null'], description: 'Phone number' },
+        location: { type: ['string', 'null'], description: 'Location' },
+        email_verified: { type: 'boolean', description: 'Email verification status' },
+        status: { type: 'string', example: 'ACTIVE', description: 'User status' },
+        createdAt: { type: 'string', format: 'date-time', description: 'Account creation date' },
+        accounts: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'Account ID' },
+              type: { type: 'string', enum: ['INDIVIDUAL', 'ORGANIZATION'], description: 'Account type' },
+              organizationId: { type: ['string', 'null'], description: 'Organization ID if applicable' },
+              createdAt: { type: 'string', format: 'date-time', description: 'Account creation date' },
+            },
+            required: ['id', 'type', 'createdAt'],
+          },
+          description: 'List of accounts owned by user',
+        },
+      },
+      required: ['user_id', 'email', 'firstName', 'lastName', 'email_verified', 'status', 'createdAt', 'accounts'],
+    },
+  },
+  required: ['success', 'resp_msg', 'resp_code', 'data'],
+} as const;
+
+export const OrganizationsResponseSchema = {
+  type: 'object',
+  properties: {
+    success: { type: 'boolean', example: true },
+    resp_msg: { type: 'string', example: 'Organizations retrieved successfully' },
+    resp_code: { type: 'number', example: 1007 },
+    data: {
+      type: 'object',
+      properties: {
+        user_id: { type: 'string', description: 'User ID' },
+        organizations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'Organization ID or "personal" for personal account' },
+              name: { type: 'string', description: 'Organization name' },
+              slug: { type: 'string', description: 'Organization slug for URLs' },
+              plan: { type: 'string', description: 'Organization subscription plan (e.g., free, pro, enterprise)' },
+              legal_name: { type: ['string', 'null'], description: 'Legal business name' },
+              createdAt: { type: 'string', format: 'date-time', description: 'Organization creation date' },
+              apps: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', description: 'App ID' },
+                    name: { type: 'string', description: 'App name' },
+                    environment: {
+                      type: 'string',
+                      enum: ['production', 'staging', 'development'],
+                      description: 'App environment',
+                    },
+                    api_key: { type: 'string', description: 'API key' },
+                    status: { type: 'string', description: 'App status' },
+                    createdAt: { type: 'string', format: 'date-time', description: 'App creation date' },
+                  },
+                  required: ['id', 'name', 'environment', 'api_key', 'status', 'createdAt'],
+                },
+                description: 'List of apps in the organization',
+              },
+            },
+            required: ['id', 'name', 'slug', 'plan', 'createdAt', 'apps'],
+          },
+          description: 'List of organizations and their apps',
+        },
+      },
+      required: ['user_id', 'organizations'],
+    },
+  },
+  required: ['success', 'resp_msg', 'resp_code', 'data'],
+} as const;
+
+export const UserAppsResponseSchema = {
+  type: 'object',
+  properties: {
+    success: { type: 'boolean', example: true },
+    resp_msg: { type: 'string', example: 'User apps retrieved successfully' },
+    resp_code: { type: 'number', example: 1008 },
+    data: {
+      type: 'object',
+      properties: {
+        user_id: { type: 'string', description: 'User ID' },
+        apps: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'App ID' },
+              orgId: { type: 'string', description: 'Organization ID or "personal"' },
+              name: { type: 'string', description: 'App name' },
+              environment: {
+                type: 'string',
+                enum: ['production', 'staging', 'development'],
+                description: 'App environment',
+              },
+              description: { type: ['string', 'null'], description: 'App description' },
+              createdAt: { type: 'string', format: 'date-time', description: 'App creation date' },
+              templateCount: { type: 'number', description: 'Number of templates for this app' },
+              apiKeyCount: { type: 'number', description: 'Number of API keys for the organization' },
+              notificationsSent: { type: 'number', description: 'Total notifications sent for the organization' },
+            },
+            required: [
+              'id',
+              'orgId',
+              'name',
+              'environment',
+              'createdAt',
+              'templateCount',
+              'apiKeyCount',
+              'notificationsSent',
+            ],
+          },
+          description: 'List of user apps with metrics',
+        },
+      },
+      required: ['user_id', 'apps'],
+    },
+  },
+  required: ['success', 'resp_msg', 'resp_code', 'data'],
+} as const;

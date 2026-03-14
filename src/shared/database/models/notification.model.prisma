@@ -6,6 +6,7 @@
 model Notification {
   id           String               @id @default(uuid())
   account_id   String
+  app_id       String?
   channel      Channel
   recipient    String
   templateCode String
@@ -19,9 +20,11 @@ model Notification {
 
   // Relations
   account      Account              @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  app          App?                 @relation(fields: [app_id], references: [id], onDelete: SetNull)
   logs         NotificationLog[]
 
   @@index([account_id, status])
+  @@index([app_id, status])
   @@index([createdAt])
   @@map("notifications")
 }

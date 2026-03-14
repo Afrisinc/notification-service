@@ -96,3 +96,48 @@ export async function verifyAuth(req: FastifyRequest, reply: FastifyReply) {
     return ApiResponseHelper.unauthorized(reply, getErrorMessage(err));
   }
 }
+
+export async function getProfile(req: FastifyRequest, reply: FastifyReply) {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return ApiResponseHelper.unauthorized(reply, 'User information not found in request');
+    }
+
+    const result = await service.getProfile(userId);
+    return ApiResponseHelper.success(reply, 'Profile retrieved successfully', result);
+  } catch (err: unknown) {
+    return ApiResponseHelper.unauthorized(reply, getErrorMessage(err));
+  }
+}
+
+export async function getOrganizationsByUserId(req: FastifyRequest, reply: FastifyReply) {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return ApiResponseHelper.unauthorized(reply, 'User information not found in request');
+    }
+
+    const result = await service.getOrganizationsByUserId(userId);
+    return ApiResponseHelper.success(reply, 'Organizations retrieved successfully', result);
+  } catch (err: unknown) {
+    return ApiResponseHelper.badRequest(reply, getErrorMessage(err));
+  }
+}
+
+export async function getUserApps(req: FastifyRequest, reply: FastifyReply) {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return ApiResponseHelper.unauthorized(reply, 'User information not found in request');
+    }
+
+    const result = await service.getUserApps(userId);
+    return ApiResponseHelper.success(reply, 'User apps retrieved successfully', result);
+  } catch (err: unknown) {
+    return ApiResponseHelper.badRequest(reply, getErrorMessage(err));
+  }
+}

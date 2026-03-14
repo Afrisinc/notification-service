@@ -98,4 +98,26 @@ export class AccountRepository {
     });
     return account?.owner_user_id === userId;
   }
+
+  async getUserAccountsWithAppsAndOrganization(userId: string) {
+    return prismaRead.account.findMany({
+      where: {
+        owner_user_id: userId,
+      },
+      include: {
+        apps: true,
+        subscription: {
+          include: {
+            plan: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        organization: true,
+      },
+    });
+  }
 }

@@ -64,6 +64,13 @@ enum UserStatus {
   SUSPENDED
 }
 
+// Application Environment
+enum Environment {
+  production
+  staging
+  development
+}
+
 // Product Status
 enum ProductStatus {
   PROVISIONING
