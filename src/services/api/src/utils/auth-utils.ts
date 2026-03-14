@@ -49,8 +49,8 @@ export function generateBaseToken(userId: string, email: string, accountIds: str
       type: 'base',
       account_ids: accountIds,
     },
-    JWT_SECRET as string,
-    { expiresIn: JWT_EXPIRE as string }
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRE } as any
   );
 }
 
@@ -79,8 +79,8 @@ export function generateProductToken(
       product: productId,
       resource_id: tenantId,
     },
-    JWT_SECRET as string,
-    { expiresIn: JWT_EXPIRE as string }
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRE } as any
   );
 }
 
@@ -97,8 +97,8 @@ export function generateResetToken(userId: string, email: string): string {
       email,
       type: 'reset',
     },
-    JWT_SECRET as string,
-    { expiresIn: '24h' }
+    JWT_SECRET,
+    { expiresIn: '24h' } as any
   );
 }
 

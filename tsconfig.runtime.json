@@ -2,10 +2,12 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "@shared/database": ["dist/shared/database"],
+      "@shared/database/*": ["dist/shared/database/*"],
+      "@shared/config": ["dist/shared/config"],
+      "@shared/config/*": ["dist/shared/config/*"],
+      "@shared/utils/*": ["dist/shared/utils/*"],
       "@shared/*": ["dist/shared/*"],
-      "@shared/common": ["dist/shared/common/src"],
-      "@shared/config": ["dist/shared/config/src"],
-      "@shared/db": ["dist/shared/db/src"],
       "@services/*": ["dist/services/*"]
     }
   }
