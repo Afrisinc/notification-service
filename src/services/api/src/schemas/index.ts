@@ -13,6 +13,9 @@
  * import { createTemplateSchema } from '@/schemas';
  */
 
+// Import common schemas first to resolve dependencies
+import { errorResponse } from './common/error-responses';
+
 // Common schemas (errors, pagination, etc.)
 export * from './common';
 
@@ -197,8 +200,6 @@ import {
   OrganizationsResponseSchema,
   UserAppsResponseSchema,
 } from './responses/auth.schema';
-
-import { errorResponse } from './common/error-responses';
 
 // Route Schemas (combining request + response)
 export const RegisterRouteSchema = {
