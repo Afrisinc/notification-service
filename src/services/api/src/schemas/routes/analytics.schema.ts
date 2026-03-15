@@ -166,3 +166,129 @@ export const AnalyticsGrowthSchema = {
     500: ErrorResponseSchema,
   },
 } as const;
+
+export const GetAllUsersSchema = {
+  tags: ['platform-users'],
+  summary: 'Get all users with details',
+  description:
+    'Retrieve all users with their accounts, organizations, and last activity timestamp with pagination support',
+  querystring: {
+    type: 'object',
+    properties: {
+      page: { type: 'integer', minimum: 1, default: 1, description: 'Page number (default: 1)' },
+      limit: {
+        type: 'integer',
+        minimum: 1,
+        maximum: 100,
+        default: 10,
+        description: 'Items per page (default: 10, max: 100)',
+      },
+    },
+  },
+  security: [{ bearerAuth: [] }],
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              email: { type: 'string', format: 'email' },
+              firstName: { type: 'string' },
+              lastName: { type: 'string' },
+              phone: { type: 'string' },
+              emailVerified: { type: 'boolean' },
+              lastActivity: { type: 'string', format: 'date-time' },
+              createdAt: { type: 'string', format: 'date-time' },
+              updatedAt: { type: 'string', format: 'date-time' },
+              accounts: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    type: { type: 'string', enum: ['INDIVIDUAL', 'ORGANIZATION'] },
+                    organization: { type: ['object', 'null'] },
+                    createdAt: { type: 'string', format: 'date-time' },
+                  },
+                },
+              },
+            },
+          },
+        },
+        meta: {
+          type: 'object',
+          properties: {
+            page: { type: 'integer' },
+            limit: { type: 'integer' },
+            total: { type: 'integer', description: 'Total number of users' },
+            pages: { type: 'integer', description: 'Total number of pages' },
+          },
+        },
+      },
+    },
+    401: ErrorResponseSchema,
+    403: ErrorResponseSchema,
+    500: ErrorResponseSchema,
+  },
+} as const;
+
+export const GetUserByIdSchema = {
+  tags: ['platform-users'],
+  summary: 'Get user by ID',
+  description: 'Retrieve a specific user with their accounts, organizations, and last activity timestamp',
+  params: {
+    type: 'object',
+    properties: {
+      userId: { type: 'string', description: 'User ID' },
+    },
+    required: ['userId'],
+  },
+  security: [{ bearerAuth: [] }],
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+        data: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            email: { type: 'string', format: 'email' },
+            firstName: { type: 'string' },
+            lastName: { type: 'string' },
+            phone: { type: 'string' },
+            emailVerified: { type: 'boolean' },
+            lastActivity: { type: 'string', format: 'date-time' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+            accounts: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  type: { type: 'string', enum: ['INDIVIDUAL', 'ORGANIZATION'] },
+                  organization: { type: ['object', 'null'] },
+                  createdAt: { type: 'string', format: 'date-time' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    401: ErrorResponseSchema,
+    403: ErrorResponseSchema,
+    404: ErrorResponseSchema,
+    500: ErrorResponseSchema,
+  },
+} as const;

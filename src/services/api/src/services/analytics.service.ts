@@ -21,6 +21,14 @@ export class AnalyticsService {
     return analyticsRepo.getGrowthMetrics(days);
   }
 
+  async getAllUsersWithDetails(page: number = 1, limit: number = 10) {
+    return analyticsRepo.getAllUsersWithDetails(page, limit);
+  }
+
+  async getUserWithDetails(userId: string) {
+    return analyticsRepo.getUserWithDetails(userId);
+  }
+
   private parseRangeInDays(range: string): number {
     const match = range.match(/(\d+)(d|w|m)/);
     if (!match) return 30;

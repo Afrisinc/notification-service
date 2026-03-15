@@ -185,6 +185,166 @@ export class AnalyticsRepository {
   }
 
   /**
+   * Get all users with their accounts, organizations, and last login
+   */
+  async getAllUsersWithDetails(page: number = 1, limit: number = 10) {
+    try {
+      // Calculate skip value
+      const skip = (page - 1) * limit;
+
+      // Get total count
+      const total = await prismaRead.user.count();
+
+      // Fetch paginated users
+      const users = await prismaRead.user.findMany({
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          email_verified: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip,
+        take: limit,
+      });
+
+      // Fetch all accounts with organizations
+      const accounts = await prismaRead.account.findMany({
+        select: {
+          id: true,
+          type: true,
+          owner_user_id: true,
+          organization_id: true,
+          createdAt: true,
+        },
+      });
+
+      const organizations = await prismaRead.organization.findMany({
+        select: {
+          id: true,
+          name: true,
+          createdAt: true,
+        },
+      });
+
+      const orgMap = new Map(organizations.map((org) => [org.id, org]));
+
+      // Map accounts to users
+      const usersWithAccounts = users.map((user) => ({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        emailVerified: user.email_verified,
+        lastActivity: user.updatedAt, // Last activity timestamp (last update to user profile)
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        accounts: accounts
+          .filter((acc) => acc.owner_user_id === user.id)
+          .map((account) => ({
+            id: account.id,
+            type: account.type,
+            organization: account.organization_id ? orgMap.get(account.organization_id) || null : null,
+            createdAt: account.createdAt,
+          })),
+      }));
+
+      // Calculate pagination metadata
+      const pages = Math.ceil(total / limit);
+
+      return {
+        data: usersWithAccounts,
+        meta: {
+          page,
+          limit,
+          total,
+          pages,
+        },
+      };
+    } catch (error) {
+      logger.error({ error }, 'Failed to fetch users with details');
+      throw error;
+    }
+  }
+
+  /**
+   * Get a specific user with full details
+   */
+  async getUserWithDetails(userId: string) {
+    try {
+      const user = await prismaRead.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          email_verified: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      if (!user) {
+        return null;
+      }
+
+      // Fetch user's accounts
+      const accounts = await prismaRead.account.findMany({
+        where: {
+          owner_user_id: userId,
+        },
+        select: {
+          id: true,
+          type: true,
+          organization_id: true,
+          createdAt: true,
+        },
+      });
+
+      // Fetch organizations
+      const organizations = await prismaRead.organization.findMany({
+        select: {
+          id: true,
+          name: true,
+          createdAt: true,
+        },
+      });
+
+      const orgMap = new Map(organizations.map((org) => [org.id, org]));
+
+      return {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        emailVerified: user.email_verified,
+        lastActivity: user.updatedAt, // Last activity timestamp (last update to user profile)
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        accounts: accounts.map((account) => ({
+          id: account.id,
+          type: account.type,
+          organization: account.organization_id ? orgMap.get(account.organization_id) || null : null,
+          createdAt: account.createdAt,
+        })),
+      };
+    } catch (error) {
+      logger.error({ error, userId }, 'Failed to fetch user details');
+      throw error;
+    }
+  }
+
+  /**
    * Aggregate dates into daily counts
    */
   private aggregateByDate(dates: Date[]): Array<{ date: string; count: number }> {

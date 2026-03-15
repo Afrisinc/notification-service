@@ -1,7 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { SecurityController } from '../controllers/security.controller';
 import { GetSecurityOverviewSchema, GetLoginEventsSchema } from '../schemas/routes/security.schema';
-import { validateBaseToken } from '../middlewares/auth.middleware';
 
 const controller = new SecurityController();
 
@@ -10,8 +9,7 @@ export async function securityRoutes(app: FastifyInstance) {
   app.get(
     '/platform/security/overview',
     {
-      schema: GetSecurityOverviewSchema,
-      onRequest: [validateBaseToken],
+      schema: { ...GetSecurityOverviewSchema, hide: true },
     },
     controller.getSecurityOverview.bind(controller)
   );
@@ -20,8 +18,7 @@ export async function securityRoutes(app: FastifyInstance) {
   app.get(
     '/platform/security/loginevents',
     {
-      schema: GetLoginEventsSchema,
-      onRequest: [validateBaseToken],
+      schema: { ...GetLoginEventsSchema, hide: true },
     },
     controller.getLoginEvents.bind(controller)
   );

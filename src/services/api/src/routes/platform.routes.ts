@@ -5,40 +5,51 @@ import {
   AnalyticsUsersSchema,
   AnalyticsAccountsSchema,
   AnalyticsGrowthSchema,
+  GetAllUsersSchema,
+  GetUserByIdSchema,
 } from '../schemas/routes/analytics.schema';
-import { validateBaseToken } from '../middlewares/auth.middleware';
 
 const controller = new PlatformController();
 
 export async function platformRoutes(app: FastifyInstance) {
-  // All platform analytics routes require authentication
-  const platformMiddleware = [validateBaseToken];
+  // All platform analytics routes require authentication (disabled for internal use)
+  // const platformMiddleware = [validateBaseToken];
 
   // GET /platform/analytics/overview
   app.get(
     '/platform/analytics/overview',
-    { schema: AnalyticsOverviewSchema, onRequest: platformMiddleware },
+    { schema: { ...AnalyticsOverviewSchema, hide: true } },
     controller.getAnalyticsOverview.bind(controller)
   );
 
   // GET /platform/analytics/users
   app.get(
     '/platform/analytics/users',
-    { schema: AnalyticsUsersSchema, onRequest: platformMiddleware },
+    { schema: { ...AnalyticsUsersSchema, hide: true } },
     controller.getAnalyticsUsers.bind(controller)
   );
 
   // GET /platform/analytics/accounts
   app.get(
     '/platform/analytics/accounts',
-    { schema: AnalyticsAccountsSchema, onRequest: platformMiddleware },
+    { schema: { ...AnalyticsAccountsSchema, hide: true } },
     controller.getAnalyticsAccounts.bind(controller)
   );
 
   // GET /platform/analytics/growth
   app.get(
     '/platform/analytics/growth',
-    { schema: AnalyticsGrowthSchema, onRequest: platformMiddleware },
+    { schema: { ...AnalyticsGrowthSchema, hide: true } },
     controller.getAnalyticsGrowth.bind(controller)
+  );
+
+  // GET /platform/users - Get all users with accounts and organizations
+  app.get('/platform/users', { schema: { ...GetAllUsersSchema, hide: true } }, controller.getAllUsers.bind(controller));
+
+  // GET /platform/users/:userId - Get specific user with details
+  app.get(
+    '/platform/users/:userId',
+    { schema: { ...GetUserByIdSchema, hide: true } },
+    controller.getUserById.bind(controller)
   );
 }

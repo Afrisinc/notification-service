@@ -47,4 +47,29 @@ export class PlatformController {
       return ApiResponseHelper.badRequest(reply, getErrorMessage(err));
     }
   }
+
+  async getAllUsers(req: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { page = 1, limit = 10 } = req.query as { page?: number; limit?: number };
+      const result = await this.analyticsService.getAllUsersWithDetails(page, limit);
+      return ApiResponseHelper.successList(reply, 'All users retrieved successfully', result.data, result.meta);
+    } catch (err: unknown) {
+      return ApiResponseHelper.badRequest(reply, getErrorMessage(err));
+    }
+  }
+
+  async getUserById(req: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { userId } = req.params as { userId: string };
+      const data = await this.analyticsService.getUserWithDetails(userId);
+
+      if (!data) {
+        return ApiResponseHelper.notFound(reply, 'User not found');
+      }
+
+      return ApiResponseHelper.success(reply, 'User retrieved successfully', data);
+    } catch (err: unknown) {
+      return ApiResponseHelper.badRequest(reply, getErrorMessage(err));
+    }
+  }
 }
