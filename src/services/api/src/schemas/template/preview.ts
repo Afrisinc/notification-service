@@ -3,31 +3,31 @@
  * Render a template preview without storing notification
  */
 
-import { templateHeaders } from "../common";
+import { templateHeaders } from '../common';
 
 export const previewTemplateRequestBody = {
-  type: "object",
-  required: ["templateCode", "channel", "locale", "variables"],
+  type: 'object',
+  required: ['templateCode', 'channel', 'locale', 'variables'],
   properties: {
     templateCode: {
-      type: "string",
+      type: 'string',
       minLength: 1,
-      description: "Unique template code (e.g., WELCOME_EMAIL)",
+      description: 'Unique template code (e.g., WELCOME_EMAIL)',
     },
     channel: {
-      type: "string",
-      enum: ["EMAIL", "SMS", "PUSH", "IN_APP", "WHATSAPP"],
-      description: "Notification channel",
+      type: 'string',
+      enum: ['EMAIL', 'SMS', 'PUSH', 'IN_APP', 'WHATSAPP'],
+      description: 'Notification channel',
     },
     locale: {
-      type: "string",
-      default: "en",
+      type: 'string',
+      default: 'en',
       minLength: 2,
       maxLength: 5,
       description: "Language/locale code (ISO 639-1). Falls back to 'en' if not found.",
     },
     variables: {
-      type: "object",
+      type: 'object',
       description: "Template variables to inject (e.g., {user: {name: 'John'}})",
       additionalProperties: true,
     },
@@ -35,60 +35,60 @@ export const previewTemplateRequestBody = {
 };
 
 export const previewTemplateResponseBody = {
-  type: "object",
+  type: 'object',
   properties: {
     subject: {
-      type: ["string", "null"],
-      description: "Rendered subject (only for EMAIL templates)",
+      type: ['string', 'null'],
+      description: 'Rendered subject (only for EMAIL templates)',
     },
     content: {
-      type: "string",
-      description: "Rendered template content with variables injected",
+      type: 'string',
+      description: 'Rendered template content with variables injected',
     },
     locale: {
-      type: "string",
-      description: "Locale used for rendering (may differ from requested locale due to fallback)",
+      type: 'string',
+      description: 'Locale used for rendering (may differ from requested locale due to fallback)',
     },
     version: {
-      type: "integer",
-      description: "Version number of template used",
+      type: 'integer',
+      description: 'Version number of template used',
     },
   },
-  required: ["content", "locale", "version"],
+  required: ['content', 'locale', 'version'],
 };
 
 export const previewTemplateSchema = {
-  description: "Render a template preview with provided variables without sending",
-  tags: ["Templates"],
+  description: 'Render a template preview with provided variables without sending',
+  tags: ['Templates'],
   headers: templateHeaders,
   body: previewTemplateRequestBody,
   response: {
     200: {
-      type: "object",
+      type: 'object',
       properties: {
-        success: { type: "boolean" },
-        resp_msg: { type: "string" },
-        resp_code: { type: "number" },
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
         data: previewTemplateResponseBody,
       },
     },
     400: {
-      type: "object",
+      type: 'object',
       properties: {
-        success: { type: "boolean" },
-        resp_msg: { type: "string" },
-        resp_code: { type: "number" },
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
       },
-      description: "Missing required variables or invalid template syntax",
+      description: 'Missing required variables or invalid template syntax',
     },
     404: {
-      type: "object",
+      type: 'object',
       properties: {
-        success: { type: "boolean" },
-        resp_msg: { type: "string" },
-        resp_code: { type: "number" },
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
       },
-      description: "Template not found",
+      description: 'Template not found',
     },
   },
 };

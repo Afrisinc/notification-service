@@ -5,6 +5,7 @@ FastifyHTTP API server for managing notifications and templates in the Afrisinc 
 ## Overview
 
 The API application provides RESTful endpoints for:
+
 - Creating and managing notifications
 - Managing notification templates
 - Querying notification history and statistics
@@ -49,34 +50,40 @@ api/
 ## Key Features
 
 ### Authentication
+
 - JWT token authentication
 - API key authentication
 - Multi-tenant support
 - Authorization middleware
 
 ### Request Validation
+
 - Zod schemas for all endpoints
 - Automatic request/response validation
 - Custom error messages
 - OpenAPI/Swagger documentation
 
 ### Rate Limiting
+
 - Per-API-key rate limiting
 - Configurable limits
 - Redis-backed counter
 
 ### Message Queue Integration
+
 - Publish events to message queue
 - Async notification processing
 - Retry logic on failures
 
 ### Health Checks
+
 - Database connectivity
 - Redis connectivity
 - Message queue connectivity
 - Dependency status
 
 ### Monitoring
+
 - Request/response logging
 - Correlation ID tracking
 - Performance metrics
@@ -87,6 +94,7 @@ api/
 ### Notifications
 
 #### Create Notification
+
 ```
 POST /api/v1/notifications
 Authorization: Bearer <token>
@@ -104,24 +112,28 @@ Authorization: Bearer <token>
 ```
 
 #### Get Notification
+
 ```
 GET /api/v1/notifications/:id
 Authorization: Bearer <token>
 ```
 
 #### List Notifications
+
 ```
 GET /api/v1/notifications?page=1&limit=20&status=sent
 Authorization: Bearer <token>
 ```
 
 #### Update Notification
+
 ```
 PUT /api/v1/notifications/:id
 Authorization: Bearer <token>
 ```
 
 #### Delete Notification
+
 ```
 DELETE /api/v1/notifications/:id
 Authorization: Bearer <token>
@@ -130,6 +142,7 @@ Authorization: Bearer <token>
 ### Templates
 
 #### Create Template
+
 ```
 POST /api/v1/templates
 Authorization: Bearer <token>
@@ -144,6 +157,7 @@ Authorization: Bearer <token>
 ```
 
 #### Get/Update/Delete Templates
+
 ```
 GET    /api/v1/templates/:id
 PUT    /api/v1/templates/:id
@@ -190,17 +204,20 @@ SMS_PROVIDER=twilio
 ## Development
 
 ### Setup
+
 ```bash
 cd apps/api
 npm install
 ```
 
 ### Run
+
 ```bash
 npm run dev
 ```
 
 ### Test
+
 ```bash
 npm test
 npm test:watch
@@ -208,11 +225,13 @@ npm test:coverage
 ```
 
 ### Build
+
 ```bash
 npm run build
 ```
 
 ### Lint
+
 ```bash
 npm run lint
 npm run lint:fix
@@ -222,11 +241,13 @@ npm run format
 ## Production
 
 ### Build Docker Image
+
 ```bash
 docker build -t notification-api:latest -f Dockerfile .
 ```
 
 ### Run Container
+
 ```bash
 docker run -p 8010:8010 \
   -e DATABASE_URL="..." \
@@ -237,6 +258,7 @@ docker run -p 8010:8010 \
 ## Scaling
 
 The API is stateless and can be scaled horizontally:
+
 - Deploy multiple instances
 - Use load balancer (nginx, cloud load balancer)
 - Share session storage via Redis
@@ -245,6 +267,7 @@ The API is stateless and can be scaled horizontally:
 ## Error Handling
 
 Standard error response format:
+
 ```json
 {
   "error": {
@@ -277,6 +300,7 @@ Standard error response format:
 ## OpenAPI Documentation
 
 Interactive API docs available at:
+
 - Development: `http://localhost:8010/docs`
 - Swagger JSON: `http://localhost:8010/docs/json`
 

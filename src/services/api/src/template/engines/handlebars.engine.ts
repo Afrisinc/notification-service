@@ -111,7 +111,7 @@ export class HandlebarsEngine {
    */
   public renderSafe(
     template: string,
-    variables: Record<string, any>,
+    variables: Record<string, any>
   ): { success: boolean; content?: string; error?: string } {
     try {
       const content = this.render(template, variables);

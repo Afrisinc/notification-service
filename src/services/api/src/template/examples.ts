@@ -11,10 +11,10 @@
  * Variables: user.name, user.email, appName, verificationLink, validityHours
  */
 export const WELCOME_EMAIL_TEMPLATE = {
-  code: "WELCOME_EMAIL",
-  channel: "EMAIL",
-  language: "en",
-  subject: "Welcome to {{appName}}, {{user.name}}!",
+  code: 'WELCOME_EMAIL',
+  channel: 'EMAIL',
+  language: 'en',
+  subject: 'Welcome to {{appName}}, {{user.name}}!',
   content: `
     <html>
       <head>
@@ -52,15 +52,15 @@ export const WELCOME_EMAIL_TEMPLATE = {
       </body>
     </html>
   `,
-  description: "Welcome email sent to new users with email verification link",
+  description: 'Welcome email sent to new users with email verification link',
   requiredVariables: [
-    "appName",
-    "user.name",
-    "user.email",
-    "verificationLink",
-    "validityHours",
-    "createdDate",
-    "currentYear",
+    'appName',
+    'user.name',
+    'user.email',
+    'verificationLink',
+    'validityHours',
+    'createdDate',
+    'currentYear',
   ],
 };
 
@@ -70,13 +70,13 @@ export const WELCOME_EMAIL_TEMPLATE = {
  * Variables: appName, otp, validityMinutes
  */
 export const OTP_SMS_TEMPLATE = {
-  code: "OTP_SMS",
-  channel: "SMS",
-  language: "en",
+  code: 'OTP_SMS',
+  channel: 'SMS',
+  language: 'en',
   content:
-    "Your {{appName}} verification code is: {{otp}}. Valid for {{validityMinutes}} minutes. Never share this code.",
-  description: "One-Time Password verification SMS",
-  requiredVariables: ["appName", "otp", "validityMinutes"],
+    'Your {{appName}} verification code is: {{otp}}. Valid for {{validityMinutes}} minutes. Never share this code.',
+  description: 'One-Time Password verification SMS',
+  requiredVariables: ['appName', 'otp', 'validityMinutes'],
 };
 
 /**
@@ -85,13 +85,13 @@ export const OTP_SMS_TEMPLATE = {
  * Variables: orderNumber, trackingUrl, estimatedDelivery
  */
 export const ORDER_SHIPPED_PUSH_TEMPLATE = {
-  code: "ORDER_SHIPPED",
-  channel: "PUSH",
-  language: "en",
+  code: 'ORDER_SHIPPED',
+  channel: 'PUSH',
+  language: 'en',
   content:
-    "Your order #{{orderNumber}} has shipped! 📦 Track it here: {{trackingUrl}} - Arriving {{estimatedDelivery}}",
-  description: "Push notification when customer order is shipped",
-  requiredVariables: ["orderNumber", "trackingUrl", "estimatedDelivery"],
+    'Your order #{{orderNumber}} has shipped! 📦 Track it here: {{trackingUrl}} - Arriving {{estimatedDelivery}}',
+  description: 'Push notification when customer order is shipped',
+  requiredVariables: ['orderNumber', 'trackingUrl', 'estimatedDelivery'],
 };
 
 /**
@@ -100,13 +100,12 @@ export const ORDER_SHIPPED_PUSH_TEMPLATE = {
  * Variables: sender.name, message.preview, messageUrl
  */
 export const NEW_MESSAGE_INAPP_TEMPLATE = {
-  code: "NEW_MESSAGE",
-  channel: "IN_APP",
-  language: "en",
-  content:
-    "{{sender.name}} sent you a message: {{message.preview}}... {{#if hasAttachment}}📎 with attachment{{/if}}",
-  description: "In-app notification for new user messages",
-  requiredVariables: ["sender.name", "message.preview", "hasAttachment"],
+  code: 'NEW_MESSAGE',
+  channel: 'IN_APP',
+  language: 'en',
+  content: '{{sender.name}} sent you a message: {{message.preview}}... {{#if hasAttachment}}📎 with attachment{{/if}}',
+  description: 'In-app notification for new user messages',
+  requiredVariables: ['sender.name', 'message.preview', 'hasAttachment'],
 };
 
 /**
@@ -115,9 +114,9 @@ export const NEW_MESSAGE_INAPP_TEMPLATE = {
  * Variables: patient.name, appointment.date, appointment.time, doctor.name, clinicName
  */
 export const APPOINTMENT_REMINDER_WHATSAPP_TEMPLATE = {
-  code: "APPOINTMENT_REMINDER",
-  channel: "WHATSAPP",
-  language: "en",
+  code: 'APPOINTMENT_REMINDER',
+  channel: 'WHATSAPP',
+  language: 'en',
   content: `Hi {{patient.name}}, 👋
 
 This is a reminder for your appointment:
@@ -130,26 +129,20 @@ This is a reminder for your appointment:
 Please arrive 10 minutes early. If you need to reschedule, reply with RESCHEDULE.
 
 Thank you!`,
-  description: "WhatsApp appointment reminder for patients",
-  requiredVariables: [
-    "patient.name",
-    "appointment.date",
-    "appointment.time",
-    "doctor.name",
-    "clinicName",
-  ],
+  description: 'WhatsApp appointment reminder for patients',
+  requiredVariables: ['patient.name', 'appointment.date', 'appointment.time', 'doctor.name', 'clinicName'],
 };
 
 /**
  * Example API Request: Create Welcome Email Template
  */
 export const CREATE_WELCOME_EMAIL_REQUEST = {
-  code: "WELCOME_EMAIL",
-  channel: "EMAIL",
-  subject: "Welcome to {{appName}}, {{user.name}}!",
+  code: 'WELCOME_EMAIL',
+  channel: 'EMAIL',
+  subject: 'Welcome to {{appName}}, {{user.name}}!',
   content: `<html><body><h1>Welcome {{user.name}}!</h1><p>Thank you for joining {{appName}}.</p><a href="{{verificationLink}}">Verify Email</a></body></html>`,
-  language: "en",
-  description: "Welcome email with email verification",
+  language: 'en',
+  description: 'Welcome email with email verification',
 };
 
 /**
@@ -157,12 +150,12 @@ export const CREATE_WELCOME_EMAIL_REQUEST = {
  */
 export const CREATE_TEMPLATE_RESPONSE = {
   success: true,
-  resp_msg: "Template created successfully",
+  resp_msg: 'Template created successfully',
   resp_code: 1001,
   data: {
-    id: "550e8400-e29b-41d4-a716-446655440000",
-    code: "WELCOME_EMAIL",
-    channel: "EMAIL",
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    code: 'WELCOME_EMAIL',
+    channel: 'EMAIL',
     active: true,
   },
 };
@@ -171,18 +164,18 @@ export const CREATE_TEMPLATE_RESPONSE = {
  * Example API Request: Preview Template
  */
 export const PREVIEW_TEMPLATE_REQUEST = {
-  templateCode: "WELCOME_EMAIL",
-  channel: "EMAIL",
-  locale: "en",
+  templateCode: 'WELCOME_EMAIL',
+  channel: 'EMAIL',
+  locale: 'en',
   variables: {
-    appName: "Afrisinc Notify",
+    appName: 'Afrisinc Notify',
     user: {
-      name: "John Doe",
-      email: "john.doe@example.com",
+      name: 'John Doe',
+      email: 'john.doe@example.com',
     },
-    verificationLink: "https://app.example.com/verify/abc123",
+    verificationLink: 'https://app.example.com/verify/abc123',
     validityHours: 24,
-    createdDate: "2025-02-09T18:30:00Z",
+    createdDate: '2025-02-09T18:30:00Z',
     currentYear: 2025,
   },
 };
@@ -192,12 +185,12 @@ export const PREVIEW_TEMPLATE_REQUEST = {
  */
 export const PREVIEW_TEMPLATE_RESPONSE = {
   success: true,
-  resp_msg: "Template rendered successfully",
+  resp_msg: 'Template rendered successfully',
   resp_code: 1000,
   data: {
-    subject: "Welcome to Afrisinc Notify, John Doe!",
+    subject: 'Welcome to Afrisinc Notify, John Doe!',
     content: `<html>...<h1>Welcome John Doe!</h1>...<a href="https://app.example.com/verify/abc123">Verify Email</a>...</html>`,
-    locale: "en",
+    locale: 'en',
     version: 1,
   },
 };
@@ -206,9 +199,9 @@ export const PREVIEW_TEMPLATE_RESPONSE = {
  * Example API Request: Create New Template Version
  */
 export const CREATE_VERSION_REQUEST = {
-  subject: "Welcome to {{appName}}, {{user.name}}! (Updated)",
+  subject: 'Welcome to {{appName}}, {{user.name}}! (Updated)',
   content: `<html><body><h1>Welcome {{user.name}}!</h1><p>Thank you for choosing {{appName}}.</p><p>Please verify your email: <a href="{{verificationLink}}">Verify Now</a></p></body></html>`,
-  createdBy: "admin@example.com",
+  createdBy: 'admin@example.com',
 };
 
 /**
@@ -216,13 +209,13 @@ export const CREATE_VERSION_REQUEST = {
  */
 export const CREATE_VERSION_RESPONSE = {
   success: true,
-  resp_msg: "Template version created successfully",
+  resp_msg: 'Template version created successfully',
   resp_code: 1001,
   data: {
-    id: "660e8400-e29b-41d4-a716-446655440001",
+    id: '660e8400-e29b-41d4-a716-446655440001',
     version: 2,
     isActive: false,
-    createdAt: "2025-02-09T19:45:00Z",
+    createdAt: '2025-02-09T19:45:00Z',
   },
 };
 
@@ -238,13 +231,13 @@ export const ACTIVATE_VERSION_REQUEST = {
  */
 export const ACTIVATE_VERSION_RESPONSE = {
   success: true,
-  resp_msg: "Template version activated successfully",
+  resp_msg: 'Template version activated successfully',
   resp_code: 1000,
   data: {
-    id: "660e8400-e29b-41d4-a716-446655440001",
+    id: '660e8400-e29b-41d4-a716-446655440001',
     version: 2,
     isActive: true,
-    createdAt: "2025-02-09T19:45:00Z",
+    createdAt: '2025-02-09T19:45:00Z',
   },
 };
 

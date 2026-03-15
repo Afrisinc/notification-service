@@ -164,9 +164,9 @@ RETRY_BACKOFF_MULTIPLIER=2
 import { getConfig, isDevelopment } from '@afrisinc/notify-config';
 
 const config = getConfig();
-console.log(config.API_PORT);        // 8010
-console.log(config.DATABASE_URL);    // postgresql://...
-console.log(isDevelopment());         // true|false
+console.log(config.API_PORT); // 8010
+console.log(config.DATABASE_URL); // postgresql://...
+console.log(isDevelopment()); // true|false
 ```
 
 ### Email Provider Configuration
@@ -243,6 +243,7 @@ NODE_ENV=production npm start
 ```
 
 Different defaults per environment:
+
 - **Development**: Pretty logging, debug level
 - **Staging**: Structured logging, info level
 - **Production**: Structured JSON logging, warn level

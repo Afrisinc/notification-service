@@ -5,6 +5,7 @@ Consumes in-app notifications from message queue and persists them in the databa
 ## Overview
 
 Independent worker service that:
+
 - Listens to `notifications.inapp` queue topic
 - Stores in-app notifications in database
 - Marks as ready for retrieval
@@ -152,6 +153,7 @@ POST  /api/v1/notifications/inapp/mark-all   # Mark all as read
 ## Scaling
 
 Run multiple instances for parallel processing:
+
 ```bash
 docker run ... worker-inapp-1
 docker run ... worker-inapp-2

@@ -5,7 +5,7 @@ export interface TenantDTO {
   id: string;
   code: string;
   name: string;
-  status: "ACTIVE" | "SUSPENDED";
+  status: 'ACTIVE' | 'SUSPENDED';
   createdAt?: Date;
   updatedAt?: Date;
 }

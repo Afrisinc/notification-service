@@ -5,6 +5,7 @@ Consumes email notifications from message queue and sends them via configured pr
 ## Overview
 
 Independent worker service that:
+
 - Listens to `notifications.email` queue topic
 - Fetches notification details from database
 - Sends email via configured provider
@@ -35,6 +36,7 @@ worker-email/
 ## Supported Providers
 
 ### SMTP
+
 - Protocol: SMTP/TLS
 - Configuration:
   ```env
@@ -47,6 +49,7 @@ worker-email/
   ```
 
 ### SendGrid
+
 - API-based email service
 - Configuration:
   ```env
@@ -56,6 +59,7 @@ worker-email/
   ```
 
 ### AWS SES
+
 - AWS service
 - Configuration:
   ```env
@@ -69,6 +73,7 @@ worker-email/
 ## Message Format
 
 Receives from queue:
+
 ```typescript
 interface EmailNotificationMessage {
   notificationId: string;
@@ -118,23 +123,27 @@ interface EmailNotificationMessage {
 ## Features
 
 ### Retry Logic
+
 - Automatic retry on transient failures
 - Exponential backoff
 - Max 3 retries by default
 - Configurable backoff parameters
 
 ### Error Handling
+
 - Distinguishes retryable vs permanent errors
 - Invalid email: Non-retryable
 - Provider timeout: Retryable
 - Authentication failure: Non-retryable
 
 ### Dead Letter Queue (DLQ)
+
 - Unrecoverable failures sent to DLQ
 - Manual replay capability
 - Preserved for investigation
 
 ### Monitoring
+
 - Structured logging per message
 - Correlation ID tracking
 - Success/failure metrics
@@ -143,22 +152,26 @@ interface EmailNotificationMessage {
 ## Development
 
 ### Setup
+
 ```bash
 cd apps/worker-email
 npm install
 ```
 
 ### Run
+
 ```bash
 npm run dev
 ```
 
 ### Build
+
 ```bash
 npm run build
 ```
 
 ### Test
+
 ```bash
 npm test
 npm test:coverage
@@ -213,6 +226,7 @@ docker run -e DATABASE_URL="..." \
 ## Health Checks
 
 Worker implements health check endpoint:
+
 ```
 GET /health
 
@@ -232,6 +246,7 @@ GET /health
 ## Scaling
 
 Run multiple instances for parallel processing:
+
 ```bash
 docker run ... worker-1
 docker run ... worker-2
@@ -239,12 +254,14 @@ docker run ... worker-3
 ```
 
 Load balanced via message queue:
+
 - Bull: Redis-backed, automatic distribution
 - RabbitMQ: Queue-based distribution
 
 ## Monitoring
 
 ### Metrics to Track
+
 - Messages processed per minute
 - Success/failure rate
 - Average processing time
@@ -253,6 +270,7 @@ Load balanced via message queue:
 - DLQ size
 
 ### Logging
+
 ```
 {
   "timestamp": "2024-01-15T10:30:00Z",
@@ -270,6 +288,7 @@ Load balanced via message queue:
 ## Troubleshooting
 
 ### Provider Connection Issues
+
 ```bash
 # Test SMTP
 telnet smtp.example.com 587
@@ -280,6 +299,7 @@ curl -X POST https://api.sendgrid.com/v3/mail/send \
 ```
 
 ### Queue Connection Issues
+
 ```bash
 # Check Redis
 redis-cli ping
@@ -289,6 +309,7 @@ rabbitmqctl status
 ```
 
 ### Message Stuck in Queue
+
 ```bash
 # Check queue
 npm run queue:status

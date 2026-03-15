@@ -51,7 +51,7 @@ export class GuestQueuePublisher implements IQueuePublisher {
         queueSize: this.messages.size,
         totalProcessed: this.messageCount,
       },
-      '📨 [GUEST QUEUE] Message published to in-memory queue',
+      '📨 [GUEST QUEUE] Message published to in-memory queue'
     );
 
     // For development, log the full message structure
@@ -136,24 +136,24 @@ export class GuestQueuePublisher implements IQueuePublisher {
       return; // Don't cleanup during tests
     }
 
-    setInterval(() => {
-      const now = Date.now();
-      let cleaned = 0;
+    setInterval(
+      () => {
+        const now = Date.now();
+        let cleaned = 0;
 
-      for (const [key, stored] of this.messages.entries()) {
-        if (now - stored.publishedAt.getTime() > this.maxRetentionMs) {
-          this.messages.delete(key);
-          cleaned++;
+        for (const [key, stored] of this.messages.entries()) {
+          if (now - stored.publishedAt.getTime() > this.maxRetentionMs) {
+            this.messages.delete(key);
+            cleaned++;
+          }
         }
-      }
 
-      if (cleaned > 0) {
-        logger.debug(
-          { cleaned, remaining: this.messages.size },
-          '[GUEST QUEUE] Cleanup completed',
-        );
-      }
-    }, 60 * 60 * 1000); // Run every hour
+        if (cleaned > 0) {
+          logger.debug({ cleaned, remaining: this.messages.size }, '[GUEST QUEUE] Cleanup completed');
+        }
+      },
+      60 * 60 * 1000
+    ); // Run every hour
   }
 
   async disconnect(): Promise<void> {

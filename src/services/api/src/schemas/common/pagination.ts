@@ -3,37 +3,37 @@
  */
 
 export const paginationMeta = {
-  type: "object",
+  type: 'object',
   properties: {
     limit: {
-      type: "integer",
-      description: "Number of items per page",
+      type: 'integer',
+      description: 'Number of items per page',
     },
     offset: {
-      type: "integer",
-      description: "Number of items to skip",
+      type: 'integer',
+      description: 'Number of items to skip',
     },
     total: {
-      type: "integer",
-      description: "Total number of items",
+      type: 'integer',
+      description: 'Total number of items',
     },
   },
-  required: ["limit", "offset", "total"],
+  required: ['limit', 'offset', 'total'],
 };
 
 export const paginationQueryParams = {
-  type: "object",
+  type: 'object',
   properties: {
     limit: {
-      type: "integer",
-      description: "Items per page (max 100)",
+      type: 'integer',
+      description: 'Items per page (max 100)',
       default: 20,
       maximum: 100,
       minimum: 1,
     },
     offset: {
-      type: "integer",
-      description: "Items to skip",
+      type: 'integer',
+      description: 'Items to skip',
       default: 0,
       minimum: 0,
     },
@@ -41,14 +41,14 @@ export const paginationQueryParams = {
 };
 
 export const listResponse = (itemSchema: any) => ({
-  type: "object",
+  type: 'object',
   properties: {
     data: {
-      type: "array",
+      type: 'array',
       items: itemSchema,
-      description: "List of items",
+      description: 'List of items',
     },
     meta: paginationMeta,
   },
-  required: ["data", "meta"],
+  required: ['data', 'meta'],
 });

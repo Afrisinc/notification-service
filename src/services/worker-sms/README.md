@@ -5,6 +5,7 @@ Consumes SMS notifications from message queue and sends them via configured prov
 ## Overview
 
 Independent worker service that:
+
 - Listens to `notifications.sms` queue topic
 - Validates phone numbers
 - Sends SMS via configured provider
@@ -15,6 +16,7 @@ Independent worker service that:
 ## Supported Providers
 
 ### Twilio
+
 ```env
 SMS_PROVIDER=twilio
 TWILIO_ACCOUNT_SID=AC...
@@ -23,6 +25,7 @@ TWILIO_FROM_NUMBER=+1234567890
 ```
 
 ### AfricasTalking
+
 ```env
 SMS_PROVIDER=africastalking
 AFRICASTALKING_API_KEY=...
@@ -56,7 +59,7 @@ worker-sms/
 interface SmsNotificationMessage {
   notificationId: string;
   tenantId: string;
-  recipient: string;  // Phone number
+  recipient: string; // Phone number
   body: string;
   metadata?: Record<string, any>;
 }
@@ -136,6 +139,7 @@ Returns queue, database, and provider connectivity status.
 ## Scaling
 
 Run multiple instances:
+
 ```bash
 docker run ... worker-sms-1
 docker run ... worker-sms-2

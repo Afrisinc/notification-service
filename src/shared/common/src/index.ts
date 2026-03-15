@@ -1,10 +1,10 @@
 // Export types
-export * from "./types/notification";
-export * from "./types/email";
+export * from './types/notification';
+export * from './types/email';
 
 // Export enums
-export * from "./enums/channel";
-export * from "./enums/status";
+export * from './enums/channel';
+export * from './enums/status';
 
 // Export constants
 export const DEFAULT_TIMEOUT_MS = 80100;

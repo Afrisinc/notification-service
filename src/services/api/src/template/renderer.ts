@@ -81,7 +81,7 @@ export class TemplateRenderer {
           language: templateData.language,
           version: templateData.version,
         },
-        'Template rendered successfully',
+        'Template rendered successfully'
       );
 
       return {
@@ -98,7 +98,7 @@ export class TemplateRenderer {
           templateCode: templateData.code,
           templateId: templateData.id,
         },
-        'Failed to render template',
+        'Failed to render template'
       );
       throw error;
     }
@@ -112,7 +112,7 @@ export class TemplateRenderer {
    */
   public renderSafe(
     templateData: TemplateData,
-    variables: Record<string, any>,
+    variables: Record<string, any>
   ): { success: boolean; data?: RenderResult; error?: string } {
     try {
       const result = this.render(templateData, variables);

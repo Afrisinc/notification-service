@@ -25,35 +25,25 @@ export class QueuePublisherFactory {
   /**
    * Create a queue publisher based on configuration
    */
-  static async createPublisher(
-    config: QueuePublisherConfig,
-  ): Promise<IQueuePublisher> {
-    logger.info(
-      { provider: config.provider },
-      'Creating queue publisher instance',
-    );
+  static async createPublisher(config: QueuePublisherConfig): Promise<IQueuePublisher> {
+    logger.info({ provider: config.provider }, 'Creating queue publisher instance');
 
     switch (config.provider) {
       case 'guest':
         return new GuestQueuePublisher(config.options);
 
       case 'rabbitmq': {
-        const rabbitmqUrl =
-          process.env.RABBITMQ_URL || 'amqp://admin:password@localhost:5672';
+        const rabbitmqUrl = process.env.RABBITMQ_URL || 'amqp://admin:password@localhost:5672';
         const publisher = new RabbitMQPublisher(rabbitmqUrl);
         await publisher.connect();
         return publisher;
       }
 
       case 'redis':
-        throw new Error(
-          'Redis queue publisher not yet implemented. Use "guest" for development.',
-        );
+        throw new Error('Redis queue publisher not yet implemented. Use "guest" for development.');
 
       case 'aws-sqs':
-        throw new Error(
-          'AWS SQS queue publisher not yet implemented. Use "guest" for development.',
-        );
+        throw new Error('AWS SQS queue publisher not yet implemented. Use "guest" for development.');
 
       default:
         throw new Error(`Unknown queue provider: ${config.provider}`);
@@ -64,16 +54,12 @@ export class QueuePublisherFactory {
    * Get default configuration based on environment
    */
   static getDefaultConfig(): QueuePublisherConfig {
-    const provider =
-      (process.env.QUEUE_PROVIDER as QueueProviderType) || 'guest';
+    const provider = (process.env.QUEUE_PROVIDER as QueueProviderType) || 'guest';
 
     return {
       provider,
       options: {
-        maxRetentionMs: parseInt(
-          process.env.QUEUE_MAX_RETENTION_MS || '86400000',
-          10,
-        ),
+        maxRetentionMs: parseInt(process.env.QUEUE_MAX_RETENTION_MS || '86400000', 10),
         maxMessages: parseInt(process.env.QUEUE_MAX_MESSAGES || '10000', 10),
         rabbitmqUrl: process.env.RABBITMQ_URL,
       },
@@ -90,9 +76,7 @@ export class QueuePublisherFactory {
       errors.push('Queue provider is required');
     }
 
-    if (
-      !['guest', 'rabbitmq', 'redis', 'aws-sqs'].includes(config.provider)
-    ) {
+    if (!['guest', 'rabbitmq', 'redis', 'aws-sqs'].includes(config.provider)) {
       errors.push(`Unknown queue provider: ${config.provider}`);
     }
 
