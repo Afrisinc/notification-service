@@ -1,180 +1,181 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Verify Your Email Address</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f5f5f5;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #fff;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .header {
-            text-align: center;
-            padding-bottom: 30px;
-            border-bottom: 2px solid #17a2b8;
-        }
-        .verification-icon {
-            font-size: 48px;
-            margin-bottom: 15px;
-        }
-        .title {
-            font-size: 24px;
-            font-weight: bold;
-            color: #17a2b8;
-        }
-        .content {
-            padding: 30px 0;
-        }
-        .body-text {
-            margin-bottom: 15px;
-            line-height: 1.8;
-        }
-        .cta-button {
-            display: inline-block;
-            background-color: #17a2b8;
-            color: white;
-            padding: 12px 30px;
-            border-radius: 4px;
-            text-decoration: none;
-            margin: 20px 0;
-            font-weight: 500;
-        }
-        .cta-button:hover {
-            background-color: #138496;
-        }
-        .code-box {
-            background-color: #e8f4f8;
-            border: 2px solid #17a2b8;
-            border-radius: 4px;
-            padding: 20px;
-            margin: 20px 0;
-            text-align: center;
-        }
-        .code-label {
-            font-size: 12px;
-            color: #555;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .verification-code {
-            font-size: 32px;
-            font-weight: bold;
-            font-family: 'Courier New', monospace;
-            letter-spacing: 3px;
-            color: #17a2b8;
-            word-break: break-all;
-        }
-        .code-expiry {
-            font-size: 12px;
-            color: #666;
-            margin-top: 10px;
-        }
-        .instructions {
-            background-color: #f0f7f8;
-            border-left: 4px solid #17a2b8;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 4px;
-        }
-        .instructions h3 {
-            margin-top: 0;
-            color: #17a2b8;
-        }
-        .instructions ol {
-            margin: 10px 0;
-            padding-left: 20px;
-        }
-        .instructions li {
-            margin: 8px 0;
-            line-height: 1.6;
-        }
-        .info-box {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            padding: 15px;
-            border-radius: 4px;
-            margin: 20px 0;
-            font-size: 14px;
-        }
-        .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-            font-size: 12px;
-            color: #666;
-            text-align: center;
-        }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        background-color: #f5f5f5;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #fff;
+        padding: 40px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .header {
+        text-align: center;
+        padding-bottom: 30px;
+        border-bottom: 2px solid #17a2b8;
+      }
+      .verification-icon {
+        font-size: 48px;
+        margin-bottom: 15px;
+      }
+      .title {
+        font-size: 24px;
+        font-weight: bold;
+        color: #17a2b8;
+      }
+      .content {
+        padding: 30px 0;
+      }
+      .body-text {
+        margin-bottom: 15px;
+        line-height: 1.8;
+      }
+      .cta-button {
+        display: inline-block;
+        background-color: #17a2b8;
+        color: white;
+        padding: 12px 30px;
+        border-radius: 4px;
+        text-decoration: none;
+        margin: 20px 0;
+        font-weight: 500;
+      }
+      .cta-button:hover {
+        background-color: #138496;
+      }
+      .code-box {
+        background-color: #e8f4f8;
+        border: 2px solid #17a2b8;
+        border-radius: 4px;
+        padding: 20px;
+        margin: 20px 0;
+        text-align: center;
+      }
+      .code-label {
+        font-size: 12px;
+        color: #555;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .verification-code {
+        font-size: 32px;
+        font-weight: bold;
+        font-family: 'Courier New', monospace;
+        letter-spacing: 3px;
+        color: #17a2b8;
+        word-break: break-all;
+      }
+      .code-expiry {
+        font-size: 12px;
+        color: #666;
+        margin-top: 10px;
+      }
+      .instructions {
+        background-color: #f0f7f8;
+        border-left: 4px solid #17a2b8;
+        padding: 15px;
+        margin: 20px 0;
+        border-radius: 4px;
+      }
+      .instructions h3 {
+        margin-top: 0;
+        color: #17a2b8;
+      }
+      .instructions ol {
+        margin: 10px 0;
+        padding-left: 20px;
+      }
+      .instructions li {
+        margin: 8px 0;
+        line-height: 1.6;
+      }
+      .info-box {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        padding: 15px;
+        border-radius: 4px;
+        margin: 20px 0;
+        font-size: 14px;
+      }
+      .footer {
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+        font-size: 12px;
+        color: #666;
+        text-align: center;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="container">
-        <div class="header">
-            <div class="verification-icon">✉️</div>
-            <div class="title">Verify Your Email Address</div>
+      <div class="header">
+        <div class="verification-icon">✉️</div>
+        <div class="title">Verify Your Email Address</div>
+      </div>
+
+      <div class="content">
+        <p class="body-text">Hello {{userName}},</p>
+
+        <p class="body-text">
+          Thank you for signing up with AfrisInc! To complete your account activation and ensure your email is valid,
+          please verify your email address using one of the methods below.
+        </p>
+
+        <div class="code-box">
+          <div class="code-label">Your Verification Code:</div>
+          <div class="verification-code">{{verificationCode}}</div>
+          <div class="code-expiry">Expires in: {{expiryTime}}</div>
         </div>
 
-        <div class="content">
-            <p class="body-text">
-                Hello {{userName}},
-            </p>
-
-            <p class="body-text">
-                Thank you for signing up with AfrisInc! To complete your account activation and ensure your email is valid, please verify your email address using one of the methods below.
-            </p>
-
-            <div class="code-box">
-                <div class="code-label">Your Verification Code:</div>
-                <div class="verification-code">{{verificationCode}}</div>
-                <div class="code-expiry">Expires in: {{expiryTime}}</div>
-            </div>
-
-            <div style="text-align: center;">
-                <a href="{{verificationLink}}" class="cta-button">Verify Email Now</a>
-            </div>
-
-            <div class="instructions">
-                <h3>How to Verify:</h3>
-                <ol>
-                    <li><strong>Method 1:</strong> Click the button above to verify instantly</li>
-                    <li><strong>Method 2:</strong> Go to our website and enter the code: <code style="background-color: #fff; padding: 2px 4px;">{{verificationCode}}</code></li>
-                </ol>
-            </div>
-
-            <div class="info-box">
-                <strong>Important:</strong>
-                <ul style="margin: 10px 0; padding-left: 20px;">
-                    <li>This verification code will expire in {{expiryTime}}</li>
-                    <li>If the code expires, you can request a new one</li>
-                    <li>Your account is temporarily restricted until verified</li>
-                    <li>Once verified, you'll have full access to all features</li>
-                </ul>
-            </div>
-
-            <p class="body-text">
-                <strong>Didn't sign up?</strong> If you believe this email was sent in error, you can safely ignore it. Your email will not be verified.
-            </p>
-
-            <p class="body-text">
-                Questions? Contact our support team at support@afrisinc.com
-            </p>
+        <div style="text-align: center">
+          <a href="{{verificationLink}}" class="cta-button">Verify Email Now</a>
         </div>
 
-        <div class="footer">
-            <p>© 2025 AfrisInc. All rights reserved.</p>
-            <p>This is an automated message, please do not reply to this email.</p>
+        <div class="instructions">
+          <h3>How to Verify:</h3>
+          <ol>
+            <li><strong>Method 1:</strong> Click the button above to verify instantly</li>
+            <li>
+              <strong>Method 2:</strong> Go to our website and enter the code:
+              <code style="background-color: #fff; padding: 2px 4px">{{verificationCode}}</code>
+            </li>
+          </ol>
         </div>
+
+        <div class="info-box">
+          <strong>Important:</strong>
+          <ul style="margin: 10px 0; padding-left: 20px">
+            <li>This verification code will expire in {{expiryTime}}</li>
+            <li>If the code expires, you can request a new one</li>
+            <li>Your account is temporarily restricted until verified</li>
+            <li>Once verified, you'll have full access to all features</li>
+          </ul>
+        </div>
+
+        <p class="body-text">
+          <strong>Didn't sign up?</strong> If you believe this email was sent in error, you can safely ignore it. Your
+          email will not be verified.
+        </p>
+
+        <p class="body-text">Questions? Contact our support team at support@afrisinc.com</p>
+      </div>
+
+      <div class="footer">
+        <p>© 2025 AfrisInc. All rights reserved.</p>
+        <p>This is an automated message, please do not reply to this email.</p>
+      </div>
     </div>
-</body>
+  </body>
 </html>

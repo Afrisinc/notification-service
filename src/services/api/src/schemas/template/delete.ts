@@ -3,54 +3,54 @@
  * Delete a template
  */
 
-import { templateHeaders } from "../common";
+import { templateHeaders } from '../common';
 
 export const deleteTemplateSchema = {
-  description: "Delete a template",
-  tags: ["Templates"],
+  description: 'Delete a template',
+  tags: ['Templates'],
   headers: templateHeaders,
   params: {
-    type: "object",
+    type: 'object',
     properties: {
       id: {
-        type: "string",
-        format: "uuid",
-        description: "Template ID",
+        type: 'string',
+        format: 'uuid',
+        description: 'Template ID',
       },
     },
-    required: ["id"],
+    required: ['id'],
   },
   response: {
     204: {
-      type: "object",
+      type: 'object',
       properties: {
-        success: { type: "boolean" },
-        resp_msg: { type: "string" },
-        resp_code: { type: "number" },
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
       },
     },
     400: {
-      type: "object",
+      type: 'object',
       properties: {
-        success: { type: "boolean" },
-        resp_msg: { type: "string" },
-        resp_code: { type: "number" },
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
       },
     },
     401: {
-      type: "object",
+      type: 'object',
       properties: {
-        success: { type: "boolean" },
-        resp_msg: { type: "string" },
-        resp_code: { type: "number" },
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
       },
     },
     404: {
-      type: "object",
+      type: 'object',
       properties: {
-        success: { type: "boolean" },
-        resp_msg: { type: "string" },
-        resp_code: { type: "number" },
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
       },
     },
   },

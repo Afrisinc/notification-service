@@ -8,17 +8,17 @@ export interface DefaultTemplate {
   code: string;
   name: string;
   description: string;
-  channel: "EMAIL";
+  channel: 'EMAIL';
   html: string;
   requiredVariables: string[];
 }
 
 export const DEFAULT_TEMPLATES: Record<string, DefaultTemplate> = {
   WELCOME: {
-    code: "WELCOME",
-    name: "Welcome Email",
-    description: "Welcome message for new users",
-    channel: "EMAIL",
+    code: 'WELCOME',
+    name: 'Welcome Email',
+    description: 'Welcome message for new users',
+    channel: 'EMAIL',
     html: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -128,14 +128,14 @@ export const DEFAULT_TEMPLATES: Record<string, DefaultTemplate> = {
     </div>
 </body>
 </html>`,
-    requiredVariables: ["userName", "userEmail", "createdDate", "dashboardUrl"],
+    requiredVariables: ['userName', 'userEmail', 'createdDate', 'dashboardUrl'],
   },
 
   SUCCESSFUL_REGISTRATION: {
-    code: "SUCCESSFUL_REGISTRATION",
-    name: "Registration Successful",
-    description: "Confirmation email for successful user registration",
-    channel: "EMAIL",
+    code: 'SUCCESSFUL_REGISTRATION',
+    name: 'Registration Successful',
+    description: 'Confirmation email for successful user registration',
+    channel: 'EMAIL',
     html: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -270,14 +270,14 @@ export const DEFAULT_TEMPLATES: Record<string, DefaultTemplate> = {
     </div>
 </body>
 </html>`,
-    requiredVariables: ["userName", "userEmail", "username", "registrationDate", "dashboardUrl"],
+    requiredVariables: ['userName', 'userEmail', 'username', 'registrationDate', 'dashboardUrl'],
   },
 
   RESET_PASSWORD: {
-    code: "RESET_PASSWORD",
-    name: "Password Reset",
-    description: "Password reset link for users who requested it",
-    channel: "EMAIL",
+    code: 'RESET_PASSWORD',
+    name: 'Password Reset',
+    description: 'Password reset link for users who requested it',
+    channel: 'EMAIL',
     html: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -431,14 +431,14 @@ export const DEFAULT_TEMPLATES: Record<string, DefaultTemplate> = {
     </div>
 </body>
 </html>`,
-    requiredVariables: ["userName", "resetLink", "expiryTime"],
+    requiredVariables: ['userName', 'resetLink', 'expiryTime'],
   },
 
   FORGOT_PASSWORD: {
-    code: "FORGOT_PASSWORD",
-    name: "Account Recovery",
-    description: "Account recovery email with verification code",
-    channel: "EMAIL",
+    code: 'FORGOT_PASSWORD',
+    name: 'Account Recovery',
+    description: 'Account recovery email with verification code',
+    channel: 'EMAIL',
     html: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -601,14 +601,14 @@ export const DEFAULT_TEMPLATES: Record<string, DefaultTemplate> = {
     </div>
 </body>
 </html>`,
-    requiredVariables: ["userName", "recoveryLink", "verificationCode", "expiryTime"],
+    requiredVariables: ['userName', 'recoveryLink', 'verificationCode', 'expiryTime'],
   },
 
   VERIFY_EMAIL: {
-    code: "VERIFY_EMAIL",
-    name: "Email Verification",
-    description: "Email verification request with verification code",
-    channel: "EMAIL",
+    code: 'VERIFY_EMAIL',
+    name: 'Email Verification',
+    description: 'Email verification request with verification code',
+    channel: 'EMAIL',
     html: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -786,14 +786,14 @@ export const DEFAULT_TEMPLATES: Record<string, DefaultTemplate> = {
     </div>
 </body>
 </html>`,
-    requiredVariables: ["userName", "verificationCode", "expiryTime", "verificationLink"],
+    requiredVariables: ['userName', 'verificationCode', 'expiryTime', 'verificationLink'],
   },
 
   ACCOUNT_CONFIRMATION: {
-    code: "ACCOUNT_CONFIRMATION",
-    name: "Account Verified",
-    description: "Confirmation email after successful account verification",
-    channel: "EMAIL",
+    code: 'ACCOUNT_CONFIRMATION',
+    name: 'Account Verified',
+    description: 'Confirmation email after successful account verification',
+    channel: 'EMAIL',
     html: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -970,7 +970,7 @@ export const DEFAULT_TEMPLATES: Record<string, DefaultTemplate> = {
     </div>
 </body>
 </html>`,
-    requiredVariables: ["userName", "userEmail", "verificationDate", "dashboardUrl"],
+    requiredVariables: ['userName', 'userEmail', 'verificationDate', 'dashboardUrl'],
   },
 };
 

@@ -66,24 +66,13 @@ common/
 ### Types
 
 ```typescript
-import {
-  Notification,
-  NotificationTemplate,
-  Tenant,
-  NotificationLog,
-  WebhookConfig,
-} from '@afrisinc/notify-common';
+import { Notification, NotificationTemplate, Tenant, NotificationLog, WebhookConfig } from '@afrisinc/notify-common';
 ```
 
 ### Enums
 
 ```typescript
-import {
-  NotificationChannel,
-  NotificationStatus,
-  NotificationPriority,
-  ProviderName,
-} from '@afrisinc/notify-common';
+import { NotificationChannel, NotificationStatus, NotificationPriority, ProviderName } from '@afrisinc/notify-common';
 
 // Usage
 const notification: Notification = {
@@ -107,12 +96,7 @@ import {
 ### Errors
 
 ```typescript
-import {
-  ServiceError,
-  ValidationError,
-  ProviderError,
-  RetryableError,
-} from '@afrisinc/notify-common';
+import { ServiceError, ValidationError, ProviderError, RetryableError } from '@afrisinc/notify-common';
 
 throw new ValidationError('Invalid email format');
 throw new ProviderError('Failed to send email', { provider: 'sendgrid' });
@@ -183,6 +167,7 @@ interface NotificationTemplate {
 ## Enums
 
 ### NotificationChannel
+
 ```typescript
 enum NotificationChannel {
   EMAIL = 'email',
@@ -192,6 +177,7 @@ enum NotificationChannel {
 ```
 
 ### NotificationStatus
+
 ```typescript
 enum NotificationStatus {
   PENDING = 'pending',
@@ -205,6 +191,7 @@ enum NotificationStatus {
 ```
 
 ### NotificationPriority
+
 ```typescript
 enum NotificationPriority {
   LOW = 'low',

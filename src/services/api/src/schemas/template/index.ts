@@ -4,16 +4,16 @@
  */
 
 // Create template
-export * from "./create";
+export * from './create';
 
 // Get template
-export * from "./get";
+export * from './get';
 
 // List templates
-export * from "./list";
+export * from './list';
 
 // Update template
-export * from "./update";
+export * from './update';
 
 // Delete template
-export * from "./delete";
+export * from './delete';

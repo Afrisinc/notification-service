@@ -1,6 +1,6 @@
 export enum NotificationStatus {
-  PENDING = "pending",
-  SENT = "sent",
-  FAILED = "failed",
-  BOUNCED = "bounced",
+  PENDING = 'pending',
+  SENT = 'sent',
+  FAILED = 'failed',
+  BOUNCED = 'bounced',
 }

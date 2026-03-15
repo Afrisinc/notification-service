@@ -3,4 +3,4 @@
  * All DTOs for API request/response data transformation
  */
 
-export type * from "./tenant";
+export type * from './tenant';

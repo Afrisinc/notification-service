@@ -2,11 +2,11 @@ export interface NotificationEvent {
   id: string;
   tenantId: string;
   recipientId: string;
-  channel: "email" | "sms" | "inapp";
+  channel: 'email' | 'sms' | 'inapp';
   subject?: string;
   body: string;
   recipient: string;
-  priority?: "low" | "normal" | "high";
+  priority?: 'low' | 'normal' | 'high';
   metadata?: Record<string, unknown>;
   createdAt: Date;
 }

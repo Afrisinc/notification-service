@@ -1,7 +1,7 @@
-import { z } from "zod";
-import { config as loadEnv } from "dotenv";
-import path from "node:path";
-import fs from "node:fs";
+import { z } from 'zod';
+import { config as loadEnv } from 'dotenv';
+import path from 'node:path';
+import fs from 'node:fs';
 
 /**
  * Load environment variables from .env file in project root
@@ -13,7 +13,7 @@ function loadEnvironmentVariables() {
   const maxAttempts = 10;
 
   while (attempts < maxAttempts) {
-    const envPath = path.join(currentDir, ".env");
+    const envPath = path.join(currentDir, '.env');
     if (fs.existsSync(envPath)) {
       loadEnv({ path: envPath });
       return;
@@ -32,30 +32,26 @@ loadEnvironmentVariables();
 const EnvSchema = z.object({
   // Server Configuration
   PORT: z.coerce.number().default(8010),
-  HOST: z.string().default("0.0.0.0"),
-  NODE_ENV: z
-    .enum(["development", "staging", "production"])
-    .default("development"),
-  LOG_LEVEL: z
-    .enum(["debug", "info", "warn", "error"])
-    .default("info"),
+  HOST: z.string().default('0.0.0.0'),
+  NODE_ENV: z.enum(['development', 'staging', 'production']).default('development'),
+  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
   // Database Configuration
   DATABASE_URL: z.string({
-    description: "PostgreSQL connection string (required for Prisma)",
+    description: 'PostgreSQL connection string (required for Prisma)',
   }),
 
   // JWT Configuration
-  JWT_SECRET: z.string().default("dev-secret-change-in-production"),
+  JWT_SECRET: z.string().default('dev-secret-change-in-production'),
 
   // Redis Configuration
-  REDIS_URL: z.string().default("redis://localhost:6379"),
+  REDIS_URL: z.string().default('redis://localhost:6379'),
 
   // Queue Configuration
-  QUEUE_NAME: z.string().default("notifications"),
+  QUEUE_NAME: z.string().default('notifications'),
 
   // RabbitMQ Configuration
-  RABBITMQ_URL: z.string().default("amqp://guest:guest@localhost:5672"),
+  RABBITMQ_URL: z.string().default('amqp://guest:guest@localhost:5672'),
   RABBITMQ_HOST: z.string().optional(),
   RABBITMQ_PORT: z.coerce.number().optional(),
   RABBITMQ_USER: z.string().optional(),
@@ -63,10 +59,10 @@ const EnvSchema = z.object({
   RABBITMQ_VHOST: z.string().optional(),
 
   // CORS Configuration
-  CORS_ORIGINS: z.string().optional().default("http://localhost:8010"),
+  CORS_ORIGINS: z.string().optional().default('http://localhost:8010'),
 
   // Email Configuration
-  EMAIL_PROVIDER: z.enum(["smtp", "sendgrid"]).default("smtp"),
+  EMAIL_PROVIDER: z.enum(['smtp', 'sendgrid']).default('smtp'),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().optional(),
   SMTP_USER: z.string().optional(),
@@ -75,10 +71,7 @@ const EnvSchema = z.object({
   SENDGRID_API_KEY: z.string().optional(),
 
   // Database Logging
-  DATABASE_LOG_QUERIES: z
-    .enum(["true", "false"])
-    .optional()
-    .default("false"),
+  DATABASE_LOG_QUERIES: z.enum(['true', 'false']).optional().default('false'),
 });
 
 export type Environment = z.infer<typeof EnvSchema>;
@@ -96,14 +89,12 @@ export function getConfig(): Environment {
     if (!result.success) {
       const errors = result.error.errors
         .map((err) => {
-          const path = err.path.join(".");
+          const path = err.path.join('.');
           return `  ${path}: ${err.message}`;
         })
-        .join("\n");
+        .join('\n');
 
-      throw new Error(
-        `Environment validation failed:\n${errors}`,
-      );
+      throw new Error(`Environment validation failed:\n${errors}`);
     }
 
     config = result.data;

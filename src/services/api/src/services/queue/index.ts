@@ -5,8 +5,4 @@
 
 export type { IQueuePublisher, QueueMessage } from './publisher.interface';
 export { GuestQueuePublisher } from './publishers/guest.publisher';
-export {
-  QueuePublisherFactory,
-  type QueueProviderType,
-  type QueuePublisherConfig,
-} from './publisher.factory';
+export { QueuePublisherFactory, type QueueProviderType, type QueuePublisherConfig } from './publisher.factory';

@@ -1,25 +1,25 @@
-import { FastifyInstance } from "fastify";
-import { correlationIdMiddleware } from "../middlewares/correlation-id.middleware";
-import { logger } from "../config/logger";
+import { FastifyInstance } from 'fastify';
+import { correlationIdMiddleware } from '../middlewares/correlation-id.middleware';
+import { logger } from '../config/logger';
 
 export async function registerRequestLifecyclePlugin(fastify: FastifyInstance) {
   // Correlation ID middleware
-  fastify.addHook("onRequest", correlationIdMiddleware);
+  fastify.addHook('onRequest', correlationIdMiddleware);
 
   // Request logging
-  fastify.addHook("onRequest", async (request, reply) => {
+  fastify.addHook('onRequest', async (request, reply) => {
     logger.debug(
       {
         method: request.method,
         url: request.url,
         requestId: request.id,
       },
-      "Incoming request",
+      'Incoming request'
     );
   });
 
   // Response logging
-  fastify.addHook("onResponse", async (request, reply) => {
+  fastify.addHook('onResponse', async (request, reply) => {
     logger.debug(
       {
         method: request.method,
@@ -28,7 +28,7 @@ export async function registerRequestLifecyclePlugin(fastify: FastifyInstance) {
         responseTime: reply.elapsedTime,
         requestId: request.id,
       },
-      "Request completed",
+      'Request completed'
     );
   });
 }

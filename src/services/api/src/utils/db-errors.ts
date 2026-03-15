@@ -1,4 +1,4 @@
-import { logger } from "../config/logger";
+import { logger } from '../config/logger';
 
 /**
  * Custom database error class for consistent error handling
@@ -7,10 +7,10 @@ export class DatabaseError extends Error {
   constructor(
     public code: string,
     public originalError: unknown,
-    message: string,
+    message: string
   ) {
     super(message);
-    this.name = "DatabaseError";
+    this.name = 'DatabaseError';
   }
 }
 
@@ -21,55 +21,55 @@ export function transformPrismaError(error: unknown, context: string): Error {
   const err = error as any;
 
   // Unique constraint violation
-  if (err.code === "P2002") {
-    const field = err.meta?.target?.[0] || "field";
+  if (err.code === 'P2002') {
+    const field = err.meta?.target?.[0] || 'field';
     const message = `${field} already exists`;
     logger.warn({ context, field }, message);
-    return new DatabaseError("UNIQUE_CONSTRAINT_VIOLATION", error, message);
+    return new DatabaseError('UNIQUE_CONSTRAINT_VIOLATION', error, message);
   }
 
   // Record not found
-  if (err.code === "P2025") {
-    const message = "Record not found";
+  if (err.code === 'P2025') {
+    const message = 'Record not found';
     logger.warn({ context }, message);
-    return new DatabaseError("NOT_FOUND", error, message);
+    return new DatabaseError('NOT_FOUND', error, message);
   }
 
   // Foreign key constraint
-  if (err.code === "P2003") {
-    const relation = err.meta?.relation_name || "unknown relation";
+  if (err.code === 'P2003') {
+    const relation = err.meta?.relation_name || 'unknown relation';
     const message = `Invalid reference to ${relation}`;
     logger.warn({ context, relation }, message);
-    return new DatabaseError("INVALID_REFERENCE", error, message);
+    return new DatabaseError('INVALID_REFERENCE', error, message);
   }
 
   // Required field missing
-  if (err.code === "P2011") {
-    const field = err.meta?.constraint || "field";
+  if (err.code === 'P2011') {
+    const field = err.meta?.constraint || 'field';
     const message = `Required field missing: ${field}`;
     logger.warn({ context, field }, message);
-    return new DatabaseError("REQUIRED_FIELD_MISSING", error, message);
+    return new DatabaseError('REQUIRED_FIELD_MISSING', error, message);
   }
 
   // Type validation error
-  if (err.code === "P2013") {
-    const message = "Invalid field type";
+  if (err.code === 'P2013') {
+    const message = 'Invalid field type';
     logger.warn({ context }, message);
-    return new DatabaseError("INVALID_TYPE", error, message);
+    return new DatabaseError('INVALID_TYPE', error, message);
   }
 
   // Database connection error
-  if (err.code === "P1002" || err.code === "P1001") {
-    const message = "Database connection failed";
+  if (err.code === 'P1002' || err.code === 'P1001') {
+    const message = 'Database connection failed';
     logger.error({ context, code: err.code }, message);
-    return new DatabaseError("CONNECTION_FAILED", error, message);
+    return new DatabaseError('CONNECTION_FAILED', error, message);
   }
 
   // Timeout error
-  if (err.code === "P1008") {
-    const message = "Database operation timeout";
+  if (err.code === 'P1008') {
+    const message = 'Database operation timeout';
     logger.error({ context }, message);
-    return new DatabaseError("TIMEOUT", error, message);
+    return new DatabaseError('TIMEOUT', error, message);
   }
 
   // Default: log and return generic error
@@ -79,23 +79,16 @@ export function transformPrismaError(error: unknown, context: string): Error {
       error: err.message,
       code: err.code,
     },
-    "Unknown database error",
+    'Unknown database error'
   );
 
-  return new DatabaseError(
-    "UNKNOWN",
-    error,
-    `Database error: ${err.message || "Unknown"}`,
-  );
+  return new DatabaseError('UNKNOWN', error, `Database error: ${err.message || 'Unknown'}`);
 }
 
 /**
  * Wrapper for database operations with error transformation
  */
-export async function executeDbOperation<T>(
-  operation: () => Promise<T>,
-  context: string,
-): Promise<T> {
+export async function executeDbOperation<T>(operation: () => Promise<T>, context: string): Promise<T> {
   try {
     return await operation();
   } catch (error) {

@@ -1,17 +1,17 @@
-import Fastify, { FastifyInstance } from "fastify";
+import Fastify, { FastifyInstance } from 'fastify';
 import {
   registerSecurityPlugin,
   registerRequestLifecyclePlugin,
   registerSwaggerPlugin,
   registerRoutesPlugin,
   registerErrorHandlerPlugin,
-} from "./plugins";
+} from './plugins';
 
 export async function createFastifyApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: true,
-    requestIdHeader: "x-request-id",
-    requestIdLogLabel: "requestId",
+    requestIdHeader: 'x-request-id',
+    requestIdLogLabel: 'requestId',
   });
 
   // Register plugins in order

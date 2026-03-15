@@ -12,6 +12,8 @@ import { registerInternalRoutes } from './internal.routes';
 import { authRoutes } from './auth.routes';
 import { registerAppRoutes } from './app.routes';
 import { registerOrganizationRoutes } from './organization.routes';
+import { securityRoutes } from './security.routes';
+import { platformRoutes } from './platform.routes';
 
 //  Register all API v1 routes
 export async function v1Routes(fastify: FastifyInstance) {
@@ -45,5 +47,11 @@ export async function v1Routes(fastify: FastifyInstance) {
 
   await fastify.register(registerInternalRoutes, {
     prefix: '/internal',
+  });
+  await fastify.register(securityRoutes, {
+    prefix: '/admin/internal',
+  });
+  await fastify.register(platformRoutes, {
+    prefix: '/admin/internal',
   });
 }

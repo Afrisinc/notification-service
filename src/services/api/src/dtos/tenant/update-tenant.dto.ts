@@ -3,5 +3,5 @@
  */
 export interface UpdateTenantDTO {
   name?: string;
-  status?: "ACTIVE" | "SUSPENDED";
+  status?: 'ACTIVE' | 'SUSPENDED';
 }
