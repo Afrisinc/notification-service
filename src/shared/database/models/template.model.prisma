@@ -16,6 +16,8 @@ model Template {
   version           Int               @default(1)
   active            Boolean           @default(true)
   requiredVariables Json?
+  design_json       Json?             // Template design configuration (layout, styling, blocks, etc.)
+  editor_type       EditorType        @default(visual) // visual (drag-drop) or code (HTML only)
   description       String?
   visibility        String            @default("private") // private | account | marketplace
   is_public         Boolean           @default(false)

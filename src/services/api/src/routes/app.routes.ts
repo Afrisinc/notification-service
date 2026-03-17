@@ -10,6 +10,7 @@ import {
   getAppTemplates,
   getAppTemplateById,
   createAppTemplate,
+  updateAppTemplate,
   getAppNotifications,
 } from '../controllers/app.controller';
 import { validateBaseToken } from '../middlewares/auth.middleware';
@@ -22,6 +23,7 @@ import {
   RotateApiKeyRouteSchema,
   GetAppsByOrgRouteSchema,
 } from '../schemas';
+import { CreateAppTemplateRouteSchema } from '../schemas/routes/app.schema';
 
 export async function registerAppRoutes(app: FastifyInstance) {
   // Create App
@@ -134,32 +136,7 @@ export async function registerAppRoutes(app: FastifyInstance) {
     '/apps/:appId/templates',
     {
       onRequest: [validateBaseToken],
-      schema: {
-        params: {
-          type: 'object',
-          properties: {
-            appId: { type: 'string', description: 'App ID' },
-          },
-          required: ['appId'],
-        },
-        body: {
-          type: 'object',
-          properties: {
-            template_id: { type: 'string', description: 'Template ID to install' },
-            customizations: { type: 'object', description: 'Custom overrides for this installation' },
-            status: {
-              type: 'string',
-              enum: ['active', 'archived', 'disabled'],
-              description: 'Installation status',
-              default: 'active',
-            },
-          },
-          required: ['template_id'],
-        },
-        tags: ['Applications', 'Templates'],
-        summary: 'Install template on app',
-        description: 'Install a template on a specific app with optional customizations',
-      },
+      schema: CreateAppTemplateRouteSchema,
     },
     createAppTemplate
   );
@@ -198,6 +175,45 @@ export async function registerAppRoutes(app: FastifyInstance) {
       },
     },
     getAppTemplateById
+  );
+
+  // Update App Template
+  app.put(
+    '/apps/:appId/templates/:templateId',
+    {
+      onRequest: [validateBaseToken],
+      schema: {
+        params: {
+          type: 'object',
+          properties: {
+            appId: { type: 'string', description: 'App ID' },
+            templateId: { type: 'string', description: 'Template ID' },
+          },
+          required: ['appId', 'templateId'],
+        },
+        body: {
+          type: 'object',
+          properties: {
+            subject: { type: 'string', description: 'Email subject' },
+            content: { type: 'string', description: 'Template content (HTML)' },
+            description: { type: 'string', description: 'Template description' },
+            design_json: { type: 'object', description: 'Design configuration' },
+            editor_type: {
+              type: 'string',
+              enum: ['visual', 'code'],
+              description: 'Editor type',
+            },
+            code: { type: 'string', description: 'Template code' },
+            channel: { type: 'string', description: 'Notification channel' },
+            language: { type: 'string', description: 'Language code' },
+          },
+        },
+        tags: ['Applications', 'Templates'],
+        summary: 'Update app template',
+        description: 'Update an existing template on an app',
+      },
+    },
+    updateAppTemplate
   );
 
   // Get App Notifications/Logs

@@ -8,6 +8,8 @@ model AppTemplate {
   app_id            String
   template_id       String
   customizations    Json?
+  design_json       Json?             // App-specific design overrides and customizations
+  editor_type       EditorType?       // Override template editor type for this app (optional)
   status            String   @default("active") // active | archived | disabled
   installationDate  DateTime @default(now())
   updatedAt         DateTime @updatedAt

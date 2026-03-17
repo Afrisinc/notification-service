@@ -22,9 +22,15 @@ export function transformPrismaError(error: unknown, context: string): Error {
 
   // Unique constraint violation
   if (err.code === 'P2002') {
-    const field = err.meta?.target?.[0] || 'field';
-    const message = `${field} already exists`;
-    logger.warn({ context, field }, message);
+    const fields = err.meta?.target || ['field'];
+    let message = `${fields.join(', ')} already exists`;
+
+    // Provide specific message for template unique constraint
+    if (context === 'template.repository' && fields.includes('code')) {
+      message = `A template with code "${err.meta?.code || 'unknown'}", channel, and language already exists for this account`;
+    }
+
+    logger.warn({ context, fields }, message);
     return new DatabaseError('UNIQUE_CONSTRAINT_VIOLATION', error, message);
   }
 

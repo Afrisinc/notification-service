@@ -2,9 +2,18 @@ import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../config/logger';
 import { AppRepository } from '../repositories/app.repository';
 import { appTemplateRepository } from '../repositories/template-installation.repository';
-import { prismaRead } from '@shared/database';
+import { TemplateRepository } from '../repositories/template.repository';
+import {
+  parseTemplateRequest,
+  extractHtmlContent,
+  extractVariablesFromContent,
+  validateDesignJson,
+  normalizeEditorType,
+} from '../utils/template-parser';
+import { prismaRead, prismaWrite } from '@shared/database';
 
 const appRepo = new AppRepository();
+const templateRepo = new TemplateRepository();
 
 export interface CreateAppRequest {
   name: string;
@@ -244,15 +253,7 @@ export class AppService {
     return enrichedApps.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  async createAppTemplate(
-    appId: string,
-    accountId: string,
-    data: {
-      template_id: string;
-      customizations?: Record<string, any>;
-      status?: 'active' | 'archived' | 'disabled';
-    }
-  ) {
+  async createAppTemplate(appId: string, accountId: string, userId: string, data: any) {
     // Verify app exists and account has access
     const app = await appRepo.findById(appId);
     if (!app) {
@@ -268,26 +269,74 @@ export class AppService {
       throw new Error('Unauthorized access to this app');
     }
 
-    // Verify template exists
-    const template = await prismaRead.template.findUnique({
-      where: { id: data.template_id },
-    });
+    // Handle two cases: install existing template OR create new template
+    let templateId: string;
+    let template: any;
 
-    if (!template) {
-      throw new Error('Template not found');
+    // Provide default language if not specified
+    if (!data.language) {
+      data.language = 'en';
     }
 
-    // Check if template is already installed
-    const existingInstallation = await appTemplateRepository.findByAppAndTemplate(appId, data.template_id);
+    if (data.template_id) {
+      // Case 1: Install existing template
+      templateId = data.template_id;
 
-    if (existingInstallation) {
-      throw new Error('Template already installed on this app');
+      // Verify template exists
+      template = await prismaRead.template.findUnique({
+        where: { id: templateId },
+      });
+
+      if (!template) {
+        throw new Error('Template not found');
+      }
+
+      // Check if template is already installed
+      const existingInstallation = await appTemplateRepository.findByAppAndTemplate(appId, templateId);
+      if (existingInstallation) {
+        throw new Error('Template already installed on this app');
+      }
+    } else if (data.code && data.channel && data.content && data.language) {
+      // Case 2: Create new template for the account using repository
+      try {
+        // Parse and validate template request data
+        const parsedData = parseTemplateRequest(data);
+
+        const newTemplate = await templateRepo.create(account.id, parsedData, userId);
+
+        templateId = newTemplate.id;
+        template = newTemplate;
+
+        logger.info(
+          {
+            appId,
+            templateId,
+            templateCode: data.code,
+            accountId,
+          },
+          'New template created for account'
+        );
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        // Check if it's a duplicate template error
+        if (errorMessage.includes('already exists') && errorMessage.includes('code')) {
+          throw new Error(
+            `Template with code "${data.code}" for ${data.channel} in ${data.language} language already exists. ` +
+              `Please use a different code or delete the existing template first.`
+          );
+        }
+
+        throw error;
+      }
+    } else {
+      throw new Error('Either template_id or (code, channel, content, language) must be provided');
     }
 
     // Create app template installation
     const appTemplate = await appTemplateRepository.create({
       app_id: appId,
-      template_id: data.template_id,
+      template_id: templateId,
       customizations: data.customizations || {},
     });
 
@@ -307,6 +356,8 @@ export class AppService {
             version: true,
             active: true,
             requiredVariables: true,
+            design_json: true,
+            editor_type: true,
             description: true,
             createdAt: true,
             updatedAt: true,
@@ -318,10 +369,11 @@ export class AppService {
     logger.info(
       {
         appId,
-        templateId: data.template_id,
+        templateId,
         templateCode: template.code,
+        mode: data.template_id ? 'install' : 'create',
       },
-      'Template installed on app'
+      'Template created/installed on app'
     );
 
     return {
@@ -341,6 +393,8 @@ export class AppService {
         version: (installation as any).template.version,
         active: (installation as any).template.active,
         requiredVariables: (installation as any).template.requiredVariables,
+        design_json: (installation as any).template.design_json,
+        editor_type: (installation as any).template.editor_type,
         description: (installation as any).template.description,
         createdAt: (installation as any).template.createdAt,
         updatedAt: (installation as any).template.updatedAt,
@@ -385,6 +439,8 @@ export class AppService {
         version: true,
         active: true,
         requiredVariables: true,
+        design_json: true,
+        editor_type: true,
         description: true,
         createdAt: true,
         updatedAt: true,
@@ -409,6 +465,8 @@ export class AppService {
         version: (template as any).version,
         active: (template as any).active,
         requiredVariables: (template as any).requiredVariables,
+        design_json: (template as any).design_json,
+        editor_type: (template as any).editor_type,
         description: (template as any).description,
         createdAt: (template as any).createdAt,
         updatedAt: (template as any).updatedAt,
@@ -423,7 +481,10 @@ export class AppService {
       throw new Error('App not found');
     }
 
+    console.log('App =================================\n ', app, '\n Account ID: ', accountId);
+
     const account = await appRepo.findAccountById(accountId);
+    console.log('Account =================================\n ', account);
     if (!account) {
       throw new Error('Account not found');
     }
@@ -567,6 +628,105 @@ export class AppService {
       page,
       limit,
       totalPages,
+    };
+  }
+
+  async updateAppTemplate(appId: string, templateId: string, accountId: string, data: any) {
+    // Verify app exists and account has access
+    const app = await appRepo.findById(appId);
+    if (!app) {
+      throw new Error('App not found');
+    }
+
+    const account = await appRepo.findAccountById(accountId);
+    if (!account) {
+      throw new Error('Account not found');
+    }
+
+    if (app.organization_id !== account.organization_id) {
+      throw new Error('Unauthorized access to this app');
+    }
+
+    // Get the app template
+    const appTemplate = await appTemplateRepository.findByAppAndTemplate(appId, templateId);
+    if (!appTemplate) {
+      throw new Error('Template not found on this app');
+    }
+
+    // Get the current template
+    const currentTemplate = await prismaRead.template.findUnique({
+      where: { id: templateId },
+    });
+
+    if (!currentTemplate) {
+      throw new Error('Template not found');
+    }
+
+    // Parse and prepare update data
+    const updateData: any = {};
+
+    if (data.subject !== undefined) updateData.subject = data.subject;
+    if (data.content !== undefined) {
+      // Clean content and extract variables
+      const cleanContent = extractHtmlContent(data.content);
+      const variables = extractVariablesFromContent(cleanContent);
+
+      updateData.content = cleanContent;
+      updateData.requiredVariables = variables;
+    }
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.design_json !== undefined) {
+      updateData.design_json = validateDesignJson(data.design_json);
+    }
+    if (data.editor_type !== undefined) {
+      updateData.editor_type = normalizeEditorType(data.editor_type);
+    }
+    if (data.code !== undefined) updateData.code = data.code;
+    if (data.channel !== undefined) updateData.channel = data.channel;
+    if (data.language !== undefined) updateData.language = data.language;
+
+    // Update template version on any change
+    if (Object.keys(updateData).length > 0) {
+      updateData.version = (currentTemplate.version || 0) + 1;
+
+      const updated = await prismaWrite.template.update({
+        where: { id: templateId },
+        data: updateData,
+        select: {
+          id: true,
+          code: true,
+          channel: true,
+          category: true,
+          subject: true,
+          content: true,
+          language: true,
+          version: true,
+          active: true,
+          requiredVariables: true,
+          design_json: true,
+          editor_type: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      logger.info({ templateId, appId, version: updated.version }, 'Template updated');
+
+      return {
+        installationId: appTemplate.id,
+        appId,
+        status: appTemplate.status,
+        template: updated,
+      };
+    }
+
+    // No changes
+    return {
+      installationId: appTemplate.id,
+      appId,
+      status: appTemplate.status,
+      template: currentTemplate,
     };
   }
 }

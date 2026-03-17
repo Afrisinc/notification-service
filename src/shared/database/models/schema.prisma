@@ -92,6 +92,12 @@ enum OrganizationMemberRole {
   MEMBER
 }
 
+// Template Editor Type
+enum EditorType {
+  visual // Drag-drop visual editor
+  code   // HTML/Code only editor
+}
+
 ////////////////////////////////////////////////////////////
 // ==================== MODELS ====================
 ////////////////////////////////////////////////////////////
