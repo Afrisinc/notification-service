@@ -23,6 +23,8 @@ export interface CreateTemplateData {
   language: string;
   requiredVariables?: any;
   description?: string;
+  design_json?: any;
+  editor_type?: 'visual' | 'code';
 }
 
 /**
@@ -234,6 +236,8 @@ export class TemplateRepository {
           content: data.content,
           language: data.language,
           requiredVariables: data.requiredVariables,
+          design_json: data.design_json,
+          editor_type: data.editor_type || 'visual',
           description: data.description,
           active: true,
           version: 1,

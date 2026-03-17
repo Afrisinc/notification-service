@@ -186,24 +186,21 @@ export async function getAppsByOrganization(req: FastifyRequest, reply: FastifyR
 export async function createAppTemplate(req: FastifyRequest, reply: FastifyReply) {
   try {
     const accountId = req.headers['x-account-id'] as string;
+    const userId = (req as any).user?.id;
     const { appId } = req.params as { appId: string };
-    const body = req.body as {
-      template_id: string;
-      customizations?: Record<string, any>;
-      status?: 'active' | 'archived' | 'disabled';
-    };
+    const body = req.body as any;
 
     if (!accountId) {
       return ApiResponseHelper.unauthorized(reply, 'Account information not found');
     }
 
-    if (!body.template_id) {
-      return ApiResponseHelper.badRequest(reply, 'template_id is required');
+    if (!userId) {
+      return ApiResponseHelper.unauthorized(reply, 'User information not found');
     }
 
-    const result = await appService.createAppTemplate(appId, accountId, body);
+    const result = await appService.createAppTemplate(appId, accountId, userId, body);
 
-    return ApiResponseHelper.success(reply, 'Template installed on app successfully', result, 201);
+    return ApiResponseHelper.success(reply, 'Template created/installed on app successfully', result, 201);
   } catch (err: unknown) {
     const errorMessage = getErrorMessage(err);
     if (errorMessage.includes('not found')) {
@@ -214,6 +211,34 @@ export async function createAppTemplate(req: FastifyRequest, reply: FastifyReply
     }
     if (errorMessage.includes('already installed')) {
       return ApiResponseHelper.badRequest(reply, errorMessage);
+    }
+    if (errorMessage.includes('Invalid reference')) {
+      return ApiResponseHelper.badRequest(reply, 'Failed to create template: User reference invalid');
+    }
+    return ApiResponseHelper.badRequest(reply, errorMessage);
+  }
+}
+
+export async function updateAppTemplate(req: FastifyRequest, reply: FastifyReply) {
+  try {
+    const accountId = req.headers['x-account-id'] as string;
+    const { appId, templateId } = req.params as { appId: string; templateId: string };
+    const body = req.body as any;
+
+    if (!accountId) {
+      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
+    }
+
+    const result = await appService.updateAppTemplate(appId, templateId, accountId, body);
+
+    return ApiResponseHelper.success(reply, 'Template updated successfully', result);
+  } catch (err: unknown) {
+    const errorMessage = getErrorMessage(err);
+    if (errorMessage.includes('not found')) {
+      return ApiResponseHelper.notFound(reply, errorMessage);
+    }
+    if (errorMessage.includes('Unauthorized')) {
+      return ApiResponseHelper.forbidden(reply, errorMessage);
     }
     return ApiResponseHelper.badRequest(reply, errorMessage);
   }
