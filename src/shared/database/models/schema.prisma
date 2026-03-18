@@ -98,6 +98,12 @@ enum EditorType {
   code   // HTML/Code only editor
 }
 
+// API Key Type
+enum KeyType {
+  test       // Test/Development API key
+  production // Production API key
+}
+
 ////////////////////////////////////////////////////////////
 // ==================== MODELS ====================
 ////////////////////////////////////////////////////////////

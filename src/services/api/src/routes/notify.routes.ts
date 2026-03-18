@@ -2,11 +2,13 @@ import { FastifyInstance } from 'fastify';
 import { notifyController } from '../controllers/notify.controller';
 import { asyncWrapper } from '../middlewares/async_wrapper.middleware';
 import { authMiddleware, validateBaseToken } from '../middlewares/auth.middleware';
+import { apiKeyMiddleware } from '../middlewares/api-key.middleware';
 import {
   sendNotificationSchema,
   bulkNotificationSchema,
   notificationStatusSchema,
   notificationListSchema,
+  sendNotificationWithKeySchema,
 } from '../schemas/notify';
 import { gatewayHeaders } from '../schemas/common';
 
@@ -21,6 +23,19 @@ export async function registerNotifyRoutes(fastify: FastifyInstance) {
       },
     },
     asyncWrapper(notifyController.sendNotification.bind(notifyController))
+  );
+
+  // Send notification with API key instead of JWT token
+  fastify.post(
+    '/notify/send-with-key',
+    {
+      onRequest: [apiKeyMiddleware],
+      schema: {
+        ...sendNotificationWithKeySchema,
+        headers: gatewayHeaders,
+      },
+    },
+    asyncWrapper(notifyController.sendNotificationWithKey.bind(notifyController))
   );
 
   fastify.post(

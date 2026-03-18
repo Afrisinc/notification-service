@@ -14,6 +14,7 @@ import { registerAppRoutes } from './app.routes';
 import { registerOrganizationRoutes } from './organization.routes';
 import { securityRoutes } from './security.routes';
 import { platformRoutes } from './platform.routes';
+import { apiKeyRoutes } from './api-key.routes';
 
 //  Register all API v1 routes
 export async function v1Routes(fastify: FastifyInstance) {
@@ -26,6 +27,10 @@ export async function v1Routes(fastify: FastifyInstance) {
   });
 
   await fastify.register(registerAppRoutes, {
+    prefix: '/api',
+  });
+
+  await fastify.register(apiKeyRoutes, {
     prefix: '/api',
   });
 
