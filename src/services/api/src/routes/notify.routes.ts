@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { notifyController } from '../controllers/notify.controller';
 import { asyncWrapper } from '../middlewares/async_wrapper.middleware';
-import { authMiddleware } from '../middlewares/auth.middleware';
+import { authMiddleware, validateBaseToken } from '../middlewares/auth.middleware';
 import {
   sendNotificationSchema,
   bulkNotificationSchema,
@@ -14,7 +14,7 @@ export async function registerNotifyRoutes(fastify: FastifyInstance) {
   fastify.post(
     '/notify/send',
     {
-      onRequest: [authMiddleware],
+      onRequest: [validateBaseToken],
       schema: {
         ...sendNotificationSchema,
         headers: gatewayHeaders,
@@ -26,7 +26,7 @@ export async function registerNotifyRoutes(fastify: FastifyInstance) {
   fastify.post(
     '/notify/bulk',
     {
-      onRequest: [authMiddleware],
+      onRequest: [validateBaseToken],
       schema: {
         ...bulkNotificationSchema,
         headers: gatewayHeaders,
@@ -39,7 +39,7 @@ export async function registerNotifyRoutes(fastify: FastifyInstance) {
   fastify.get(
     '/notify/logs',
     {
-      onRequest: [authMiddleware],
+      onRequest: [validateBaseToken],
       schema: {
         ...notificationListSchema,
         headers: gatewayHeaders,
@@ -51,7 +51,7 @@ export async function registerNotifyRoutes(fastify: FastifyInstance) {
   fastify.get(
     '/notify/:id',
     {
-      onRequest: [authMiddleware],
+      onRequest: [validateBaseToken],
       schema: {
         ...notificationStatusSchema,
         headers: gatewayHeaders,

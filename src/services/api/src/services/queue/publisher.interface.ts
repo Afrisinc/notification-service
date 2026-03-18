@@ -12,6 +12,7 @@ export interface QueueMessage {
   channel: 'EMAIL' | 'SMS' | 'IN_APP' | 'PUSH' | 'WHATSAPP';
   recipient: string;
   templateCode: string;
+  templateId?: string; // Template ID for tracking usage per template
   payload: Record<string, any>;
   priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
   timestamp: Date;

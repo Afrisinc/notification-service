@@ -729,6 +729,53 @@ export class AppService {
       template: currentTemplate,
     };
   }
+
+  async deleteAppTemplate(appId: string, templateId: string, accountId: string, userId: string) {
+    // Verify app exists and account has access
+    const app = await appRepo.findById(appId);
+    if (!app) {
+      throw new Error('App not found');
+    }
+
+    const account = await appRepo.findAccountById(accountId);
+    if (!account) {
+      throw new Error('Account not found');
+    }
+
+    if (app.organization_id !== account.organization_id) {
+      throw new Error('Unauthorized access to this app');
+    }
+
+    // Get the template to verify ownership
+    const template = await prismaRead.template.findUnique({
+      where: { id: templateId },
+    });
+
+    if (!template) {
+      throw new Error('Template not found');
+    }
+
+    // Verify user owns this template (created_by_user_id matches)
+    if (template.created_by_user_id !== userId) {
+      throw new Error('Only the template creator can delete it');
+    }
+
+    // Get the app template installation
+    const appTemplate = await appTemplateRepository.findByAppAndTemplate(appId, templateId);
+    if (!appTemplate) {
+      throw new Error('Template not found on this app');
+    }
+
+    // Delete the app template installation
+    await appTemplateRepository.delete(appTemplate.id);
+
+    logger.info({ appId, templateId, userId }, 'App template deleted');
+
+    return {
+      success: true,
+      message: 'Template deleted successfully',
+    };
+  }
 }
 
 export const appService = new AppService();
