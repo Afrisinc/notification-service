@@ -1,28 +1,24 @@
 /**
  * Schema for POST /notify/send endpoint
- * Send a single notification
+ * Send a single notification using template ID
  *
- * ⚠️  IMPORTANT: Template Code Format Requirements
- * The templateCode field must match the pattern: ^[A-Z_]+$
- * - Only UPPERCASE letters (A-Z) and underscores (_) allowed
- * - No lowercase, hyphens, spaces, or numbers
+ * ⚠️  IMPORTANT: Template ID Format
+ * The templateId field must be a valid UUID (universally unique identifier)
+ * This refers to the specific template instance installed on the app
  *
- * Valid examples:
- * - WELCOME_EMAIL
- * - VERIFY_EMAIL
- * - ORDER_CONFIRMATION
- * - PASSWORD_RESET
+ * Why Template ID instead of Code?
+ * - Better tracking: Know exactly which template version was used
+ * - Analytics: Track per-template usage and performance
+ * - Multi-language: Same code can have multiple language versions (different IDs)
+ * - Versioning: Track which template version sent the notification
  *
- * Invalid examples (will return 400 Bad Request):
- * - welcome-email (lowercase with hyphen)
- * - Welcome Email (spaces and mixed case)
- * - verify_email (lowercase)
+ * Example templateId: 'ee62bf5a-f672-444c-93a0-8d1620e69731'
  */
 
 export const sendNotificationRequestBody = {
   type: 'object',
   description: 'Request to send a single notification',
-  required: ['channel', 'recipient', 'templateCode', 'payload'],
+  required: ['channel', 'recipient', 'templateId', 'app_id', 'payload'],
   properties: {
     channel: {
       type: 'string',
@@ -34,13 +30,17 @@ export const sendNotificationRequestBody = {
       minLength: 1,
       description: 'Recipient email, phone number, or user ID',
     },
-    templateCode: {
+    templateId: {
       type: 'string',
-      minLength: 1,
-      pattern: '^[A-Z_]+$',
+      format: 'uuid',
       description:
-        'Template code identifier. Must contain only uppercase letters (A-Z) and underscores (_). Examples: WELCOME_EMAIL, VERIFY_EMAIL, ORDER_CONFIRMATION',
-      examples: ['WELCOME_EMAIL', 'VERIFY_EMAIL'],
+        'Template ID (UUID) - the specific template instance to use. Provides better tracking and analytics for app notification usage',
+    },
+    app_id: {
+      type: 'string',
+      format: 'uuid',
+      description:
+        'App/Product ID - Required for tracking which app sent the notification for professional usage analytics',
     },
     payload: {
       type: 'object',

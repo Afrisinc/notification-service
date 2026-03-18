@@ -23,7 +23,7 @@ export class NotificationConsumer {
         {
           accountId,
           channel: payload.channel,
-          templateCode: payload.templateCode,
+          templateId: payload.templateId,
           recipient: payload.recipient,
         },
         'Processing notification from queue'
@@ -35,7 +35,7 @@ export class NotificationConsumer {
           account_id: accountId,
           channel: payload.channel as Channel,
           recipient: payload.recipient,
-          templateCode: payload.templateCode,
+          templateCode: 'queued-notification', // Placeholder for template code
           payload: payload.payload || {},
           status: 'QUEUED',
           priority: payload.priority || 'NORMAL',

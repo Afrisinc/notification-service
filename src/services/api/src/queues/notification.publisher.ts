@@ -8,7 +8,7 @@ export interface BatchPublishResult {
   published: number;
   failed: number;
   messageIds: string[];
-  errors: Array<{ index: number; error: string; templateCode: string }>;
+  errors: Array<{ index: number; error: string }>;
 }
 
 /**
@@ -99,7 +99,7 @@ export class NotificationPublisher {
           messageId,
           tenantId,
           channel: notification.channel,
-          templateCode: notification.templateCode,
+          templateId: notification.templateId,
           recipient: notification.recipient,
         },
         'Publishing notification to queue'
@@ -127,7 +127,7 @@ export class NotificationPublisher {
         {
           error: errorMessage,
           tenantId,
-          templateCode: notification.templateCode,
+          templateId: notification.templateId,
         },
         'Failed to publish notification to queue'
       );
@@ -181,7 +181,6 @@ export class NotificationPublisher {
         results.errors.push({
           index: i,
           error: errorMessage,
-          templateCode: batch.notifications[i].templateCode,
         });
 
         logger.warn(
@@ -189,7 +188,7 @@ export class NotificationPublisher {
             index: i,
             error: errorMessage,
             tenantId,
-            templateCode: batch.notifications[i].templateCode,
+            templateId: batch.notifications[i].templateId,
           },
           'Failed to publish notification in batch'
         );

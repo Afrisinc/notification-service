@@ -8,15 +8,17 @@ export class NotifyController {
     console.log('Received send notification request with body:', request.body);
     try {
       const body = request.body as SendNotificationRequest;
-      // Extract account ID from JWT token (first account in the list)
-      const accountIds = (request as any).user?.account_ids || [];
-      const accountId = accountIds[0];
+      const accountId = request.headers['x-account-id'] as string;
 
       if (!accountId) {
         return ApiResponseHelper.unauthorized(reply, 'No account access');
       }
 
-      const notification = await notifyService.sendNotification(accountId, body);
+      if (!body.app_id) {
+        return ApiResponseHelper.badRequest(reply, 'app_id is required in request body');
+      }
+
+      const notification = await notifyService.sendNotification(accountId, body.app_id, body);
 
       console.log('Notification created with ID:', notification);
 
@@ -52,7 +54,15 @@ export class NotifyController {
         return ApiResponseHelper.unauthorized(reply, 'No account access');
       }
 
-      const { response } = await notifyService.bulkSend(accountId, body.notifications);
+      // Validate all notifications have app_id
+      if (body.notifications.some((n) => !n.app_id)) {
+        return ApiResponseHelper.badRequest(reply, 'All notifications must have app_id in request body');
+      }
+
+      // Use app_id from first notification (all should have the same app_id for bulk operations)
+      const appId = body.notifications[0].app_id;
+
+      const { response } = await notifyService.bulkSend(accountId, appId, body.notifications);
 
       logger.info(
         {

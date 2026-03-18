@@ -244,6 +244,35 @@ export async function updateAppTemplate(req: FastifyRequest, reply: FastifyReply
   }
 }
 
+export async function deleteAppTemplate(req: FastifyRequest, reply: FastifyReply) {
+  try {
+    const accountId = req.headers['x-account-id'] as string;
+    const userId = (req as any).user?.id;
+    const { appId, templateId } = req.params as { appId: string; templateId: string };
+
+    if (!accountId) {
+      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
+    }
+
+    if (!userId) {
+      return ApiResponseHelper.unauthorized(reply, 'User information not found');
+    }
+
+    const result = await appService.deleteAppTemplate(appId, templateId, accountId, userId);
+
+    return ApiResponseHelper.success(reply, result.message, {}, 200);
+  } catch (err: unknown) {
+    const errorMessage = getErrorMessage(err);
+    if (errorMessage.includes('not found')) {
+      return ApiResponseHelper.notFound(reply, errorMessage);
+    }
+    if (errorMessage.includes('Unauthorized') || errorMessage.includes('creator')) {
+      return ApiResponseHelper.forbidden(reply, errorMessage);
+    }
+    return ApiResponseHelper.badRequest(reply, errorMessage);
+  }
+}
+
 export async function getAppTemplateById(req: FastifyRequest, reply: FastifyReply) {
   try {
     const accountId = req.headers['x-account-id'] as string;

@@ -1,5 +1,5 @@
 import pino from 'pino';
-import { prismaRead } from '@shared/database';
+import { prismaRead, prismaWrite } from '@shared/database';
 import { getConfig } from '@shared/config';
 import { SMTPProvider } from './providers/smtp';
 import { SendGridProvider } from './providers/sendgrid';
@@ -99,9 +99,43 @@ export class EmailProcessor {
       }
 
       this.logger.info({ emailId, messageId: result.messageId }, 'Email sent successfully');
+
+      // Record success log to database
+      try {
+        await prismaWrite.notificationLog.create({
+          data: {
+            notificationId: emailId,
+            provider: config.EMAIL_PROVIDER || 'unknown',
+            status: 'SENT',
+            response: result.messageId || 'Email sent successfully',
+          },
+        });
+        this.logger.debug({ emailId }, 'Notification log recorded');
+      } catch (logError) {
+        this.logger.warn({ emailId, error: logError }, 'Failed to record notification log');
+        // Don't throw - email was sent successfully even if logging failed
+      }
     } catch (error) {
       const emailId = email?.id || email?.notificationId;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const emailConfig = getConfig();
+
       this.logger.error({ error, emailId }, 'Failed to process email');
+
+      // Record failure log to database
+      try {
+        await prismaWrite.notificationLog.create({
+          data: {
+            notificationId: emailId,
+            provider: emailConfig.EMAIL_PROVIDER || 'unknown',
+            status: 'FAILED',
+            response: errorMessage,
+          },
+        });
+      } catch (logError) {
+        this.logger.warn({ emailId, error: logError }, 'Failed to record failure log');
+      }
+
       throw error;
     }
   }

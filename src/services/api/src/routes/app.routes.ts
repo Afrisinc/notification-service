@@ -11,6 +11,7 @@ import {
   getAppTemplateById,
   createAppTemplate,
   updateAppTemplate,
+  deleteAppTemplate,
   getAppNotifications,
 } from '../controllers/app.controller';
 import { validateBaseToken } from '../middlewares/auth.middleware';
@@ -214,6 +215,28 @@ export async function registerAppRoutes(app: FastifyInstance) {
       },
     },
     updateAppTemplate
+  );
+
+  // Delete App Template
+  app.delete(
+    '/apps/:appId/templates/:templateId',
+    {
+      onRequest: [validateBaseToken],
+      schema: {
+        params: {
+          type: 'object',
+          properties: {
+            appId: { type: 'string', description: 'App ID' },
+            templateId: { type: 'string', description: 'Template ID' },
+          },
+          required: ['appId', 'templateId'],
+        },
+        tags: ['Applications', 'Templates'],
+        summary: 'Delete app template',
+        description: 'Delete a template from an app (only template owner can delete)',
+      },
+    },
+    deleteAppTemplate
   );
 
   // Get App Notifications/Logs

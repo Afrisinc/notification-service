@@ -1,5 +1,4 @@
 import { logger } from '../config/logger';
-import { templateService } from './template.service';
 import { prismaWrite } from '@shared/database';
 import { IQueuePublisher, QueueMessage, QueuePublisherFactory, QueuePublisherConfig } from './queue';
 
@@ -10,7 +9,8 @@ export type Priority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
 export interface SendNotificationRequest {
   channel: Channel;
   recipient: string;
-  templateCode: string;
+  templateId: string; // UUID of the template instance
+  app_id: string; // App/product ID - required for tracking notifications per app
   payload: Record<string, any>;
   priority?: Priority;
 }
@@ -20,7 +20,8 @@ export interface Notification {
   account_id: string;
   channel: Channel;
   recipient: string;
-  templateCode: string;
+  templateId: string; // UUID for tracking which template version was used
+  templateCode: string; // Code for reference
   status: NotificationStatus;
   priority: Priority;
   payload: Record<string, any>;
@@ -47,19 +48,31 @@ const notifications: Map<string, Notification> = new Map();
 let queuePublisher: IQueuePublisher;
 
 export class NotifyService {
-  async sendNotification(accountId: string, request: SendNotificationRequest): Promise<Notification> {
-    // Validate template exists
-    const template = await templateService.getTemplateByCode(accountId, request.templateCode, request.channel);
+  async sendNotification(accountId: string, appId: string, request: SendNotificationRequest): Promise<Notification> {
+    // Validate template exists by ID
+    const template = await prismaWrite.template.findUnique({
+      where: { id: request.templateId },
+    });
 
     if (!template) {
-      const error = new Error(`Template not found: ${request.templateCode}`);
-      logger.warn({ accountId, templateCode: request.templateCode }, 'Template not found');
+      const error = new Error(`Template not found: ${request.templateId}`);
+      logger.warn({ accountId, templateId: request.templateId }, 'Template not found');
+      throw error;
+    }
+
+    // Verify template belongs to account
+    if (template.account_id !== accountId) {
+      const error = new Error('Unauthorized: Template does not belong to your account');
+      logger.warn(
+        { accountId, templateId: request.templateId, templateAccountId: template.account_id },
+        'Unauthorized template access'
+      );
       throw error;
     }
 
     // Render template with payload variables
     let renderedContent = template.content;
-    let renderedSubject = template.subject || request.templateCode;
+    let renderedSubject = template.subject || template.code;
 
     if (request.payload && Object.keys(request.payload).length > 0) {
       try {
@@ -70,7 +83,7 @@ export class NotifyService {
         }
       } catch (renderError) {
         logger.warn(
-          { templateCode: request.templateCode, error: renderError },
+          { templateId: request.templateId, templateCode: template.code, error: renderError },
           'Template rendering failed, using raw template'
         );
         // Continue with unrendered template
@@ -81,9 +94,10 @@ export class NotifyService {
     const notification = await prismaWrite.notification.create({
       data: {
         account_id: accountId,
+        app_id: appId, // Save app ID for tracking
         channel: request.channel as any,
         recipient: request.recipient,
-        templateCode: request.templateCode,
+        templateCode: template.code, // Store code for reference
         status: 'PENDING',
         priority: request.priority || 'NORMAL',
         payload: request.payload,
@@ -96,7 +110,8 @@ export class NotifyService {
       tenantId: accountId, // Using tenantId field for backwards compatibility, contains account ID
       channel: request.channel,
       recipient: request.recipient,
-      templateCode: request.templateCode,
+      templateCode: template.code,
+      templateId: request.templateId, // Include template ID for tracking
       subject: renderedSubject,
       body: renderedContent,
       payload: request.payload,
@@ -113,6 +128,7 @@ export class NotifyService {
     logger.info(
       {
         notificationId: notification.id,
+        templateId: request.templateId,
         accountId,
         channel: request.channel,
       },
@@ -121,6 +137,7 @@ export class NotifyService {
 
     return {
       ...notification,
+      templateId: request.templateId,
       payload: (notification.payload || {}) as Record<string, any>,
     };
   }
@@ -144,6 +161,7 @@ export class NotifyService {
 
   async bulkSend(
     accountId: string,
+    appId: string,
     requests: SendNotificationRequest[]
   ): Promise<{ notifications: Notification[]; response: BulkSendResponse }> {
     const results: Notification[] = [];
@@ -153,7 +171,7 @@ export class NotifyService {
 
     for (let i = 0; i < requests.length; i++) {
       try {
-        const notification = await this.sendNotification(accountId, requests[i]);
+        const notification = await this.sendNotification(accountId, appId, requests[i]);
         results.push(notification);
         accepted++;
       } catch (error) {
