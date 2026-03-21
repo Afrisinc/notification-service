@@ -9,6 +9,115 @@ const logger = pino();
 
 export class OrganizationService {
   /**
+   * Create a new organization
+   */
+  async createOrganization(
+    data: {
+      name: string;
+      legalName?: string;
+      country?: string;
+      location?: string;
+      taxId?: string;
+      email?: string;
+      phone?: string;
+    },
+    userId: string
+  ) {
+    try {
+      // Create organization
+      const org = await prismaWrite.organization.create({
+        data: {
+          id: randomUUID(),
+          name: data.name,
+          slug: data.name.toLowerCase().replace(/\s+/g, '-'),
+          legal_name: data.legalName,
+          country: data.country || 'NG',
+          location: data.location,
+          tax_id: data.taxId,
+          org_email: data.email,
+          org_phone: data.phone,
+        },
+      });
+
+      // Add user as owner
+      await prismaWrite.organizationMember.create({
+        data: {
+          id: randomUUID(),
+          organization_id: org.id,
+          user_id: userId,
+          role: 'OWNER',
+        },
+      });
+
+      // Create account for the organization to associate with user
+      await prismaWrite.account.create({
+        data: {
+          id: randomUUID(),
+          owner_user_id: userId,
+          organization_id: org.id,
+          type: 'ORGANIZATION',
+        },
+      });
+
+      return org;
+    } catch (error) {
+      logger.error({ error, userId }, 'Failed to create organization');
+      throw error;
+    }
+  }
+
+  /**
+   * List organizations for a user
+   */
+  async listOrganizations(userId: string, page: number = 1, limit: number = 10) {
+    try {
+      const skip = (page - 1) * limit;
+
+      const [organizations, total] = await Promise.all([
+        prismaRead.organization.findMany({
+          where: {
+            members: {
+              some: {
+                user_id: userId,
+              },
+            },
+          },
+          include: {
+            _count: {
+              select: {
+                members: true,
+              },
+            },
+          },
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+        }),
+        prismaRead.organization.count({
+          where: {
+            members: {
+              some: {
+                user_id: userId,
+              },
+            },
+          },
+        }),
+      ]);
+
+      return {
+        organizations,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (error) {
+      logger.error({ error, userId }, 'Failed to list organizations');
+      throw error;
+    }
+  }
+
+  /**
    * Check if user has admin/owner permissions in organization
    */
   async canManageOrganization(orgId: string, userId: string): Promise<boolean> {

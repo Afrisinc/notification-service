@@ -22,6 +22,20 @@ export async function registerOrganizationRoutes(fastify: FastifyInstance) {
   const templateController = new TemplateController();
   const orgController = new OrganizationController();
 
+  // Create organization
+  fastify.post(
+    '/organizations',
+    { onRequest: [validateBaseToken], schema: { tags: ['Organizations'] } },
+    asyncWrapper(orgController.createOrganization.bind(orgController))
+  );
+
+  // List organizations
+  fastify.get(
+    '/organizations',
+    { onRequest: [validateBaseToken], schema: { tags: ['Organizations'] } },
+    asyncWrapper(orgController.listOrganizations.bind(orgController))
+  );
+
   // Get organization by ID
   fastify.get(
     '/organizations/:orgId',

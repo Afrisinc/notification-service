@@ -13,6 +13,93 @@ export class OrganizationController {
   }
 
   /**
+   * Create a new organization
+   */
+  async createOrganization(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = (request as any).user?.id;
+      const body = request.body as {
+        name: string;
+        legalName?: string;
+        country?: string;
+        location?: string;
+        taxId?: string;
+        email?: string;
+        phone?: string;
+      };
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
+      }
+
+      if (!body.name) {
+        return ApiResponseHelper.badRequest(reply, 'Organization name is required');
+      }
+
+      const org = await this.organizationService.createOrganization(body, userId);
+
+      return ApiResponseHelper.created(reply, 'Organization created successfully', {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        legalName: org.legal_name,
+        location: org.location,
+        country: org.country,
+        taxId: org.tax_id,
+        orgEmail: org.org_email,
+        orgPhone: org.org_phone,
+        createdAt: org.createdAt,
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to create organization');
+      return ApiResponseHelper.internalError(reply, 'Failed to create organization');
+    }
+  }
+
+  /**
+   * List organizations for the current user
+   */
+  async listOrganizations(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = (request as any).user?.id;
+      const query = request.query as { page?: string; limit?: string };
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
+      }
+
+      const page = parseInt(query.page || '1', 10);
+      const limit = parseInt(query.limit || '10', 10);
+
+      const result = await this.organizationService.listOrganizations(userId, page, limit);
+
+      return ApiResponseHelper.success(reply, 'Organizations retrieved successfully', {
+        organizations: result.organizations.map((org: any) => ({
+          id: org.id,
+          name: org.name,
+          slug: org.slug,
+          legalName: org.legal_name,
+          location: org.location,
+          country: org.country,
+          taxId: org.tax_id,
+          orgEmail: org.org_email,
+          orgPhone: org.org_phone,
+          memberCount: org._count?.members || 0,
+          createdAt: org.createdAt,
+          updatedAt: org.updatedAt,
+        })),
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to list organizations');
+      return ApiResponseHelper.internalError(reply, 'Failed to list organizations');
+    }
+  }
+
+  /**
    * Get organization details by ID
    */
   async getOrganizationById(request: FastifyRequest, reply: FastifyReply) {
