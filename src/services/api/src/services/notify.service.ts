@@ -101,6 +101,7 @@ export class NotifyService {
         status: 'PENDING',
         priority: request.priority || 'NORMAL',
         payload: request.payload,
+        sentAt: new Date(), // Set sentAt timestamp for log filtering
       },
     });
 

@@ -322,44 +322,6 @@ export async function getAppTemplates(req: FastifyRequest, reply: FastifyReply) 
   }
 }
 
-export async function getAppNotifications(req: FastifyRequest, reply: FastifyReply) {
-  try {
-    const accountId = req.headers['x-account-id'] as string;
-    const { appId } = req.params as { appId: string };
-    const query = req.query as {
-      page?: string;
-      limit?: string;
-      status?: string;
-      startDate?: string;
-      endDate?: string;
-    };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
-
-    const page = parseInt(query.page || '1', 10);
-    const limit = parseInt(query.limit || '20', 10);
-
-    const notifications = await appService.getAppNotifications(appId, accountId, page, limit, {
-      status: query.status,
-      startDate: query.startDate ? new Date(query.startDate) : undefined,
-      endDate: query.endDate ? new Date(query.endDate) : undefined,
-    });
-
-    return ApiResponseHelper.success(reply, 'Notifications retrieved successfully', notifications);
-  } catch (err: unknown) {
-    const errorMessage = getErrorMessage(err);
-    if (errorMessage.includes('not found')) {
-      return ApiResponseHelper.notFound(reply, errorMessage);
-    }
-    if (errorMessage.includes('Unauthorized')) {
-      return ApiResponseHelper.forbidden(reply, errorMessage);
-    }
-    return ApiResponseHelper.badRequest(reply, errorMessage);
-  }
-}
-
 export async function getAppOverview(req: FastifyRequest, reply: FastifyReply) {
   try {
     const accountId = req.headers['x-account-id'] as string;

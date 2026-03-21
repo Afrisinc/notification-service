@@ -11,10 +11,14 @@ import { registerProjectRoutes } from './project.routes';
 import { registerInternalRoutes } from './internal.routes';
 import { authRoutes } from './auth.routes';
 import { registerAppRoutes } from './app.routes';
+import { registerAppSettingsRoutes } from './app-settings.routes';
 import { registerOrganizationRoutes } from './organization.routes';
 import { securityRoutes } from './security.routes';
 import { platformRoutes } from './platform.routes';
 import { apiKeyRoutes } from './api-key.routes';
+import { registerContactRoutes } from './contact.routes';
+import { registerCampaignRoutes } from './campaign.routes';
+import { registerNotificationLogsRoutes } from './notification-logs.routes';
 
 //  Register all API v1 routes
 export async function v1Routes(fastify: FastifyInstance) {
@@ -27,6 +31,22 @@ export async function v1Routes(fastify: FastifyInstance) {
   });
 
   await fastify.register(registerAppRoutes, {
+    prefix: '/api',
+  });
+
+  await fastify.register(registerAppSettingsRoutes, {
+    prefix: '/api',
+  });
+
+  await fastify.register(registerContactRoutes, {
+    prefix: '/api',
+  });
+
+  await fastify.register(registerCampaignRoutes, {
+    prefix: '/api',
+  });
+
+  await fastify.register(registerNotificationLogsRoutes, {
     prefix: '/api',
   });
 

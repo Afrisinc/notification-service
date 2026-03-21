@@ -1,0 +1,40 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: CONTACTS
+// Contact management for apps
+////////////////////////////////////////////////////////////
+
+enum ContactStatus {
+  active
+  inactive
+  unsubscribed
+}
+
+model Contact {
+  id                    String         @id @default(uuid())
+  app_id                String
+  email                 String
+  first_name            String?
+  last_name             String?
+  phone                 String?
+  status                ContactStatus  @default(active)
+  subscribed            Boolean        @default(true)
+  tags                  String[]       @default([])
+  attributes            Json?          @default("{}")
+  notification_count    Int            @default(0)
+  last_notification_sent DateTime?
+  created_by_user_id    String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  // Relations
+  app                   App            @relation(fields: [app_id], references: [id], onDelete: Cascade)
+  createdByUser         User?          @relation("CreatedBy", fields: [created_by_user_id], references: [id], onDelete: SetNull)
+
+  // Unique constraint: email per app
+  @@unique([app_id, email])
+  @@index([app_id])
+  @@index([status])
+  @@index([subscribed])
+  @@index([createdAt])
+  @@map("contacts")
+}

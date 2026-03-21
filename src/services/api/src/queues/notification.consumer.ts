@@ -12,9 +12,9 @@ export class NotificationConsumer {
   /**
    * Process notification message from queue
    */
-  async processNotification(message: any, accountId: string) {
+  async processNotification(message: any, accountId: string, appId?: string) {
     try {
-      const payload = message as SendNotificationRequest;
+      const payload = message as any;
 
       // Validate required fields
       this.validatePayload(payload);
@@ -22,6 +22,7 @@ export class NotificationConsumer {
       logger.debug(
         {
           accountId,
+          appId: appId || payload.app_id,
           channel: payload.channel,
           templateId: payload.templateId,
           recipient: payload.recipient,
@@ -30,15 +31,18 @@ export class NotificationConsumer {
       );
 
       // Save notification to database
+      const templateCode = (payload as any).templateCode || 'queued-notification';
       const notification = await prismaWrite.notification.create({
         data: {
           account_id: accountId,
+          app_id: appId || (payload as any).app_id, // Use provided appId or fallback to payload
           channel: payload.channel as Channel,
           recipient: payload.recipient,
-          templateCode: 'queued-notification', // Placeholder for template code
+          templateCode,
           payload: payload.payload || {},
           status: 'QUEUED',
           priority: payload.priority || 'NORMAL',
+          sentAt: new Date(), // Set timestamp for log filtering
         },
       });
 
@@ -82,7 +86,7 @@ export class NotificationConsumer {
   /**
    * Batch process multiple notifications
    */
-  async processBatch(messages: any[], tenantId: string) {
+  async processBatch(messages: any[], tenantId: string, appId?: string) {
     const results = {
       processed: 0,
       failed: 0,
@@ -91,18 +95,18 @@ export class NotificationConsumer {
 
     for (let i = 0; i < messages.length; i++) {
       try {
-        await this.processNotification(messages[i], tenantId);
+        await this.processNotification(messages[i], tenantId, appId);
         results.processed++;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         results.failed++;
         results.errors.push({ index: i, error: errorMessage });
-        logger.warn({ index: i, error: errorMessage, tenantId }, 'Failed to process notification in batch');
+        logger.warn({ index: i, error: errorMessage, tenantId, appId }, 'Failed to process notification in batch');
       }
     }
 
     logger.info(
-      { processed: results.processed, failed: results.failed, tenantId },
+      { processed: results.processed, failed: results.failed, tenantId, appId },
       'Batch notification processing completed'
     );
 

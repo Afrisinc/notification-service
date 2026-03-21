@@ -1,0 +1,52 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: CAMPAIGNS
+// Campaign management and performance tracking
+////////////////////////////////////////////////////////////
+
+enum CampaignStatus {
+  draft
+  scheduled
+  completed
+  cancelled
+}
+
+model Campaign {
+  id                    String           @id @default(uuid())
+  app_id                String
+  name                  String
+  channel               Channel
+  template_id           String
+  recipient_type        String           @default("all") // all, tags, segment, custom
+  recipient_count       Int              @default(0)
+  recipient_tags        String[]         @default([])
+  recipient_segment     String?
+  status                CampaignStatus   @default(draft)
+  sent_count            Int              @default(0)
+  delivered_count       Int              @default(0)
+  failed_count          Int              @default(0)
+  bounce_count          Int              @default(0)
+  open_count            Int              @default(0)
+  click_count           Int              @default(0)
+  conversion_count      Int              @default(0)
+  unsubscribe_count     Int              @default(0)
+  scheduled_at          DateTime?
+  sent_at               DateTime?
+  completed_at          DateTime?
+  metadata              Json?            @default("{}")
+  created_by_user_id    String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  // Relations
+  app                   App              @relation(fields: [app_id], references: [id], onDelete: Cascade)
+  template              Template         @relation(fields: [template_id], references: [id], onDelete: Restrict)
+  createdByUser         User?            @relation("CreatedByCampaign", fields: [created_by_user_id], references: [id], onDelete: SetNull)
+
+  @@unique([app_id, name])
+  @@index([app_id])
+  @@index([status])
+  @@index([channel])
+  @@index([scheduled_at])
+  @@index([createdAt])
+  @@map("campaigns")
+}

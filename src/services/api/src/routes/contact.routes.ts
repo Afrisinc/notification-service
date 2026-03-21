@@ -1,0 +1,104 @@
+import type { FastifyInstance } from 'fastify';
+import {
+  listContacts,
+  createContact,
+  getContact,
+  updateContact,
+  deleteContact,
+  bulkImportContacts,
+  searchContacts,
+  exportContacts,
+} from '../controllers/contact.controller';
+import { validateBaseToken } from '../middlewares/auth.middleware';
+import {
+  ListContactsSchema,
+  CreateContactSchema,
+  GetContactSchema,
+  UpdateContactSchema,
+  DeleteContactSchema,
+  BulkImportContactsSchema,
+  SearchContactsSchema,
+  ExportContactsSchema,
+} from '../schemas/routes/contact.schema';
+
+export async function registerContactRoutes(app: FastifyInstance) {
+  // List Contacts
+  app.get(
+    '/apps/:appId/contacts',
+    {
+      onRequest: [validateBaseToken],
+      schema: ListContactsSchema,
+    },
+    listContacts
+  );
+
+  // Search Contacts (before specific ID routes for route specificity)
+  app.get(
+    '/apps/:appId/contacts/search',
+    {
+      onRequest: [validateBaseToken],
+      schema: SearchContactsSchema,
+    },
+    searchContacts
+  );
+
+  // Export Contacts
+  app.get(
+    '/apps/:appId/contacts/export',
+    {
+      onRequest: [validateBaseToken],
+      schema: ExportContactsSchema,
+    },
+    exportContacts
+  );
+
+  // Create Contact
+  app.post(
+    '/apps/:appId/contacts',
+    {
+      onRequest: [validateBaseToken],
+      schema: CreateContactSchema,
+    },
+    createContact
+  );
+
+  // Bulk Import Contacts
+  app.post(
+    '/apps/:appId/contacts/import',
+    {
+      onRequest: [validateBaseToken],
+      schema: BulkImportContactsSchema,
+    },
+    bulkImportContacts
+  );
+
+  // Get Single Contact
+  app.get(
+    '/apps/:appId/contacts/:contactId',
+    {
+      onRequest: [validateBaseToken],
+      schema: GetContactSchema,
+    },
+    getContact
+  );
+
+  // Update Contact
+  app.put(
+    '/apps/:appId/contacts/:contactId',
+    {
+      onRequest: [validateBaseToken],
+      schema: UpdateContactSchema,
+    },
+    updateContact
+  );
+
+  // Delete Contact
+  app.delete(
+    '/apps/:appId/contacts/:contactId',
+    {
+      onRequest: [validateBaseToken],
+      schema: DeleteContactSchema,
+    },
+    deleteContact
+  );
+}

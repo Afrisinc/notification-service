@@ -31,6 +31,7 @@ model Template {
   createdBy         User              @relation("CreatedBy", fields: [created_by_user_id], references: [id], onDelete: Restrict)
   versions          TemplateVersion[]
   appTemplates      AppTemplate[]
+  campaigns         Campaign[]
 
   @@unique([account_id, code, channel, language])
   @@index([account_id, active])

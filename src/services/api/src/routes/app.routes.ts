@@ -12,7 +12,6 @@ import {
   createAppTemplate,
   updateAppTemplate,
   deleteAppTemplate,
-  getAppNotifications,
   getAppOverview,
 } from '../controllers/app.controller';
 import { validateBaseToken } from '../middlewares/auth.middleware';
@@ -239,20 +238,6 @@ export async function registerAppRoutes(app: FastifyInstance) {
       },
     },
     deleteAppTemplate
-  );
-
-  // Get App Notifications/Logs
-  app.get(
-    '/apps/:appId/notifications',
-    {
-      onRequest: [validateBaseToken],
-      schema: {
-        tags: ['Applications', 'Notifications'],
-        summary: 'Get app notification logs',
-        description: 'Retrieve notification delivery logs for a specific app with pagination and filtering',
-      },
-    },
-    getAppNotifications
   );
 
   // Get App Overview
