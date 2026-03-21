@@ -25,6 +25,8 @@ model User {
   tokens            Token[]           @relation("Tokens")
   authorizationCodes AuthorizationCode[]
   templates         Template[]        @relation("CreatedBy")
+  invitesSent       OrganizationInvite[] @relation("InvitesSent")
+  invitesAccepted   OrganizationInvite[] @relation("InvitesAccepted")
 
   @@map("users")
 }

@@ -1,6 +1,9 @@
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import pino from 'pino';
 import { prismaRead, prismaWrite } from '@shared/database';
+import { NotifyService } from './notify.service';
+import { env } from '../config/env';
+import { template } from 'handlebars';
 
 const logger = pino();
 
@@ -45,9 +48,27 @@ export class OrganizationService {
   }
 
   /**
+   * Get organization details by ID
+   */
+  async getOrganizationById(orgId: string) {
+    try {
+      const org = await prismaRead.organization.findUnique({
+        where: { id: orgId },
+        include: {
+          _count: true,
+        },
+      });
+
+      return org;
+    } catch (error) {
+      logger.error({ error, orgId }, 'Error fetching organization');
+      throw error;
+    }
+  }
+
+  /**
    * Create an invite for someone to join an organization
-   * For now, this just returns an invite object structure
-   * In production, this would send an email invite
+   * Stores invite with token in database and sends email notification
    */
   async createInvite(orgId: string, email: string, role: string) {
     try {
@@ -60,23 +81,66 @@ export class OrganizationService {
         throw new Error('Organization not found');
       }
 
-      // Generate invite ID
+      // Generate invite ID and token
       const inviteId = randomUUID();
+      const inviteToken = randomUUID();
 
       // Create expiry date (7 days from now)
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
-      logger.info({ orgId, email, role }, 'Organization invite created');
+      // Store invite in database with plaintext token
+      const storedInvite = await prismaWrite.organizationInvite.create({
+        data: {
+          id: inviteId,
+          organization_id: orgId,
+          email,
+          role,
+          token: inviteToken,
+          status: 'pending',
+          expiresAt,
+        },
+      });
 
-      // Return invite object (in production, would also send email)
+      // Generate invitation link with plaintext token
+      const invitationLink = `${env.WEBAPP_URL}/invite/${inviteId}/${inviteToken}`;
+
+      logger.info({ orgId, email, role, inviteId }, 'Organization invite created and stored');
+
+      // Send invite email using notification service
+      try {
+        const notifyService = new NotifyService();
+
+        // Extract member name from email (part before @)
+        const memberName = email.split('@')[0];
+
+        await notifyService.sendNotification(env.ACCOUNT_ID, env.SYSTEM_APP_ID, {
+          channel: 'EMAIL',
+          recipient: email,
+          templateId: 'd7b6f03f-b261-4334-9adf-2c74485ea4bf', // Organization invite template
+          app_id: env.SYSTEM_APP_ID,
+          payload: {
+            member_name: memberName,
+            org_name: org.name,
+            invitation_link: invitationLink,
+          },
+        });
+
+        logger.info({ email, orgId }, 'Organization invite email sent');
+      } catch (emailError) {
+        logger.warn({ emailError, email }, 'Failed to send organization invite email, but invite stored in database');
+        // Don't throw - invite was created even if email fails
+      }
+
+      // Return invite object
       return {
-        id: inviteId,
-        email,
-        role,
-        status: 'pending',
-        createdAt: new Date(),
-        expiresAt,
+        id: storedInvite.id,
+        email: storedInvite.email,
+        role: storedInvite.role,
+        status: storedInvite.status,
+        invitationLink,
+        createdAt: storedInvite.createdAt,
+        expiresAt: storedInvite.expiresAt,
       };
     } catch (error) {
       logger.error({ error, orgId, email }, 'Failed to create organization invite');
@@ -212,6 +276,137 @@ export class OrganizationService {
       return updated;
     } catch (error) {
       logger.error({ error, orgId }, 'Failed to update organization');
+      throw error;
+    }
+  }
+
+  /**
+   * Validate an organization invitation by fetching from database and verifying token
+   */
+  async validateInvite(inviteId: string, token: string) {
+    try {
+      // Fetch invite from database
+      const invite = await prismaRead.organizationInvite.findUnique({
+        where: { id: inviteId },
+        include: {
+          organization: {
+            select: { id: true, name: true },
+          },
+        },
+      });
+
+      if (!invite) {
+        logger.warn({ inviteId }, 'Invitation not found');
+        return null;
+      }
+
+      // Verify token matches stored token
+      if (invite.token !== token) {
+        logger.warn({ inviteId }, 'Invalid invitation token');
+        return null;
+      }
+
+      // Check if invitation has expired
+      if (new Date() > invite.expiresAt) {
+        logger.warn({ inviteId }, 'Invitation has expired');
+        // Update status to expired
+        await prismaWrite.organizationInvite.update({
+          where: { id: inviteId },
+          data: { status: 'expired' },
+        });
+        return null;
+      }
+
+      // Check if already accepted
+      if (invite.status === 'accepted') {
+        logger.warn({ inviteId }, 'Invitation already accepted');
+        return null;
+      }
+
+      logger.info({ inviteId, email: invite.email }, 'Invitation validated successfully');
+      return invite;
+    } catch (error) {
+      logger.error({ error, inviteId }, 'Error validating invitation');
+      throw error;
+    }
+  }
+
+  /**
+   * Accept an organization invitation and add user to organization
+   * Handles both new and existing users
+   * User email must match invitation email
+   */
+  async acceptInvite(inviteId: string, token: string, userId: string) {
+    try {
+      // Validate the invite
+      const invite = await this.validateInvite(inviteId, token);
+
+      if (!invite) {
+        throw new Error('Invalid or expired invitation');
+      }
+
+      // Get user details to verify email matches
+      const user = await prismaRead.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Verify user email matches invitation email
+      if (user.email !== invite.email) {
+        logger.warn(
+          { userId, inviteEmail: invite.email, userEmail: user.email },
+          'Email mismatch for invitation acceptance'
+        );
+        throw new Error('Your email does not match the invitation email. Please log in with the invited email.');
+      }
+
+      // Check if user is already a member
+      const existingMember = await prismaRead.organizationMember.findFirst({
+        where: {
+          organization_id: invite.organization_id,
+          user_id: userId,
+        },
+      });
+
+      if (existingMember) {
+        throw new Error('User is already a member of this organization');
+      }
+
+      // Create organization member record
+      const member = await prismaWrite.organizationMember.create({
+        data: {
+          organization_id: invite.organization_id,
+          user_id: userId,
+          role: invite.role as any, // role is OWNER, ADMIN, or MEMBER
+        },
+      });
+
+      // Update invite status to accepted
+      await prismaWrite.organizationInvite.update({
+        where: { id: inviteId },
+        data: {
+          status: 'accepted',
+          acceptedBy_user_id: userId,
+          acceptedAt: new Date(),
+        },
+      });
+
+      logger.info({ inviteId, userId, orgId: invite.organization_id }, 'Organization invitation accepted');
+
+      return {
+        memberId: member.id,
+        orgId: invite.organization_id,
+        orgName: invite.organization.name,
+        role: member.role,
+        addedAt: member.createdAt,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to accept invitation';
+      logger.error({ error, inviteId, userId }, message);
       throw error;
     }
   }

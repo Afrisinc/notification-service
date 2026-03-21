@@ -13,6 +13,7 @@ import {
   updateAppTemplate,
   deleteAppTemplate,
   getAppNotifications,
+  getAppOverview,
 } from '../controllers/app.controller';
 import { validateBaseToken } from '../middlewares/auth.middleware';
 import {
@@ -25,6 +26,7 @@ import {
   GetAppsByOrgRouteSchema,
 } from '../schemas';
 import { CreateAppTemplateRouteSchema } from '../schemas/routes/app.schema';
+import { GetAppOverviewSchema } from '../schemas/routes/app-overview.schema';
 
 export async function registerAppRoutes(app: FastifyInstance) {
   // Create App
@@ -251,5 +253,20 @@ export async function registerAppRoutes(app: FastifyInstance) {
       },
     },
     getAppNotifications
+  );
+
+  // Get App Overview
+  app.get(
+    '/apps/:appId/overview',
+    {
+      onRequest: [validateBaseToken],
+      schema: {
+        ...GetAppOverviewSchema,
+        tags: ['Applications', 'Analytics'],
+        summary: 'Get app overview with statistics',
+        description: 'Retrieve app overview including stats, chart data, and recent activity',
+      },
+    },
+    getAppOverview
   );
 }

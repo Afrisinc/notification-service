@@ -68,6 +68,7 @@ const EnvSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM: z.string().optional(),
+  FROM_EMAIL: z.string().default('noreply@afrisinc.com'),
   SENDGRID_API_KEY: z.string().optional(),
 
   // Database Logging

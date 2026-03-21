@@ -5,11 +5,14 @@ import { asyncWrapper } from '../middlewares/async_wrapper.middleware';
 import { validateBaseToken } from '../middlewares/auth.middleware';
 import { GetTemplatesByOrganizationRouteSchema } from '../schemas/routes/template.schema';
 import {
+  GetOrganizationByIdSchema,
   CreateOrganizationInviteSchema,
   GetOrganizationMembersSchema,
   RemoveOrganizationMemberSchema,
   UpdateOrganizationSchema,
   DeleteOrganizationSchema,
+  ValidateInviteSchema,
+  AcceptInviteSchema,
 } from '../schemas/routes/organization.schema';
 
 /**
@@ -18,6 +21,13 @@ import {
 export async function registerOrganizationRoutes(fastify: FastifyInstance) {
   const templateController = new TemplateController();
   const orgController = new OrganizationController();
+
+  // Get organization by ID
+  fastify.get(
+    '/organizations/:orgId',
+    { onRequest: [validateBaseToken], schema: GetOrganizationByIdSchema },
+    asyncWrapper(orgController.getOrganizationById.bind(orgController))
+  );
 
   // Get templates by organization
   fastify.get(
@@ -59,5 +69,19 @@ export async function registerOrganizationRoutes(fastify: FastifyInstance) {
     '/organizations/:orgId',
     { onRequest: [validateBaseToken], schema: DeleteOrganizationSchema },
     asyncWrapper(orgController.deleteOrganization.bind(orgController))
+  );
+
+  // Validate invitation (no auth required - used before login/registration)
+  fastify.get(
+    '/invites/:inviteId/:token',
+    { schema: ValidateInviteSchema },
+    asyncWrapper(orgController.validateInvite.bind(orgController))
+  );
+
+  // Accept invitation (auth required - user must be logged in)
+  fastify.post(
+    '/invites/:inviteId/:token/accept',
+    { onRequest: [validateBaseToken], schema: AcceptInviteSchema },
+    asyncWrapper(orgController.acceptInvite.bind(orgController))
   );
 }

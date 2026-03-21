@@ -1,22 +1,16 @@
 import pino from 'pino';
 import { prismaRead, prismaWrite } from '@shared/database';
 import { getConfig } from '@shared/config';
-import { SMTPProvider } from './providers/smtp';
-import { SendGridProvider } from './providers/sendgrid';
+import { EmailProviderFactory } from './providers/strategy';
 
 export class EmailProcessor {
-  private smtpProvider?: SMTPProvider;
-  private sendgridProvider?: SendGridProvider;
+  private providerStrategy;
 
   constructor(private logger: pino.Logger) {
     const config = getConfig();
 
-    // Initialize providers based on config
-    if (config.EMAIL_PROVIDER === 'smtp') {
-      this.smtpProvider = new SMTPProvider(logger);
-    } else if (config.EMAIL_PROVIDER === 'sendgrid') {
-      this.sendgridProvider = new SendGridProvider(logger);
-    }
+    // Initialize provider strategy with fallback support
+    this.providerStrategy = EmailProviderFactory.createStrategy(config, logger);
   }
 
   async process(email: any): Promise<void> {
@@ -86,18 +80,8 @@ export class EmailProcessor {
         'Email data prepared for sending'
       );
 
-      // Select provider
-      let result;
-      const config = getConfig();
-
-      if (config.EMAIL_PROVIDER === 'sendgrid' && this.sendgridProvider) {
-        result = await this.sendgridProvider.send(emailData);
-      } else if (this.smtpProvider) {
-        result = await this.smtpProvider.send(emailData);
-      } else {
-        throw new Error('No email provider configured');
-      }
-
+      // Send using provider strategy (tries providers in order with fallback)
+      const result = await this.providerStrategy.send(emailData);
       this.logger.info({ emailId, messageId: result.messageId }, 'Email sent successfully');
 
       // Record success log to database
@@ -105,7 +89,7 @@ export class EmailProcessor {
         await prismaWrite.notificationLog.create({
           data: {
             notificationId: emailId,
-            provider: config.EMAIL_PROVIDER || 'unknown',
+            provider: 'multi-provider-strategy',
             status: 'SENT',
             response: result.messageId || 'Email sent successfully',
           },

@@ -18,6 +18,7 @@ model Organization {
 
   // Relations
   members           OrganizationMember[]
+  invites           OrganizationInvite[] @relation("OrganizationInvites")
   accounts          Account[]
   apps              App[]
 

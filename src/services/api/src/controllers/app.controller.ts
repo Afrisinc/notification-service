@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { appService, CreateAppRequest } from '../services/app.service';
+import { AppOverviewService } from '../services/app-overview.service';
 import { ApiResponseHelper } from '../utils';
 import { logger } from '../config/logger';
 
@@ -347,6 +348,58 @@ export async function getAppNotifications(req: FastifyRequest, reply: FastifyRep
     });
 
     return ApiResponseHelper.success(reply, 'Notifications retrieved successfully', notifications);
+  } catch (err: unknown) {
+    const errorMessage = getErrorMessage(err);
+    if (errorMessage.includes('not found')) {
+      return ApiResponseHelper.notFound(reply, errorMessage);
+    }
+    if (errorMessage.includes('Unauthorized')) {
+      return ApiResponseHelper.forbidden(reply, errorMessage);
+    }
+    return ApiResponseHelper.badRequest(reply, errorMessage);
+  }
+}
+
+export async function getAppOverview(req: FastifyRequest, reply: FastifyReply) {
+  try {
+    const accountId = req.headers['x-account-id'] as string;
+    const { appId } = req.params as { appId: string };
+    const query = req.query as {
+      startDate?: string;
+      endDate?: string;
+      channels?: string;
+    };
+
+    if (!accountId) {
+      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
+    }
+
+    // Parse filters
+    const filters: {
+      startDate?: Date;
+      endDate?: Date;
+      channels?: string[];
+    } = {};
+
+    if (query.startDate) {
+      filters.startDate = new Date(query.startDate);
+    }
+
+    if (query.endDate) {
+      filters.endDate = new Date(query.endDate);
+    }
+
+    if (query.channels) {
+      filters.channels = query.channels
+        .split(',')
+        .map((c) => c.trim().toUpperCase())
+        .filter((c) => c);
+    }
+
+    const overviewService = new AppOverviewService();
+    const overview = await overviewService.getAppOverview(appId, accountId, filters);
+
+    return ApiResponseHelper.success(reply, 'App overview retrieved successfully', overview);
   } catch (err: unknown) {
     const errorMessage = getErrorMessage(err);
     if (errorMessage.includes('not found')) {

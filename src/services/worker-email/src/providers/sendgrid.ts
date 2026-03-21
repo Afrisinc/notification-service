@@ -23,7 +23,7 @@ export class SendGridProvider implements EmailProvider {
 
       const msg = {
         to: email.to,
-        from: config.SMTP_FROM || 'noreply@notification.local',
+        from: config.FROM_EMAIL || config.SMTP_FROM || 'noreply@notification.local',
         subject: email.subject,
         text: email.body,
         html: email.html || email.body,

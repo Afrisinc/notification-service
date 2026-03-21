@@ -13,13 +13,57 @@ export class OrganizationController {
   }
 
   /**
+   * Get organization details by ID
+   */
+  async getOrganizationById(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { orgId } = request.params as { orgId: string };
+      const userId = (request as any).user?.id;
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
+      }
+
+      // Verify user is part of the organization
+      const isMember = await this.organizationService.isOrganizationMember(orgId, userId);
+      if (!isMember) {
+        return ApiResponseHelper.forbidden(reply, 'You do not have access to this organization');
+      }
+
+      const org = await this.organizationService.getOrganizationById(orgId);
+
+      if (!org) {
+        return ApiResponseHelper.notFound(reply, 'Organization not found');
+      }
+
+      return ApiResponseHelper.success(reply, 'Organization retrieved successfully', {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        legalName: org.legal_name,
+        location: org.location,
+        country: org.country,
+        taxId: org.tax_id,
+        orgEmail: org.org_email,
+        orgPhone: org.org_phone,
+        createdAt: org.createdAt,
+        updatedAt: org.updatedAt,
+        memberCount: org._count?.members || 0,
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get organization');
+      return ApiResponseHelper.internalError(reply, 'Failed to get organization');
+    }
+  }
+
+  /**
    * Create an invite for someone to join an organization
    */
   async createInvite(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { orgId } = request.params as { orgId: string };
       const { email, role } = request.body as { email: string; role: 'OWNER' | 'ADMIN' | 'MEMBER' };
-      const userId = (request as any).user?.userId;
+      const userId = (request as any).user?.id;
 
       if (!userId) {
         return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
@@ -54,7 +98,7 @@ export class OrganizationController {
     try {
       const { orgId } = request.params as { orgId: string };
       const { page = 1, limit = 10 } = request.query as { page?: number; limit?: number };
-      const userId = (request as any).user?.userId;
+      const userId = (request as any).user?.id;
 
       if (!userId) {
         return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
@@ -88,7 +132,7 @@ export class OrganizationController {
   async removeMember(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { orgId, memberId } = request.params as { orgId: string; memberId: string };
-      const userId = (request as any).user?.userId;
+      const userId = (request as any).user?.id;
 
       if (!userId) {
         return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
@@ -158,7 +202,7 @@ export class OrganizationController {
   async deleteOrganization(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { orgId } = request.params as { orgId: string };
-      const userId = (request as any).user?.userId;
+      const userId = (request as any).user?.id;
 
       if (!userId) {
         return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
@@ -176,6 +220,78 @@ export class OrganizationController {
 
       if (message.includes('Only organization owner')) {
         return ApiResponseHelper.forbidden(reply, message);
+      }
+
+      return ApiResponseHelper.internalError(reply, message);
+    }
+  }
+
+  /**
+   * Validate an organization invitation (no auth required)
+   */
+  async validateInvite(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { inviteId, token } = request.params as { inviteId: string; token: string };
+
+      const invite = await this.organizationService.validateInvite(inviteId, token);
+
+      if (!invite) {
+        return ApiResponseHelper.notFound(reply, 'Invitation not found or invalid');
+      }
+
+      const isExpired = new Date() > new Date((invite as any).expiresAt);
+
+      return ApiResponseHelper.success(reply, 'Invitation validated successfully', {
+        inviteId: (invite as any).id,
+        email: (invite as any).email,
+        orgId: (invite as any).organization_id,
+        orgName: (invite as any).organization?.name,
+        role: (invite as any).role,
+        status: isExpired ? 'expired' : (invite as any).status,
+        expiresAt: (invite as any).expiresAt,
+        isExpired,
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to validate invitation');
+      return ApiResponseHelper.internalError(reply, 'Failed to validate invitation');
+    }
+  }
+
+  /**
+   * Accept an organization invitation (auth required)
+   */
+  async acceptInvite(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { inviteId, token } = request.params as { inviteId: string; token: string };
+      const userId = (request as any).user?.id;
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
+      }
+
+      const result = await this.organizationService.acceptInvite(inviteId, token, userId);
+
+      if (!result) {
+        return ApiResponseHelper.badRequest(reply, 'Failed to accept invitation');
+      }
+
+      return ApiResponseHelper.success(reply, 'Invitation accepted successfully', {
+        memberId: result.memberId,
+        orgId: result.orgId,
+        orgName: result.orgName,
+        role: result.role,
+        addedAt: result.addedAt,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to accept invitation';
+      logger.error({ error }, message);
+
+      if (message.includes('expired')) {
+        return ApiResponseHelper.badRequest(reply, 'Invitation has expired');
+      }
+
+      if (message.includes('already a member')) {
+        return ApiResponseHelper.badRequest(reply, 'User is already a member of this organization');
       }
 
       return ApiResponseHelper.internalError(reply, message);

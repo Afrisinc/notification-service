@@ -35,7 +35,7 @@ export class SMTPProvider implements EmailProvider {
       const config = getConfig();
 
       const mailOptions = {
-        from: config.SMTP_FROM || 'noreply@notification.local',
+        from: config.FROM_EMAIL || config.SMTP_FROM || 'noreply@notification.local',
         to: email.to,
         subject: email.subject,
         text: email.body,

@@ -1,5 +1,45 @@
 import { standardErrorResponses } from '../common/error-responses';
 
+export const GetOrganizationByIdSchema = {
+  description: 'Get organization details by ID',
+  tags: ['Organizations'],
+  params: {
+    type: 'object',
+    properties: {
+      orgId: { type: 'string', format: 'uuid', description: 'Organization ID' },
+    },
+    required: ['orgId'],
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'integer' },
+        data: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            slug: { type: 'string' },
+            legalName: { type: 'string' },
+            location: { type: 'string' },
+            country: { type: 'string' },
+            taxId: { type: 'string' },
+            orgEmail: { type: 'string', format: 'email' },
+            orgPhone: { type: 'string' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+            memberCount: { type: 'integer' },
+          },
+        },
+      },
+    },
+    ...standardErrorResponses,
+  },
+};
+
 export const CreateOrganizationInviteSchema = {
   description: 'Create an invite to join an organization',
   tags: ['Organizations'],
@@ -228,6 +268,78 @@ export const DeleteOrganizationSchema = {
           properties: {
             deleted: { type: 'boolean' },
             orgId: { type: 'string', format: 'uuid' },
+          },
+        },
+      },
+    },
+    ...standardErrorResponses,
+  },
+  security: [{ bearerAuth: [] }],
+};
+
+export const ValidateInviteSchema = {
+  description: 'Validate an organization invitation (no auth required)',
+  tags: ['Organizations', 'Invites'],
+  params: {
+    type: 'object',
+    properties: {
+      inviteId: { type: 'string', format: 'uuid', description: 'Invitation ID' },
+      token: { type: 'string', description: 'Invitation token' },
+    },
+    required: ['inviteId', 'token'],
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'integer' },
+        data: {
+          type: 'object',
+          properties: {
+            inviteId: { type: 'string', format: 'uuid' },
+            email: { type: 'string', format: 'email' },
+            orgId: { type: 'string', format: 'uuid' },
+            orgName: { type: 'string' },
+            role: { type: 'string', enum: ['OWNER', 'ADMIN', 'MEMBER'] },
+            status: { type: 'string', enum: ['pending', 'accepted', 'rejected', 'expired'] },
+            expiresAt: { type: 'string', format: 'date-time' },
+            isExpired: { type: 'boolean' },
+          },
+        },
+      },
+    },
+    ...standardErrorResponses,
+  },
+};
+
+export const AcceptInviteSchema = {
+  description: 'Accept an organization invitation and add user to organization',
+  tags: ['Organizations', 'Invites'],
+  params: {
+    type: 'object',
+    properties: {
+      inviteId: { type: 'string', format: 'uuid', description: 'Invitation ID' },
+      token: { type: 'string', description: 'Invitation token' },
+    },
+    required: ['inviteId', 'token'],
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'integer' },
+        data: {
+          type: 'object',
+          properties: {
+            memberId: { type: 'string', format: 'uuid' },
+            orgId: { type: 'string', format: 'uuid' },
+            orgName: { type: 'string' },
+            role: { type: 'string', enum: ['OWNER', 'ADMIN', 'MEMBER'] },
+            addedAt: { type: 'string', format: 'date-time' },
           },
         },
       },
