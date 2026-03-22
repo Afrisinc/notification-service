@@ -1,0 +1,24 @@
+model OrganizationInvite {
+  id                String   @id @default(uuid())
+  organization_id   String
+  email             String
+  role              String   @default("MEMBER") // OWNER, ADMIN, MEMBER
+  token             String   @unique // Plaintext token sent to user (hashed when stored in production)
+  status            String   @default("pending") // pending, accepted, rejected, expired
+  invitedBy_user_id String?
+  acceptedBy_user_id String?
+  acceptedAt        DateTime?
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  organization      Organization @relation("OrganizationInvites", fields: [organization_id], references: [id], onDelete: Cascade)
+  invitedByUser     User? @relation("InvitesSent", fields: [invitedBy_user_id], references: [id], onDelete: SetNull)
+  acceptedByUser    User? @relation("InvitesAccepted", fields: [acceptedBy_user_id], references: [id], onDelete: SetNull)
+
+  @@unique([organization_id, email])
+  @@index([email])
+  @@index([status])
+  @@index([expiresAt])
+}

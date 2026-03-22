@@ -7,6 +7,7 @@ model ApiKey {
   id         String    @id @default(uuid())
   keyHash    String    @unique
   name       String
+  type       KeyType   @default(test) // test or production
   revoked    Boolean   @default(false)
   lastUsedAt DateTime?
   createdAt  DateTime  @default(now())

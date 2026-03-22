@@ -73,6 +73,15 @@ export class AuthService {
             },
           });
 
+          // Add user as OWNER member of the personal organization
+          await tx.organizationMember.create({
+            data: {
+              organization_id: personalOrg.id,
+              user_id: user.id,
+              role: 'OWNER',
+            },
+          });
+
           return { user, account };
         } else if (data.account_type === 'company') {
           // Create organization for company accounts

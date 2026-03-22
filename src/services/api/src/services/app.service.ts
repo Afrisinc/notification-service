@@ -110,7 +110,7 @@ export class AppService {
 
     const [templateCount, notificationCount, apiKeyCount] = await prismaRead.$transaction([
       prismaRead.appTemplate.count({ where: { app_id: appId } }),
-      prismaRead.notification.count({ where: { account_id: accountId } }),
+      prismaRead.notification.count({ where: { app_id: appId } }),
       prismaRead.apiKey.count({ where: { app_id: appId } }),
     ]);
 
@@ -138,7 +138,7 @@ export class AppService {
     for (const app of apps) {
       const [templateCount, notificationCount, apiKeyCount] = await prismaRead.$transaction([
         prismaRead.appTemplate.count({ where: { app_id: app.id } }),
-        prismaRead.notification.count({ where: { account_id: accountId } }),
+        prismaRead.notification.count({ where: { app_id: app.id } }),
         prismaRead.apiKey.count({ where: { app_id: app.id } }),
       ]);
 
@@ -230,8 +230,8 @@ export class AppService {
     for (const app of apps) {
       const [templateCount, notificationCount, apiKeyCount] = await prismaRead.$transaction([
         prismaRead.appTemplate.count({ where: { app_id: app.id } }),
-        prismaRead.notification.count({ where: { account_id: app.account_id } }),
-        prismaRead.apiKey.count({ where: { account_id: app.account_id } }),
+        prismaRead.notification.count({ where: { app_id: app.id } }),
+        prismaRead.apiKey.count({ where: { app_id: app.id } }),
       ]);
 
       enrichedApps.push({

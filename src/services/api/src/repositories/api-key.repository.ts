@@ -5,10 +5,17 @@ export class ApiKeyRepository {
   /**
    * Create a new API key
    */
-  async create(data: { keyHash: string; name: string; account_id: string; app_id: string }): Promise<{
+  async create(data: {
+    keyHash: string;
+    name: string;
+    account_id: string;
+    app_id: string;
+    type?: 'test' | 'production';
+  }): Promise<{
     id: string;
     keyHash: string;
     name: string;
+    type: string;
     account_id: string;
     app_id: string;
     revoked: boolean;
@@ -22,6 +29,7 @@ export class ApiKeyRepository {
           name: data.name,
           account_id: data.account_id,
           app_id: data.app_id,
+          type: data.type || 'test',
         },
       });
 
@@ -43,6 +51,7 @@ export class ApiKeyRepository {
     id: string;
     keyHash: string;
     name: string;
+    type: string;
     account_id: string;
     app_id: string;
     revoked: boolean;
@@ -50,9 +59,20 @@ export class ApiKeyRepository {
     lastUsedAt: Date | null;
   } | null> {
     try {
-      return await prismaRead.apiKey.findUnique({
+      return (await prismaRead.apiKey.findUnique({
         where: { keyHash },
-      });
+        select: {
+          id: true,
+          keyHash: true,
+          name: true,
+          type: true,
+          account_id: true,
+          app_id: true,
+          revoked: true,
+          createdAt: true,
+          lastUsedAt: true,
+        },
+      })) as any;
     } catch (error) {
       logger.error({ error }, 'Failed to find API key by hash');
       throw error;
@@ -66,6 +86,7 @@ export class ApiKeyRepository {
     id: string;
     keyHash: string;
     name: string;
+    type: string;
     account_id: string;
     app_id: string;
     revoked: boolean;
@@ -131,6 +152,7 @@ export class ApiKeyRepository {
     id: string;
     keyHash: string;
     name: string;
+    type: string;
     account_id: string;
     app_id: string;
     revoked: boolean;
@@ -158,6 +180,7 @@ export class ApiKeyRepository {
     id: string;
     keyHash: string;
     name: string;
+    type: string;
     account_id: string;
     app_id: string;
     revoked: boolean;

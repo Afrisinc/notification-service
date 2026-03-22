@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { appService, CreateAppRequest } from '../services/app.service';
+import { AppOverviewService } from '../services/app-overview.service';
 import { ApiResponseHelper } from '../utils';
 import { logger } from '../config/logger';
 
@@ -321,32 +322,46 @@ export async function getAppTemplates(req: FastifyRequest, reply: FastifyReply) 
   }
 }
 
-export async function getAppNotifications(req: FastifyRequest, reply: FastifyReply) {
+export async function getAppOverview(req: FastifyRequest, reply: FastifyReply) {
   try {
     const accountId = req.headers['x-account-id'] as string;
     const { appId } = req.params as { appId: string };
     const query = req.query as {
-      page?: string;
-      limit?: string;
-      status?: string;
       startDate?: string;
       endDate?: string;
+      channels?: string;
     };
 
     if (!accountId) {
       return ApiResponseHelper.unauthorized(reply, 'Account information not found');
     }
 
-    const page = parseInt(query.page || '1', 10);
-    const limit = parseInt(query.limit || '20', 10);
+    // Parse filters
+    const filters: {
+      startDate?: Date;
+      endDate?: Date;
+      channels?: string[];
+    } = {};
 
-    const notifications = await appService.getAppNotifications(appId, accountId, page, limit, {
-      status: query.status,
-      startDate: query.startDate ? new Date(query.startDate) : undefined,
-      endDate: query.endDate ? new Date(query.endDate) : undefined,
-    });
+    if (query.startDate) {
+      filters.startDate = new Date(query.startDate);
+    }
 
-    return ApiResponseHelper.success(reply, 'Notifications retrieved successfully', notifications);
+    if (query.endDate) {
+      filters.endDate = new Date(query.endDate);
+    }
+
+    if (query.channels) {
+      filters.channels = query.channels
+        .split(',')
+        .map((c) => c.trim().toUpperCase())
+        .filter((c) => c);
+    }
+
+    const overviewService = new AppOverviewService();
+    const overview = await overviewService.getAppOverview(appId, accountId, filters);
+
+    return ApiResponseHelper.success(reply, 'App overview retrieved successfully', overview);
   } catch (err: unknown) {
     const errorMessage = getErrorMessage(err);
     if (errorMessage.includes('not found')) {

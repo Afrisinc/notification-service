@@ -27,7 +27,12 @@ export class ApiKeyService {
   /**
    * Create API key for app
    */
-  async createApiKey(account_id: string, app_id: string, name: string): Promise<CreateApiKeyResponse> {
+  async createApiKey(
+    account_id: string,
+    app_id: string,
+    name: string,
+    type: 'test' | 'production' = 'test'
+  ): Promise<CreateApiKeyResponse> {
     const plainKey = this.generateApiKey();
     const keyHash = this.hashApiKey(plainKey);
 
@@ -36,6 +41,7 @@ export class ApiKeyService {
       name,
       account_id,
       app_id,
+      type,
     });
 
     logger.info({ apiKeyId: apiKey.id, account_id, keyName: name }, 'API key created');

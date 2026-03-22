@@ -21,6 +21,9 @@ model App {
   notifications     Notification[]
   usageRecords      UsageRecord[]
   apiKeys           ApiKey[]
+  contacts          Contact[]
+  campaigns         Campaign[]
+  settings          AppSettings?
 
   @@index([account_id])
   @@index([organization_id])

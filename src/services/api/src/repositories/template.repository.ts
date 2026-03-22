@@ -276,6 +276,8 @@ export class TemplateRepository {
           ...(data.content !== undefined && { content: data.content }),
           ...(data.requiredVariables !== undefined && { requiredVariables: data.requiredVariables }),
           ...(data.description !== undefined && { description: data.description }),
+          ...(data.design_json !== undefined && { design_json: data.design_json }),
+          ...(data.editor_type !== undefined && { editor_type: data.editor_type }),
         },
         include: {
           versions: {

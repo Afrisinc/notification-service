@@ -1,0 +1,72 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: APP SETTINGS & CONFIGURATION
+// Application settings, allowed domains, and webhooks
+////////////////////////////////////////////////////////////
+
+model AppSettings {
+  id                String   @id @default(uuid())
+  app_id            String   @unique
+  description       String?
+  allowedDomains    String[] @default([]) // Array of allowed domain URLs
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  app               App      @relation(fields: [app_id], references: [id], onDelete: Cascade)
+  webhooks          Webhook[]
+
+  @@index([app_id])
+  @@map("app_settings")
+}
+
+model Webhook {
+  id                String   @id @default(uuid())
+  app_id            String
+  appSettings_id    String
+  url               String   // Webhook endpoint URL
+  events            String[] // Array of event types to subscribe to
+  headers           Json?    // Custom HTTP headers
+  isActive          Boolean  @default(true)
+
+  // Retry policy
+  maxRetries        Int      @default(5)
+  retryDelay        Int      @default(300) // In seconds
+  backoffMultiplier Float    @default(2)
+
+  // Tracking
+  failureCount      Int      @default(0)
+  lastError         String?
+  lastTriggeredAt   DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  appSettings       AppSettings @relation(fields: [appSettings_id], references: [id], onDelete: Cascade)
+  logs              WebhookLog[]
+
+  @@index([app_id])
+  @@index([appSettings_id])
+  @@map("webhooks")
+}
+
+model WebhookLog {
+  id                String   @id @default(uuid())
+  webhook_id        String
+  event             String   // Event type that triggered the webhook
+  status            String   // success, failed, pending
+  statusCode        Int?     // HTTP status code
+  responseTime      Int      // In milliseconds
+  payload           Json     // The payload sent to webhook
+  response          String?  // Response from webhook endpoint
+  attemptNumber     Int      @default(1)
+  nextRetryAt       DateTime?
+  timestamp         DateTime @default(now())
+
+  // Relations
+  webhook           Webhook  @relation(fields: [webhook_id], references: [id], onDelete: Cascade)
+
+  @@index([webhook_id])
+  @@index([status])
+  @@index([timestamp])
+  @@map("webhook_logs")
+}
