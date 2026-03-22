@@ -34,6 +34,13 @@ export async function registerTemplateRoutes(fastify: FastifyInstance) {
     asyncWrapper(controller.previewTemplate.bind(controller))
   );
 
+  // List user's templates (specific path BEFORE generic params) - PROTECTED
+  fastify.get(
+    '/templates/my-templates',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(controller.listMyTemplates.bind(controller))
+  );
+
   // Create new template
   fastify.post(
     '/templates',
@@ -69,6 +76,20 @@ export async function registerTemplateRoutes(fastify: FastifyInstance) {
     asyncWrapper(controller.activateVersion.bind(controller))
   );
 
+  // Publish template to marketplace (specific path BEFORE generic :id) - PROTECTED
+  fastify.post(
+    '/templates/:id/publish',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(controller.publishTemplate.bind(controller))
+  );
+
+  // Unpublish template from marketplace (specific path BEFORE generic :id) - PROTECTED
+  fastify.put(
+    '/templates/:id/unpublish',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(controller.unpublishTemplate.bind(controller))
+  );
+
   // Install template in project (specific path BEFORE generic :id) - PROTECTED
   fastify.post(
     '/templates/:id/install',
@@ -88,6 +109,13 @@ export async function registerTemplateRoutes(fastify: FastifyInstance) {
     '/templates/:id/analytics',
     { onRequest: [validateBaseToken], schema: GetTemplateRouteSchema },
     asyncWrapper(controller.getTemplateAnalytics.bind(controller))
+  );
+
+  // Get template for editing (before generic :id routes) - PROTECTED
+  fastify.get(
+    '/templates/:id/edit',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(controller.getTemplateForEdit.bind(controller))
   );
 
   // Get template by ID - PUBLIC ENDPOINT

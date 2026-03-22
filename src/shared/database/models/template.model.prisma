@@ -21,7 +21,26 @@ model Template {
   description       String?
   visibility        String            @default("private") // private | account | marketplace
   is_public         Boolean           @default(false)
-  price             Float?
+  price             Float?            // Price in cents for marketplace templates
+  currency          String            @default("USD") // Currency code
+
+  // Marketplace fields
+  thumbnail         String?           // Thumbnail image URL
+  previewUrl        String?           // Preview/demo URL
+  screenshots       String[]          @default([]) // Array of screenshot URLs
+  tags              String[]          @default([]) // Tags for discoverability
+  estimatedDeliveryTime String?       // e.g., "< 1 second"
+  compatibility     Json?             // Provider compatibility (Sendgrid, Mailgun, Twilio, etc.)
+
+  // Marketplace metrics
+  rating            Float?            @default(0) // Average rating 0-5
+  ratingCount       Int               @default(0) // Total number of ratings
+  installs          Int               @default(0) // Total installations
+  relatedTemplates  String[]          @default([]) // IDs of related templates
+
+  // Changelog
+  changelog         Json?             // Array of version changes
+
   deletedAt         DateTime?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
@@ -32,11 +51,13 @@ model Template {
   versions          TemplateVersion[]
   appTemplates      AppTemplate[]
   campaigns         Campaign[]
+  reviews           TemplateReview[]
 
   @@unique([account_id, code, channel, language])
   @@index([account_id, active])
   @@index([account_id, category])
   @@index([account_id, code, channel, active])
   @@index([account_id, deletedAt])
+  @@index([visibility, is_public, active]) // For marketplace filtering
   @@map("templates")
 }

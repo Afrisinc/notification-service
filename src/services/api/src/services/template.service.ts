@@ -35,6 +35,9 @@ export interface UpdateTemplateRequest {
   subject?: string;
   content?: string;
   active?: boolean;
+  description?: string;
+  design_json?: any;
+  editor_type?: 'visual' | 'code';
 }
 
 export interface CreateVersionRequest {
@@ -212,10 +215,13 @@ export class TemplateService {
         requiredVariables = extractRequiredVariables(request.content);
       }
 
-      // Update template
+      // Update template with all supported fields
       const updated = await templateRepository.update(tenantId, templateId, {
         subject: request.subject,
         content: request.content,
+        description: request.description,
+        design_json: request.design_json,
+        editor_type: request.editor_type,
         requiredVariables: requiredVariables ? (requiredVariables.length > 0 ? requiredVariables : null) : undefined,
       });
 

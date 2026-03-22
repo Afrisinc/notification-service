@@ -12,6 +12,7 @@ import { registerInternalRoutes } from './internal.routes';
 import { authRoutes } from './auth.routes';
 import { registerAppRoutes } from './app.routes';
 import { registerAppSettingsRoutes } from './app-settings.routes';
+import { registerMarketplaceRoutes } from './marketplace.routes';
 import { registerOrganizationRoutes } from './organization.routes';
 import { securityRoutes } from './security.routes';
 import { platformRoutes } from './platform.routes';
@@ -35,6 +36,10 @@ export async function v1Routes(fastify: FastifyInstance) {
   });
 
   await fastify.register(registerAppSettingsRoutes, {
+    prefix: '/api',
+  });
+
+  await fastify.register(registerMarketplaceRoutes, {
     prefix: '/api',
   });
 

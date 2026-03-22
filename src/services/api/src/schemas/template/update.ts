@@ -22,6 +22,18 @@ export const updateTemplateRequestBody = {
       type: 'boolean',
       description: 'Whether template is active',
     },
+    description: {
+      type: 'string',
+      description: 'Template description',
+    },
+    design_json: {
+      description: 'Visual editor design state (from email builder)',
+    },
+    editor_type: {
+      type: 'string',
+      enum: ['visual', 'code'],
+      description: 'Editor type (visual or code)',
+    },
   },
 };
 

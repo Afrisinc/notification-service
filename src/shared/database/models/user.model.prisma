@@ -29,6 +29,7 @@ model User {
   invitesAccepted   OrganizationInvite[] @relation("InvitesAccepted")
   createdContacts   Contact[]         @relation("CreatedBy")
   campaigns         Campaign[]        @relation("CreatedByCampaign")
+  templateReviews   TemplateReview[]  @relation("TemplateReviews")
 
   @@map("users")
 }

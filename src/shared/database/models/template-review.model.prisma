@@ -1,0 +1,25 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: TEMPLATE REVIEWS
+// Ratings and reviews for marketplace templates
+////////////////////////////////////////////////////////////
+
+model TemplateReview {
+  id                String   @id @default(uuid())
+  template_id       String
+  user_id           String
+  rating            Int      // 1-5 stars
+  review            String?  // Optional review text
+  helpful           Int      @default(0) // Count of helpful votes
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  template          Template @relation(fields: [template_id], references: [id], onDelete: Cascade)
+  user              User     @relation("TemplateReviews", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([template_id, user_id]) // One review per user per template
+  @@index([template_id, rating])
+  @@index([user_id])
+  @@index([createdAt])
+  @@map("template_reviews")
+}

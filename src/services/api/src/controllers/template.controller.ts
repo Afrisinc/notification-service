@@ -3,7 +3,7 @@ import { logger } from '../config/logger';
 import { templateService, CreateTemplateRequest, UpdateTemplateRequest } from '../services/template.service';
 import { ApiResponseHelper } from '../utils';
 import { appTemplateRepository } from '../repositories/template-installation.repository';
-import { prismaRead } from '@shared/database';
+import { prismaRead, prismaWrite } from '@shared/database';
 
 export class TemplateController {
   async createTemplate(request: FastifyRequest, reply: FastifyReply) {
@@ -53,11 +53,87 @@ export class TemplateController {
     }
   }
 
+  async getTemplateForEdit(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const accountId = request.headers['x-account-id'] as string;
+      const userId = (request as any).user?.id;
+      const { id } = request.params as { id: string };
+
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'No account access');
+      }
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User information not found');
+      }
+
+      // Protected endpoint - get template for editing (includes inactive/drafts)
+      const template = await prismaRead.template.findUnique({
+        where: { id },
+      });
+
+      if (!template || template.account_id !== accountId || template.created_by_user_id !== userId) {
+        return ApiResponseHelper.notFound(reply, 'Template not found or not owned by user');
+      }
+
+      if (template.deletedAt) {
+        return ApiResponseHelper.notFound(reply, 'Template has been deleted');
+      }
+
+      logger.debug({ templateId: id, correlationId: request.id }, 'Fetched template for editing');
+
+      // Reconstruct content based on channel type
+      let content: any = null;
+      if (template.content) {
+        if (template.channel === 'EMAIL') {
+          content = {
+            email: {
+              subject: template.subject,
+              html: template.content,
+            },
+          };
+        } else if (template.channel === 'SMS') {
+          content = {
+            sms: {
+              body: template.content,
+            },
+          };
+        }
+      }
+
+      return ApiResponseHelper.success(reply, 'Template retrieved for editing', {
+        id: template.id,
+        slug: template.code,
+        name: template.subject || template.code,
+        description: template.description,
+        channel: template.channel,
+        category: (template as any).category || 'MARKETING',
+        author: 'You',
+        isFree: true,
+        variables: template.requiredVariables || [],
+        subject: template.subject,
+        content,
+        language: template.language,
+        version: template.version,
+        active: template.active,
+        designJson: (template as any).design_json,
+        editorType: (template as any).editor_type || 'visual',
+        createdAt: template.createdAt.toISOString(),
+        updatedAt: template.updatedAt.toISOString(),
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to fetch template for editing');
+
+      ApiResponseHelper.badRequest(reply, errorMessage);
+    }
+  }
+
   async getTemplate(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
 
-      // Public endpoint - get template by ID
+      // Public endpoint - get template by ID (active only)
       const template = await prismaRead.template.findUnique({
         where: { id },
       });
@@ -93,7 +169,7 @@ export class TemplateController {
         name: template.subject || template.code,
         description: template.description,
         channel: template.channel,
-        category: template.category,
+        category: (template as any).category,
         author: 'Notify',
         isFree: true,
         variables: template.requiredVariables || [],
@@ -102,6 +178,8 @@ export class TemplateController {
         language: template.language,
         version: template.version,
         active: template.active,
+        designJson: (template as any).design_json,
+        editorType: (template as any).editor_type || 'visual',
         createdAt: template.createdAt.toISOString(),
         updatedAt: template.updatedAt.toISOString(),
       });
@@ -218,14 +296,42 @@ export class TemplateController {
 
       logger.info({ templateId: id, correlationId: request.id }, 'Template updated');
 
+      // Reconstruct content based on channel type
+      let content: any = null;
+      if (template.content) {
+        if (template.channel === 'EMAIL') {
+          content = {
+            email: {
+              subject: template.subject,
+              html: template.content,
+            },
+          };
+        } else if (template.channel === 'SMS') {
+          content = {
+            sms: {
+              body: template.content,
+            },
+          };
+        }
+      }
+
       ApiResponseHelper.updated(reply, 'Template updated successfully', {
         id: template.id,
-        code: template.code,
+        slug: template.code,
+        name: template.subject || template.code,
+        description: template.description,
         channel: template.channel,
+        category: (template as any).category || 'MARKETING',
+        author: 'Notify',
+        isFree: true,
+        variables: template.requiredVariables || [],
         subject: template.subject,
-        content: template.content,
+        content,
         language: template.language,
+        version: template.version,
         active: template.active,
+        designJson: (template as any).design_json,
+        editorType: (template as any).editor_type || 'visual',
         createdAt: template.createdAt.toISOString(),
         updatedAt: template.updatedAt.toISOString(),
       });
@@ -757,6 +863,220 @@ export class TemplateController {
       logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to get organization templates');
 
       ApiResponseHelper.badRequest(reply, errorMessage);
+    }
+  }
+
+  async listMyTemplates(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const accountId = request.headers['x-account-id'] as string;
+      const userId = (request as any).user?.id;
+      const { limit, offset } = request.query as { limit?: string; offset?: string };
+
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'No account access');
+      }
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User information not found');
+      }
+
+      // Get user's templates
+      const where: any = {
+        account_id: accountId,
+        created_by_user_id: userId,
+        deletedAt: null,
+      };
+
+      const pageLimit = limit ? Math.min(parseInt(limit, 10), 100) : 20;
+      const pageOffset = offset ? parseInt(offset, 10) : 0;
+
+      const [templates, total] = await Promise.all([
+        prismaRead.template.findMany({
+          where,
+          skip: pageOffset,
+          take: pageLimit,
+          orderBy: { createdAt: 'desc' },
+        }),
+        prismaRead.template.count({ where }),
+      ]);
+
+      logger.debug(
+        {
+          userId,
+          accountId,
+          count: templates.length,
+          total,
+          correlationId: request.id,
+        },
+        'Listed user templates'
+      );
+
+      ApiResponseHelper.successList(
+        reply,
+        'User templates retrieved',
+        templates.map((t) => ({
+          id: t.id,
+          code: t.code,
+          channel: t.channel,
+          category: t.category,
+          subject: t.subject,
+          description: t.description,
+          language: t.language,
+          version: t.version,
+          active: t.active,
+          visibility: t.visibility || 'private',
+          isPublic: t.is_public || false,
+          rating: t.rating || 0,
+          ratingCount: t.ratingCount || 0,
+          installs: t.installs || 0,
+          createdAt: t.createdAt.toISOString(),
+          updatedAt: t.updatedAt.toISOString(),
+        })),
+        { limit: pageLimit, offset: pageOffset, total }
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to list user templates');
+
+      ApiResponseHelper.badRequest(reply, errorMessage);
+    }
+  }
+
+  async publishTemplate(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const accountId = request.headers['x-account-id'] as string;
+      const userId = (request as any).user?.id;
+      const { id: templateId } = request.params as { id: string };
+      const body = request.body as {
+        description?: string;
+        thumbnail?: string;
+        tags?: string[];
+      };
+
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'No account access');
+      }
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User information not found');
+      }
+
+      // Verify template exists and belongs to user
+      const template = await prismaRead.template.findUnique({
+        where: { id: templateId },
+      });
+
+      if (!template || template.account_id !== accountId || template.created_by_user_id !== userId) {
+        return ApiResponseHelper.notFound(reply, 'Template not found or not owned by user');
+      }
+
+      if (template.deletedAt) {
+        return ApiResponseHelper.badRequest(reply, 'Cannot publish a deleted template');
+      }
+
+      // Publish template to marketplace
+      const published = await prismaWrite.template.update({
+        where: { id: templateId },
+        data: {
+          visibility: 'marketplace',
+          is_public: true,
+          description: body.description || template.description,
+          thumbnail: body.thumbnail,
+          tags: body.tags || template.tags,
+        },
+      });
+
+      logger.info(
+        {
+          templateId,
+          userId,
+          accountId,
+          correlationId: request.id,
+        },
+        'Template published to marketplace'
+      );
+
+      ApiResponseHelper.success(reply, 'Template published to marketplace', {
+        id: published.id,
+        code: published.code,
+        channel: published.channel,
+        visibility: published.visibility,
+        isPublic: published.is_public,
+        publishedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to publish template');
+
+      if (errorMessage.includes('not found')) {
+        ApiResponseHelper.notFound(reply, errorMessage);
+      } else {
+        ApiResponseHelper.badRequest(reply, errorMessage);
+      }
+    }
+  }
+
+  async unpublishTemplate(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const accountId = request.headers['x-account-id'] as string;
+      const userId = (request as any).user?.id;
+      const { id: templateId } = request.params as { id: string };
+
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'No account access');
+      }
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User information not found');
+      }
+
+      // Verify template exists and belongs to user
+      const template = await prismaRead.template.findUnique({
+        where: { id: templateId },
+      });
+
+      if (!template || template.account_id !== accountId || template.created_by_user_id !== userId) {
+        return ApiResponseHelper.notFound(reply, 'Template not found or not owned by user');
+      }
+
+      if (template.deletedAt) {
+        return ApiResponseHelper.badRequest(reply, 'Cannot unpublish a deleted template');
+      }
+
+      // Unpublish template from marketplace
+      const unpublished = await prismaWrite.template.update({
+        where: { id: templateId },
+        data: {
+          visibility: 'private',
+          is_public: false,
+        },
+      });
+
+      logger.info(
+        {
+          templateId,
+          userId,
+          accountId,
+          correlationId: request.id,
+        },
+        'Template unpublished from marketplace'
+      );
+
+      ApiResponseHelper.success(reply, 'Template unpublished from marketplace', {
+        id: unpublished.id,
+        code: unpublished.code,
+        visibility: unpublished.visibility,
+        isPublic: unpublished.is_public,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to unpublish template');
+
+      if (errorMessage.includes('not found')) {
+        ApiResponseHelper.notFound(reply, errorMessage);
+      } else {
+        ApiResponseHelper.badRequest(reply, errorMessage);
+      }
     }
   }
 }
