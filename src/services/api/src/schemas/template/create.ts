@@ -40,6 +40,15 @@ export const createTemplateRequestBody = {
       type: 'string',
       description: 'Optional template description',
     },
+    design_json: {
+      type: 'object',
+      description: 'Optional email builder JSON for visual editor',
+    },
+    editor_type: {
+      type: 'string',
+      enum: ['visual', 'code'],
+      description: 'Optional editor type (visual or code)',
+    },
   },
 };
 

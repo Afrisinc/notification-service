@@ -4,6 +4,7 @@ import { templateVersionRepository } from '../repositories/template-version.repo
 import { templateRenderer, RenderResult } from '../template/renderer';
 import { extractRequiredVariables } from '../template/validators/template.validator';
 import { getDefaultTemplate, hasDefaultTemplate, listDefaultTemplates as listDefaults } from '../templates';
+import { parseTemplateRequest } from '../utils/template-parser';
 
 export interface Template {
   id: string;
@@ -29,6 +30,8 @@ export interface CreateTemplateRequest {
   content: string;
   language: string;
   description?: string;
+  design_json?: any;
+  editor_type?: 'visual' | 'code';
 }
 
 export interface UpdateTemplateRequest {
@@ -57,29 +60,40 @@ export class TemplateService {
    */
   async createTemplate(accountId: string, userId: string, request: CreateTemplateRequest): Promise<Template> {
     try {
-      // Extract required variables from content
-      const requiredVariables = extractRequiredVariables(request.content);
+      // Parse template request (extracts design_json from HTML comment and normalizes data)
+      const parsedData = parseTemplateRequest({
+        code: request.code,
+        channel: request.channel,
+        subject: request.subject,
+        content: request.content,
+        language: request.language,
+        description: request.description,
+        design_json: request.design_json,
+        editor_type: request.editor_type,
+      });
 
       // Create template in database with userId
       const template = await templateRepository.create(
         accountId,
         {
-          code: request.code,
-          channel: request.channel,
-          subject: request.subject,
-          content: request.content,
-          language: request.language,
-          requiredVariables: requiredVariables.length > 0 ? requiredVariables : null,
-          description: request.description,
+          code: parsedData.code,
+          channel: parsedData.channel,
+          subject: parsedData.subject,
+          content: parsedData.content,
+          language: parsedData.language,
+          requiredVariables: parsedData.requiredVariables.length > 0 ? parsedData.requiredVariables : null,
+          description: parsedData.description,
+          design_json: parsedData.design_json,
+          editor_type: parsedData.editor_type,
         },
         userId
       );
 
       // Create initial version (v1)
       await templateVersionRepository.create(template.id, 1, {
-        subject: request.subject,
-        content: request.content,
-        requiredVariables: requiredVariables.length > 0 ? requiredVariables : null,
+        subject: parsedData.subject,
+        content: parsedData.content,
+        requiredVariables: parsedData.requiredVariables.length > 0 ? parsedData.requiredVariables : null,
       });
 
       logger.info(
@@ -209,19 +223,38 @@ export class TemplateService {
         throw new Error(`Template not found: ${templateId}`);
       }
 
-      // Extract required variables if content changed
-      let requiredVariables;
+      // If content is being updated, parse it to extract design_json and clean HTML
+      const updateData: any = {
+        subject: request.subject,
+        description: request.description,
+        design_json: request.design_json,
+        editor_type: request.editor_type,
+      };
+
+      let requiredVariables: string[] | undefined;
+
       if (request.content !== undefined) {
-        requiredVariables = extractRequiredVariables(request.content);
+        // Parse the content to extract design_json from embedded comment and clean HTML
+        const parsedContent = parseTemplateRequest({
+          code: template.code,
+          channel: template.channel as any,
+          subject: request.subject || template.subject,
+          content: request.content,
+          language: template.language,
+          description: request.description || template.description,
+          design_json: request.design_json,
+          editor_type: request.editor_type,
+        });
+
+        updateData.content = parsedContent.content;
+        updateData.design_json = parsedContent.design_json;
+        updateData.editor_type = parsedContent.editor_type;
+        requiredVariables = parsedContent.requiredVariables;
       }
 
       // Update template with all supported fields
       const updated = await templateRepository.update(tenantId, templateId, {
-        subject: request.subject,
-        content: request.content,
-        description: request.description,
-        design_json: request.design_json,
-        editor_type: request.editor_type,
+        ...updateData,
         requiredVariables: requiredVariables ? (requiredVariables.length > 0 ? requiredVariables : null) : undefined,
       });
 
