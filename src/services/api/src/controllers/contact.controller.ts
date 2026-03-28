@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { contactService } from '../services/contact.service';
+import { UsageTrackingService } from '../services/usage-tracking.service';
 import { ApiResponseHelper } from '../utils';
 import pino from 'pino';
 
@@ -79,6 +80,9 @@ export async function createContact(req: FastifyRequest, reply: FastifyReply) {
       tags: body.tags,
       attributes: body.attributes,
     });
+
+    // Track usage
+    await UsageTrackingService.recordUsage(accountId, appId, 'contacts', 1);
 
     return ApiResponseHelper.success(reply, 'Contact created successfully', contact, 201);
   } catch (err: unknown) {
@@ -222,6 +226,9 @@ export async function bulkImportContacts(req: FastifyRequest, reply: FastifyRepl
         updateIfExists: body.updateIfExists,
       }
     );
+
+    // Track usage for successfully imported contacts
+    await UsageTrackingService.recordUsage(accountId, appId, 'contacts', result.imported);
 
     return ApiResponseHelper.success(reply, 'Contacts imported successfully', result, 201);
   } catch (err: unknown) {

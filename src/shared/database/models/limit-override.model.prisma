@@ -1,0 +1,17 @@
+model LimitOverride {
+  id               String    @id @default(uuid())
+  account_id       String
+  metric           String
+  plan_limit       Int       // original plan limit
+  temporary_limit  Int       // override limit
+  expires_at       DateTime?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  account          Account   @relation(fields: [account_id], references: [id], onDelete: Cascade)
+
+  @@index([account_id])
+  @@index([expires_at])
+  @@unique([account_id, metric])
+  @@map("limit_overrides")
+}

@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { appService, CreateAppRequest } from '../services/app.service';
 import { AppOverviewService } from '../services/app-overview.service';
+import { UsageTrackingService } from '../services/usage-tracking.service';
 import { ApiResponseHelper } from '../utils';
 import { logger } from '../config/logger';
 
@@ -25,6 +26,9 @@ export async function createApp(req: FastifyRequest, reply: FastifyReply) {
     const app = await appService.createApp(body);
 
     logger.info({ userId, accountId, appId: app.id, appName: app.name }, 'App created successfully');
+
+    // Track usage
+    await UsageTrackingService.recordUsage(accountId, app.id, 'apps', 1);
 
     return ApiResponseHelper.success(reply, 'App created successfully', app, 201);
   } catch (err: unknown) {

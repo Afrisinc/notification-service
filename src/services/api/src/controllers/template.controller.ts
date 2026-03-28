@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../config/logger';
 import { templateService, CreateTemplateRequest, UpdateTemplateRequest } from '../services/template.service';
+import { UsageTrackingService } from '../services/usage-tracking.service';
 import { ApiResponseHelper } from '../utils';
 import { appTemplateRepository } from '../repositories/template-installation.repository';
 import { prismaRead, prismaWrite } from '@shared/database';
@@ -30,6 +31,10 @@ export class TemplateController {
         },
         'Template created'
       );
+
+      // Track usage - templates don't have a specific appId at creation, so we track per account
+      // This is tracked for the account's template count limit
+      await UsageTrackingService.recordUsage(accountId, accountId, 'templates', 1);
 
       ApiResponseHelper.created(reply, 'Template created successfully', {
         id: template.id,

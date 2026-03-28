@@ -1,0 +1,16 @@
+model LimitChangeHistory {
+  id         String   @id @default(uuid())
+  limit_id   String
+  metric     String
+  old_value  Int
+  new_value  Int
+  reason     String?
+  changed_by String   // admin email or "system"
+  changed_at DateTime @default(now())
+
+  planLimit  PlanLimit @relation(fields: [limit_id], references: [id], onDelete: Cascade)
+
+  @@index([limit_id])
+  @@index([changed_at])
+  @@map("limit_change_history")
+}

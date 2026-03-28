@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { campaignService } from '../services/campaign.service';
+import { UsageTrackingService } from '../services/usage-tracking.service';
 import { ApiResponseHelper } from '../utils';
 import pino from 'pino';
 
@@ -81,6 +82,9 @@ export async function createCampaign(req: FastifyRequest, reply: FastifyReply) {
       scheduled_at: body.scheduledAt ? new Date(body.scheduledAt) : undefined,
       metadata: body.metadata,
     });
+
+    // Track usage
+    await UsageTrackingService.recordUsage(accountId, appId, 'campaigns', 1);
 
     return ApiResponseHelper.success(reply, 'Campaign created successfully', campaign, 201);
   } catch (err: unknown) {

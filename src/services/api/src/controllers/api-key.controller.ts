@@ -1,5 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { apiKeyService } from '../services/api-key.service';
+import { UsageTrackingService } from '../services/usage-tracking.service';
 import { logger } from '../config/logger';
 import { ApiResponseHelper } from '../utils';
 
@@ -25,6 +26,9 @@ export class ApiKeyController {
       const result = await apiKeyService.createApiKey(account_id, appId, name, type);
 
       logger.info({ keyId: result.id, appId, userId: (request as any).userId }, 'API key created');
+
+      // Track usage
+      await UsageTrackingService.recordUsage(account_id, appId, 'api_keys', 1);
 
       return ApiResponseHelper.success(reply, 'API key created successfully', result, 201);
     } catch (error) {

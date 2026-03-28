@@ -1,6 +1,7 @@
 import pino from 'pino';
 import bcrypt from 'bcryptjs';
 import { prismaWrite } from '../config/prisma';
+import { seedPlanLimits } from '../../db/prisma/seeds/plans.seed';
 
 const logger = pino();
 const prisma = prismaWrite;
@@ -187,6 +188,10 @@ async function main() {
     ]);
 
     logger.info('Created subscription plans');
+
+    // Seed plan limits
+    logger.info('Seeding plan limits...');
+    await seedPlanLimits(prisma);
 
     // Create subscriptions for individual accounts
     logger.info('Creating subscriptions for individual accounts...');
