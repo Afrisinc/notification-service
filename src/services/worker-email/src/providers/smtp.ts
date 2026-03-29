@@ -33,9 +33,33 @@ export class SMTPProvider implements EmailProvider {
   async send(email: EmailNotification): Promise<{ messageId: string }> {
     try {
       const config = getConfig();
+      let fromEmail = config.FROM_EMAIL || config.SMTP_FROM || 'noreply@notification.local';
+      let fromName: string | undefined = undefined;
+
+      // Try to get app-specific email config if appId is provided
+      if (email.appId) {
+        try {
+          const { prismaRead } = await import('@shared/database');
+          const emailConfig = await prismaRead.appEmailConfig.findUnique({
+            where: { app_id: email.appId },
+          });
+
+          if (emailConfig) {
+            fromEmail = emailConfig.from_email;
+            fromName = emailConfig.from_name || undefined;
+            this.logger.debug({ appId: email.appId, from: fromEmail }, 'Using app-specific email configuration');
+          }
+        } catch (configError) {
+          this.logger.warn(
+            { error: configError, appId: email.appId },
+            'Failed to load app-specific email config, using platform default'
+          );
+          // Continue with platform default
+        }
+      }
 
       const mailOptions = {
-        from: config.FROM_EMAIL || config.SMTP_FROM || 'noreply@notification.local',
+        from: fromName ? `${fromName} <${fromEmail}>` : fromEmail,
         to: email.to,
         subject: email.subject,
         text: email.body,

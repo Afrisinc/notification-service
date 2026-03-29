@@ -24,6 +24,7 @@ model App {
   contacts          Contact[]
   campaigns         Campaign[]
   settings          AppSettings?
+  emailConfig       AppEmailConfig?
 
   @@index([account_id])
   @@index([organization_id])

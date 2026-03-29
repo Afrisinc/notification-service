@@ -9,6 +9,7 @@
 export interface QueueMessage {
   notificationId: string;
   tenantId: string; // Account ID (for backwards compatibility, called tenantId in message)
+  appId?: string; // App ID for reference
   channel: 'EMAIL' | 'SMS' | 'IN_APP' | 'PUSH' | 'WHATSAPP';
   recipient: string;
   templateCode: string;
@@ -19,6 +20,9 @@ export interface QueueMessage {
   // Rendered template content (optional, for EMAIL channel)
   subject?: string;
   body?: string;
+  // Email sender information (resolved at publish time)
+  fromEmail?: string;
+  fromName?: string;
 }
 
 export interface IQueuePublisher {

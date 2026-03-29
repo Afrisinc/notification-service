@@ -21,23 +21,67 @@ export class SendGridProvider implements EmailProvider {
     try {
       const config = getConfig();
 
+      // Use sender info from message (resolved at publish time)
+      let fromEmail = (email as any).fromEmail;
+      let fromName = (email as any).fromName;
+
+      // If not in message, try to look up from database (fallback for safety)
+      if (!fromEmail && email.appId) {
+        try {
+          const database = await import('@shared/database');
+          if (database && database.prismaRead) {
+            const emailConfig = await database.prismaRead.appEmailConfig.findUnique({
+              where: { app_id: email.appId },
+            });
+
+            if (emailConfig) {
+              fromEmail = emailConfig.from_email;
+              fromName = emailConfig.from_name || fromName;
+              this.logger.debug(
+                { appId: email.appId, from: fromEmail },
+                'Using app-specific email config (fallback lookup)'
+              );
+            }
+          }
+        } catch (configError) {
+          this.logger.warn(
+            { error: configError instanceof Error ? configError.message : String(configError), appId: email.appId },
+            'Fallback app config lookup failed'
+          );
+        }
+      }
+
+      // Use platform default if still not found
+      if (!fromEmail) {
+        fromEmail = config.FROM_EMAIL || config.SMTP_FROM || 'noreply@notification.local';
+      }
+
+      if (!fromName) {
+        fromName = 'Afrisinc';
+      }
+
       const msg = {
         to: email.to,
-        from: config.FROM_EMAIL || config.SMTP_FROM || 'noreply@notification.local',
+        from: fromName ? `${fromName} <${fromEmail}>` : fromEmail,
         subject: email.subject,
         text: email.body,
         html: email.html || email.body,
       };
 
+      this.logger.debug({ to: email.to, from: msg.from, appId: email.appId }, 'Sending email via SendGrid');
+
       const result = await sgMail.send(msg);
 
       const messageId = (result[0].headers['x-message-id'] as string) || 'unknown';
 
-      this.logger.debug({ messageId, to: email.to }, 'Email sent via SendGrid');
+      this.logger.debug({ messageId, to: email.to, from: msg.from }, 'Email sent via SendGrid');
 
       return { messageId };
     } catch (error) {
-      this.logger.error({ error, to: email.to }, 'SendGrid provider failed to send email');
+      this.logger.error(
+        { error: error instanceof Error ? error.message : String(error), to: email.to },
+        'SendGrid provider failed to send email'
+      );
       throw error;
     }
   }
