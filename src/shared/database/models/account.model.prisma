@@ -21,6 +21,7 @@ model Account {
   userPreferences   UserPreference[]
   subscription      Subscription?
   usageRecords      UsageRecord[]
+  limitOverrides    LimitOverride[]
 
   @@index([owner_user_id])
   @@index([organization_id])

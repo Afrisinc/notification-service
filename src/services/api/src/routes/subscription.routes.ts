@@ -1,0 +1,91 @@
+import { FastifyInstance } from 'fastify';
+import { subscriptionController } from '../controllers/subscription.controller';
+import { asyncWrapper } from '../middlewares/async_wrapper.middleware';
+import { validateBaseToken } from '../middlewares/auth.middleware';
+import {
+  GetSubscriptionDetailsSchema,
+  GetPlansSchema,
+  ChangePlanSchema,
+  CancelSubscriptionSchema,
+  PauseSubscriptionSchema,
+  ResumeSubscriptionSchema,
+} from '../schemas/routes/subscription.schema';
+
+/**
+ * Subscription management routes
+ */
+export async function registerSubscriptionRoutes(fastify: FastifyInstance) {
+  // Get subscription details (protected)
+  fastify.get(
+    '/subscriptions/current',
+    { onRequest: [validateBaseToken], schema: GetSubscriptionDetailsSchema },
+    asyncWrapper(subscriptionController.getSubscriptionDetails.bind(subscriptionController))
+  );
+
+  // Get available plans (public)
+  fastify.get(
+    '/subscriptions/plans',
+    { schema: GetPlansSchema },
+    asyncWrapper(subscriptionController.getAvailablePlans.bind(subscriptionController))
+  );
+
+  // Change plan (protected)
+  fastify.put(
+    '/subscriptions/plan',
+    { onRequest: [validateBaseToken], schema: ChangePlanSchema },
+    asyncWrapper(subscriptionController.changePlan.bind(subscriptionController))
+  );
+
+  // Cancel subscription (protected)
+  fastify.post(
+    '/subscriptions/cancel',
+    { onRequest: [validateBaseToken], schema: CancelSubscriptionSchema },
+    asyncWrapper(subscriptionController.cancelSubscription.bind(subscriptionController))
+  );
+
+  // Pause subscription (protected)
+  fastify.post(
+    '/subscriptions/pause',
+    { onRequest: [validateBaseToken], schema: PauseSubscriptionSchema },
+    asyncWrapper(subscriptionController.pauseSubscription.bind(subscriptionController))
+  );
+
+  // Resume subscription (protected)
+  fastify.post(
+    '/subscriptions/resume',
+    { onRequest: [validateBaseToken], schema: ResumeSubscriptionSchema },
+    asyncWrapper(subscriptionController.resumeSubscription.bind(subscriptionController))
+  );
+
+  // ========================
+  // Dashboard Endpoints
+  // ========================
+
+  // Get usage dashboard (protected)
+  fastify.get(
+    '/subscriptions/dashboard/usage',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(subscriptionController.getUsageDashboard.bind(subscriptionController))
+  );
+
+  // Get usage breakdown by metric (protected)
+  fastify.get(
+    '/subscriptions/dashboard/breakdown',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(subscriptionController.getUsageBreakdown.bind(subscriptionController))
+  );
+
+  // Check feature availability (protected)
+  fastify.get(
+    '/subscriptions/features/check',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(subscriptionController.checkFeatureAvailability.bind(subscriptionController))
+  );
+
+  // Get upgrade recommendations (protected)
+  fastify.get(
+    '/subscriptions/recommendations/upgrade',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(subscriptionController.getUpgradeRecommendations.bind(subscriptionController))
+  );
+}

@@ -2,6 +2,7 @@ export interface EmailNotification {
   id: string;
   tenantId: string;
   recipientId: string;
+  appId?: string; // Optional app ID for custom email config lookup
   to: string;
   subject: string;
   body: string;

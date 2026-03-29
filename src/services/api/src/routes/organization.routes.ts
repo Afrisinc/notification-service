@@ -3,6 +3,7 @@ import { TemplateController } from '../controllers/template.controller';
 import { OrganizationController } from '../controllers/organization.controller';
 import { asyncWrapper } from '../middlewares/async_wrapper.middleware';
 import { validateBaseToken } from '../middlewares/auth.middleware';
+import { planGuards } from '../guards/plan-guard';
 import { GetTemplatesByOrganizationRouteSchema } from '../schemas/routes/template.schema';
 import {
   GetOrganizationByIdSchema,
@@ -53,7 +54,13 @@ export async function registerOrganizationRoutes(fastify: FastifyInstance) {
   // Create organization invite
   fastify.post(
     '/organizations/:orgId/invites',
-    { onRequest: [validateBaseToken], schema: CreateOrganizationInviteSchema },
+    {
+      onRequest: [
+        validateBaseToken,
+        planGuards.checkUsageLimit('team_members', 1), // Check if can add more team members
+      ],
+      schema: CreateOrganizationInviteSchema,
+    },
     asyncWrapper(orgController.createInvite.bind(orgController))
   );
 

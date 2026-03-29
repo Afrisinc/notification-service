@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../config/logger';
 import { notifyService, SendNotificationRequest, BulkSendRequest } from '../services/notify.service';
+import { UsageTrackingService } from '../services/usage-tracking.service';
 import { ApiResponseHelper } from '../utils';
 
 export class NotifyController {
@@ -23,6 +24,10 @@ export class NotifyController {
       console.log('Notification created with ID:', notification);
 
       logger.info({ notificationId: notification.id, correlationId: request.id }, 'Notification sent successfully');
+
+      // Track usage
+      const metric = `${body.channel.toLowerCase()}s_per_month`;
+      await UsageTrackingService.recordUsage(accountId, body.app_id, metric, 1);
 
       ApiResponseHelper.accepted(reply, 'Notification queued for processing', {
         id: notification.id,
@@ -83,6 +88,10 @@ export class NotifyController {
         'Notification sent with API key'
       );
 
+      // Track usage
+      const metric = `${body.channel.toLowerCase()}s_per_month`;
+      await UsageTrackingService.recordUsage(accountId, app_id, metric, 1);
+
       ApiResponseHelper.accepted(reply, 'Notification queued for processing', {
         id: notification.id,
         status: notification.status,
@@ -133,6 +142,11 @@ export class NotifyController {
         },
         'Bulk notifications processed'
       );
+
+      // Track usage for accepted notifications
+      const channel = body.notifications[0]?.channel?.toLowerCase() || 'email';
+      const metric = `${channel}s_per_month`;
+      await UsageTrackingService.recordUsage(accountId, appId, metric, response.accepted);
 
       ApiResponseHelper.accepted(reply, 'Bulk notifications queued for processing', response);
     } catch (error) {

@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import pino from 'pino';
 import { OrganizationService } from '../services/organization.service';
+import { UsageTrackingService } from '../services/usage-tracking.service';
 import { ApiResponseHelper } from '../utils/api-response';
 
 const logger = pino();
@@ -163,6 +164,10 @@ export class OrganizationController {
       }
 
       const invite = await this.organizationService.createInvite(orgId, email, role);
+
+      // Track usage - use orgId as both account and app for organization-level tracking
+      const accountId = request.headers['x-account-id'] as string;
+      await UsageTrackingService.recordUsage(accountId, orgId, 'team_members', 1);
 
       return ApiResponseHelper.created(reply, 'Invite created successfully', {
         inviteId: invite.id,

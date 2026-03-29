@@ -1,0 +1,22 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: EMAIL CONFIGURATION
+// App-specific email sender configuration
+////////////////////////////////////////////////////////////
+
+model AppEmailConfig {
+  id              String   @id @default(uuid())
+  app_id          String   @unique
+  from_email      String   // The sender email address
+  from_name       String?  // Optional sender display name (e.g., "Afrisinc Support")
+  reply_to_email  String?  // Optional reply-to address
+  reply_to_name   String?  // Optional reply-to display name
+  is_verified     Boolean  @default(false) // Email verification status (for domain verification)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  // Relations
+  app             App      @relation(fields: [app_id], references: [id], onDelete: Cascade)
+
+  @@index([app_id])
+  @@map("app_email_configs")
+}

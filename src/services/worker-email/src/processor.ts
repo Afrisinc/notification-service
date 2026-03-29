@@ -91,10 +91,15 @@ export class EmailProcessor {
             notificationId: emailId,
             provider: 'multi-provider-strategy',
             status: 'SENT',
-            response: result.messageId || 'Email sent successfully',
+            response: {
+              messageId: result.messageId || 'unknown',
+              sentAt: new Date().toISOString(),
+              to: email.to,
+              from: email.appId ? `${(email as any).fromName || 'Afrisinc'} <${(email as any).fromEmail}>` : undefined,
+            },
           },
         });
-        this.logger.debug({ emailId }, 'Notification log recorded');
+        this.logger.debug({ emailId, messageId: result.messageId }, 'Notification log recorded');
       } catch (logError) {
         this.logger.warn({ emailId, error: logError }, 'Failed to record notification log');
         // Don't throw - email was sent successfully even if logging failed
@@ -113,7 +118,11 @@ export class EmailProcessor {
             notificationId: emailId,
             provider: emailConfig.EMAIL_PROVIDER || 'unknown',
             status: 'FAILED',
-            response: errorMessage,
+            response: {
+              error: errorMessage,
+              failedAt: new Date().toISOString(),
+              to: email.to,
+            },
           },
         });
       } catch (logError) {

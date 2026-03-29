@@ -1,5 +1,5 @@
 import { logger } from '../config/logger';
-import { prismaWrite } from '@shared/database';
+import { prismaWrite, prismaRead } from '@shared/database';
 import { IQueuePublisher, QueueMessage, QueuePublisherFactory, QueuePublisherConfig } from './queue';
 
 export type Channel = 'EMAIL' | 'SMS' | 'IN_APP' | 'PUSH' | 'WHATSAPP';
@@ -105,10 +105,27 @@ export class NotifyService {
       },
     });
 
+    // Get app-specific email config if available
+    let fromEmail: string | undefined;
+    let fromName: string | undefined;
+    try {
+      const emailConfig = await prismaRead.appEmailConfig.findUnique({
+        where: { app_id: appId },
+      });
+      if (emailConfig) {
+        fromEmail = emailConfig.from_email;
+        fromName = emailConfig.from_name || undefined;
+      }
+    } catch (configError) {
+      logger.warn({ appId, error: configError }, 'Failed to load app email config');
+      // Continue without custom config - will use platform default in worker
+    }
+
     // Publish to queue with rendered content
     await queuePublisher.publish({
       notificationId: notification.id,
       tenantId: accountId, // Using tenantId field for backwards compatibility, contains account ID
+      appId: appId, // Include app ID for reference
       channel: request.channel,
       recipient: request.recipient,
       templateCode: template.code,
@@ -118,6 +135,9 @@ export class NotifyService {
       payload: request.payload,
       priority: request.priority || 'NORMAL',
       timestamp: new Date(),
+      // Email sender information (resolved at publish time)
+      fromEmail: fromEmail,
+      fromName: fromName,
     });
 
     // Update status to QUEUED
