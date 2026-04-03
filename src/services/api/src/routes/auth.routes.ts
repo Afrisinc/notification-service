@@ -53,7 +53,7 @@ export async function authRoutes(app: FastifyInstance) {
   );
 
   app.post(
-    '/oauth/exchange',
+    '/auth/exchange',
     {
       schema: {
         ...OAuthExchangeRouteSchema,
@@ -79,7 +79,7 @@ export async function authRoutes(app: FastifyInstance) {
   );
 
   app.post(
-    '/reset-password',
+    '/auth/reset-password',
     {
       schema: {
         ...ResetPasswordRouteSchema,
