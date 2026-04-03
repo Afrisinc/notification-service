@@ -228,12 +228,6 @@ export const ForgotPasswordRouteSchema = {
 
 export const ResetPasswordRouteSchema = {
   body: { ...ResetPasswordRequestSchema },
-  querystring: {
-    type: 'object',
-    properties: {
-      token: { type: 'string' },
-    },
-  },
   response: {
     200: ResetPasswordResponseSchema,
     400: errorResponse,
