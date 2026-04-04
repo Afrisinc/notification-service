@@ -73,7 +73,7 @@ export const ListContactsSchema = {
 };
 
 export const CreateContactSchema = {
-  description: 'Create a new contact',
+  description: 'Create a new contact (supports both authenticated and public access with contact form support)',
   tags: ['Contacts'],
   params: {
     type: 'object',
@@ -89,19 +89,27 @@ export const CreateContactSchema = {
       firstName: { type: 'string', description: 'First name' },
       lastName: { type: 'string', description: 'Last name' },
       phone: { type: 'string', description: 'Phone number' },
+      company: { type: 'string', description: 'Company name' },
+      subject: { type: 'string', description: 'Subject or inquiry topic' },
+      message: { type: 'string', description: 'Contact form message (for contact_form source)' },
       status: { type: 'string', enum: ['active', 'inactive', 'unsubscribed'], default: 'active' },
       subscribed: { type: 'boolean', default: true },
       tags: { type: 'array', items: { type: 'string' } },
       attributes: { type: 'object', description: 'Custom attributes' },
+      source: {
+        type: 'string',
+        enum: ['contact_form', 'import', 'api', 'webhook', 'widget', 'newsletter'],
+        description:
+          'Contact source. When set to contact_form: automatically adds contact_form tag and sends auto-reply email',
+      },
     },
     required: ['email'],
   },
   headers: {
     type: 'object',
     properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
+      'x-account-id': { type: 'string', description: 'Account ID (optional - auto-resolved from app if not provided)' },
     },
-    required: ['x-account-id'],
   },
   response: {
     201: {
@@ -115,7 +123,6 @@ export const CreateContactSchema = {
     },
     ...standardErrorResponses,
   },
-  security: [{ bearerAuth: [] }],
 };
 
 export const GetContactSchema = {

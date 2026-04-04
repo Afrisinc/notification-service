@@ -14,18 +14,14 @@ export class ContactService {
    */
   async createContact(appId: string, data: CreateContactInput) {
     try {
-      // Validate email uniqueness
-      const existing = await contactRepository.findByEmail(data.email, appId);
-      if (existing) {
-        throw new Error('Contact with this email already exists');
-      }
-
       // Validate email format
       if (!this.isValidEmail(data.email)) {
         throw new Error('Invalid email format');
       }
 
-      const contact = await contactRepository.create({
+      // Use upsert: create if new, update if exists
+      // This allows subscribing existing contacts to newsletters, updating info, etc.
+      const contact = await contactRepository.upsert(appId, data.email, {
         ...data,
         app_id: appId,
       });

@@ -1,10 +1,13 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { contactService } from '../services/contact.service';
 import { UsageTrackingService } from '../services/usage-tracking.service';
+import { NotifyService } from '../services/notify.service';
 import { ApiResponseHelper } from '../utils';
+import { prismaRead } from '@shared/database';
 import pino from 'pino';
 
 const logger = pino();
+const notifyService = new NotifyService();
 
 const getErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : 'Unknown error';
@@ -48,25 +51,55 @@ export async function listContacts(req: FastifyRequest, reply: FastifyReply) {
 
 export async function createContact(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const accountId = req.headers['x-account-id'] as string;
     const { appId } = req.params as { appId: string };
     const body = req.body as {
       email: string;
       firstName?: string;
       lastName?: string;
       phone?: string;
+      company?: string;
+      subject?: string;
+      message?: string;
       status?: string;
       subscribed?: boolean;
       tags?: string[];
       attributes?: Record<string, any>;
+      source?: string;
     };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
 
     if (!body.email) {
       return ApiResponseHelper.badRequest(reply, 'Email is required');
+    }
+
+    // Get account ID from header (authenticated) or app context (public)
+    let accountId = req.headers['x-account-id'] as string;
+    if (!accountId) {
+      const app = await prismaRead.app.findUnique({
+        where: { id: appId },
+        select: { account_id: true },
+      });
+      if (!app) {
+        return ApiResponseHelper.notFound(reply, 'App not found');
+      }
+      accountId = app.account_id;
+    }
+
+    // Add contact_form tag if source is contact_form
+    const tags = body.tags || [];
+    if (body.source === 'contact_form' && !tags.includes('contact_form')) {
+      tags.push('contact_form');
+    }
+
+    // Prepare attributes with optional fields if provided
+    const attributes = body.attributes || {};
+    if (body.message) {
+      attributes.message = body.message;
+    }
+    if (body.company) {
+      attributes.company = body.company;
+    }
+    if (body.subject) {
+      attributes.subject = body.subject;
     }
 
     const contact = await contactService.createContact(appId, {
@@ -77,12 +110,51 @@ export async function createContact(req: FastifyRequest, reply: FastifyReply) {
       phone: body.phone,
       status: body.status as any,
       subscribed: body.subscribed,
-      tags: body.tags,
-      attributes: body.attributes,
+      tags,
+      attributes,
+      source: body.source as 'contact_form' | 'api' | 'import' | 'webhook' | 'widget' | undefined,
     });
 
     // Track usage
     await UsageTrackingService.recordUsage(accountId, appId, 'contacts', 1);
+
+    // Send auto-reply for contact form submissions
+    if (body.source === 'contact_form') {
+      try {
+        // Look up or create auto-reply template
+        const template = await prismaRead.template.findFirst({
+          where: {
+            account_id: accountId,
+            code: 'CONTACT_FORM_AUTOREPLY',
+          },
+          select: { id: true },
+        });
+
+        if (template) {
+          // Send auto-reply notification asynchronously (non-blocking)
+          notifyService
+            .sendNotification(accountId, appId, {
+              channel: 'EMAIL',
+              recipient: body.email,
+              templateId: template.id,
+              app_id: appId,
+              payload: {
+                firstName: body.firstName || 'Valued Customer',
+                companyName: 'Our Team',
+              },
+            })
+            .catch((err) => {
+              logger.error({ error: err, contactId: contact.id }, 'Failed to send contact form auto-reply');
+            });
+        } else {
+          // Send simple text-based auto-reply if template doesn't exist
+          logger.info({ contactId: contact.id }, 'Contact form template not found, skipping auto-reply');
+        }
+      } catch (err) {
+        logger.error({ error: err, contactId: contact.id }, 'Error sending contact form auto-reply');
+        // Don't fail the contact creation if auto-reply fails
+      }
+    }
 
     return ApiResponseHelper.success(reply, 'Contact created successfully', contact, 201);
   } catch (err: unknown) {
