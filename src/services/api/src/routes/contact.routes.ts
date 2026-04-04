@@ -52,11 +52,12 @@ export async function registerContactRoutes(app: FastifyInstance) {
     exportContacts
   );
 
-  // Create Contact
+  // Create Contact (Supports both authenticated and public access with contact form support)
+  // For authenticated: send x-account-id header
+  // For public/contact form: auto-resolves account from app, supports source=contact_form for auto-reply
   app.post(
     '/apps/:appId/contacts',
     {
-      onRequest: [validateBaseToken],
       schema: CreateContactSchema,
     },
     createContact

@@ -10,6 +10,7 @@ export interface CreateContactInput {
   subscribed?: boolean;
   tags?: string[];
   attributes?: Record<string, any>;
+  source?: 'contact_form' | 'api' | 'import' | 'webhook' | 'widget' | 'newsletter';
 }
 
 export interface UpdateContactInput {
@@ -47,6 +48,49 @@ export class ContactRepository {
         attributes: data.attributes || {},
       },
     });
+  }
+
+  /**
+   * Create or update contact (upsert)
+   * Merges tags and attributes if contact exists
+   */
+  async upsert(appId: string, email: string, data: CreateContactInput) {
+    // Get existing contact if any
+    const existing = await this.findByEmail(email, appId);
+
+    if (existing) {
+      // Merge tags: combine existing + new, remove duplicates
+      const existingTags = existing.tags || [];
+      const newTags = data.tags || [];
+      const mergedTags = Array.from(new Set([...existingTags, ...newTags]));
+
+      // Merge attributes: spread existing + new (new overwrites)
+      const existingAttrs = (existing.attributes as Record<string, any>) || {};
+      const newAttrs = data.attributes || {};
+      const mergedAttrs = { ...existingAttrs, ...newAttrs };
+
+      // Store source in attributes if provided
+      if (data.source) {
+        mergedAttrs.source = data.source;
+      }
+
+      // Update existing contact
+      return prismaWrite.contact.update({
+        where: { id: existing.id },
+        data: {
+          first_name: data.first_name || existing.first_name,
+          last_name: data.last_name || existing.last_name,
+          phone: data.phone || existing.phone,
+          status: data.status || existing.status,
+          subscribed: data.subscribed !== undefined ? data.subscribed : existing.subscribed,
+          tags: mergedTags,
+          attributes: mergedAttrs,
+        },
+      });
+    }
+
+    // Create new contact
+    return this.create(data);
   }
 
   /**
