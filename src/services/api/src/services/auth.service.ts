@@ -1,6 +1,6 @@
-import { UserRepository } from '../repositories/indentity-repositories/user.repository';
-import { AccountRepository } from '../repositories/indentity-repositories/account.repository';
-import { AuthorizationCodeRepository } from '../repositories/indentity-repositories/authorization-code.repository';
+import { UserRepository } from '../repositories/identity-repositories/user.repository';
+import { AccountRepository } from '../repositories/identity-repositories/account.repository';
+import { AuthorizationCodeRepository } from '../repositories/identity-repositories/authorization-code.repository';
 import {
   comparePassword,
   generateBaseToken,
@@ -133,7 +133,7 @@ export class AuthService {
 
         // Publish verification email notification via queue
         const queuePublisher = getQueuePublisher();
-        const notificationId = `verif-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        const notificationId = `verify-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
         await queuePublisher.publish({
           notificationId,
@@ -262,6 +262,36 @@ export class AuthService {
 
     const resetToken = generateResetToken(user.id, user.email);
     const resetLink = `${env.WEBAPP_URL}/reset-password?token=${resetToken}`;
+
+    // Send reset password email
+    try {
+      const queuePublisher = getQueuePublisher();
+      const notificationId = `reset-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+
+      await queuePublisher.publish({
+        notificationId,
+        tenantId: env.ACCOUNT_ID, // Use system account ID for transactional emails
+        channel: 'EMAIL',
+        recipient: user.email,
+        templateCode: NOTIFICATION_TEMPLATES.AUTH_PASSWORD_RESET,
+        templateId: env.RESET_PASSWORD_TEMPLATE_ID,
+        appId: env.SYSTEM_APP_ID,
+        payload: {
+          firstName: user.firstName,
+          resetLink,
+          expirationHours: 24,
+          companyName: env.COMPANY_NAME,
+          supportEmail: env.SUPPORT_EMAIL,
+        },
+        priority: 'HIGH',
+        timestamp: new Date(),
+      });
+
+      logger.info({ userId: user.id, email: user.email }, 'Reset password email published');
+    } catch (emailError) {
+      const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
+      logger.warn({ error: errorMessage, userId: user.id }, 'Failed to publish reset password email');
+    }
 
     return { resetLink };
   }

@@ -31,6 +31,7 @@ export const env = cleanEnv(process.env, {
 
   // System App ID (for organization invites and system notifications)
   SYSTEM_APP_ID: str({ default: 'system-org-app' }),
+  RESET_PASSWORD_TEMPLATE_ID: str({ default: 'system-reset-password' }),
 
   // SMTP Configuration (optional)
   SMTP_HOST: str({ default: 'localhost' }),
