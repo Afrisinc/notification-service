@@ -1,4 +1,4 @@
-import { SecurityRepository } from '../repositories/indentity-repositories/security.repository';
+import { SecurityRepository } from '../repositories/identity-repositories/security.repository';
 
 const securityRepo = new SecurityRepository();
 
