@@ -76,15 +76,14 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ secrets.GHCR_OWNER }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+            type=raw,value=qa
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./Dockerfile      
           push: ${{ github.event_name != 'pull_request' }}
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
@@ -115,9 +114,8 @@ jobs:
             set -e
             APP_PATH="${{ secrets.VPS_APP_PATH }}/notification-service/qa"
             cd $APP_PATH
-
             echo "Pulling latest image..."
-            docker compose pull
-            docker compose up -d --remove-orphans
+            docker compose -p notification-qa --env-file .env.qa -f docker-compose.yml pull
+            docker compose -p notification-qa --env-file .env.qa -f docker-compose.yml up -d --remove-orphans
             docker image prune -af
-            docker compose ps
+            docker compose -p notification-qa --env-file .env.qa -f docker-compose.yml ps
