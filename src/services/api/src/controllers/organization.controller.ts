@@ -177,8 +177,14 @@ export class OrganizationController {
         createdAt: invite.createdAt,
         expiresAt: invite.expiresAt,
       });
-    } catch (error) {
+    } catch (error: any) {
       logger.error({ error }, 'Failed to create invite');
+      if (
+        error.message === 'Organization not found' ||
+        error.message === 'An invite for this email already exists for the organization'
+      ) {
+        return ApiResponseHelper.badRequest(reply, error.message);
+      }
       return ApiResponseHelper.internalError(reply, 'Failed to create invite');
     }
   }
