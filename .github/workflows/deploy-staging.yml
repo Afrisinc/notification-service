@@ -115,6 +115,6 @@ jobs:
 
             echo "Pulling latest image..."
             docker compose --env-file .env.staging -f docker-compose.yml pull
-            docker compose --env-file .env.staging -f docker-compose.yml up -d --remove-orphans
+            docker compose --env-file .env.staging -f docker-compose.yml up -d
             docker image prune -af
             docker compose ps
