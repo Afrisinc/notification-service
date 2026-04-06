@@ -59,6 +59,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nodejs:nodejs /app/register-paths.js ./register-paths.js
+COPY --from=builder --chown=nodejs:nodejs /app/src ./src
 
 USER nodejs
 
