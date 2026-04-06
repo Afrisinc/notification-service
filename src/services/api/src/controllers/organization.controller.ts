@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import pino from 'pino';
 import { OrganizationService } from '../services/organization.service';
+import { AccountService } from '../services/account.service';
 import { UsageTrackingService } from '../services/usage-tracking.service';
 import { ApiResponseHelper } from '../utils/api-response';
 
@@ -8,9 +9,11 @@ const logger = pino();
 
 export class OrganizationController {
   private organizationService: OrganizationService;
+  private accountService: AccountService;
 
   constructor() {
     this.organizationService = new OrganizationService();
+    this.accountService = new AccountService();
   }
 
   /**
@@ -165,9 +168,25 @@ export class OrganizationController {
 
       const invite = await this.organizationService.createInvite(orgId, email, role);
 
-      // Track usage - use orgId as both account and app for organization-level tracking
+      // Track usage - verify account owns organization before tracking
       const accountId = request.headers['x-account-id'] as string;
-      await UsageTrackingService.recordUsage(accountId, orgId, 'team_members', 1);
+      if (accountId) {
+        try {
+          // Verify that the account owns this organization using AccountService
+          const ownsOrganization = await this.accountService.verifyAccountOwnsOrganization(accountId, orgId);
+
+          if (ownsOrganization) {
+            // Account owns the organization - safe to track usage
+            await UsageTrackingService.recordUsage(accountId, orgId, 'team_members', 1);
+          } else {
+            // Account doesn't own this organization - security issue
+            logger.warn({ accountId, orgId }, 'Account attempted to track usage for unowned organization');
+          }
+        } catch (trackingError) {
+          logger.error({ trackingError, accountId, orgId }, 'Failed to verify account ownership for usage tracking');
+          // Don't fail the invite creation if tracking fails
+        }
+      }
 
       return ApiResponseHelper.created(reply, 'Invite created successfully', {
         inviteId: invite.id,

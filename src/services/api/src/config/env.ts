@@ -29,9 +29,13 @@ export const env = cleanEnv(process.env, {
   SUPPORT_EMAIL: str({ default: 'support@afrisinc.com' }),
   FROM_EMAIL: str({ default: 'noreply@afrisinc.com' }),
 
-  // System App ID (for organization invites and system notifications)
+  // System Account and App ID
+  SYSTEM_ACCOUNT_ID: str({ default: 'afrisinc-notify-account' }),
   SYSTEM_APP_ID: str({ default: 'system-org-app' }),
+
+  //System Template IDs
   RESET_PASSWORD_TEMPLATE_ID: str({ default: 'system-reset-password' }),
+  ORGANIZATION_INVITE_TEMPLATE_ID: str({ default: 'd7b6f03f-b261-4334-9adf-2c74485ea4bf' }),
 
   // SMTP Configuration (optional)
   SMTP_HOST: str({ default: 'localhost' }),

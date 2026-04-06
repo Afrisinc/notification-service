@@ -4,8 +4,14 @@
  */
 
 import { prismaWrite, prismaRead } from '@shared/database';
+import { AccountRepository } from '../repositories/identity-repositories/account.repository';
 
 export class AccountService {
+  private accountRepository: AccountRepository;
+
+  constructor() {
+    this.accountRepository = new AccountRepository();
+  }
   /**
    * Get account details with enrollment information
    * @param accountId Account ID
@@ -66,6 +72,41 @@ export class AccountService {
       return subscription;
     } catch (error) {
       throw new Error(`Failed to create subscription: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Verify that an account owns/is associated with an organization
+   * @param accountId Account ID
+   * @param organizationId Organization ID
+   * @returns true if account owns the organization, false otherwise
+   */
+  async verifyAccountOwnsOrganization(accountId: string, organizationId: string): Promise<boolean> {
+    try {
+      const account = await this.accountRepository.findByIdWithOrganization(accountId);
+
+      if (!account) {
+        return false;
+      }
+
+      // Account owns the organization if its organization_id matches
+      return account.organization_id === organizationId;
+    } catch (error) {
+      throw new Error(`Failed to verify account ownership: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Get account with organization details
+   * @param accountId Account ID
+   */
+  async getAccountWithOrganization(accountId: string) {
+    try {
+      return await this.accountRepository.findByIdWithOrganization(accountId);
+    } catch (error) {
+      throw new Error(
+        `Failed to get account with organization: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 }

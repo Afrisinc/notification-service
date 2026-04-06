@@ -120,4 +120,19 @@ export class AccountRepository {
       },
     });
   }
+
+  /**
+   * Get account with organization details
+   * Used to verify account owns an organization
+   */
+  async findByIdWithOrganization(id: string) {
+    return prismaRead.account.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        organization_id: true,
+        type: true,
+      },
+    });
+  }
 }
