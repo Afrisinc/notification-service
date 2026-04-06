@@ -1,16 +1,9 @@
-name: Build & Deploy Monolithic Service
+name: Build & Deploy Monolithic Service to Staging
 
 on:
   push:
     branches:
-      - main
-      - develop
-      - master
-  pull_request:
-    branches:
-      - main
-      - develop
-      - master
+      - release
 
 env:
   REGISTRY: ghcr.io
@@ -45,9 +38,6 @@ jobs:
 
       - name: Type check
         run: pnpm type-check
-
-      # - name: Run tests
-      #   run: pnpm test --passWithNoTests
 
   # Build and push single monolithic image
   build-and-push:
@@ -103,7 +93,7 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/release')
 
     steps:
       - name: Checkout repository
@@ -120,8 +110,7 @@ jobs:
           command_timeout: 10m
           script: |
             set -e
-            APP_PATH="${{ secrets.VPS_APP_PATH }}"
-            APP_PATH=${APP_PATH:=/opt/apps/afrisinc/notification-service}
+            APP_PATH="${{ secrets.VPS_APP_PATH }}/notification-service/staging"
             cd $APP_PATH
 
             echo "Pulling latest image..."
