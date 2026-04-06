@@ -57,7 +57,7 @@ export async function registerOrganizationRoutes(fastify: FastifyInstance) {
     {
       onRequest: [
         validateBaseToken,
-        // planGuards.checkUsageLimit('team_members', 1), // Check if can add more team members
+        planGuards.checkUsageLimit('team_members', 1), // Check if can add more team members
       ],
       schema: CreateOrganizationInviteSchema,
     },
