@@ -116,7 +116,7 @@ jobs:
             cd $APP_PATH
 
             echo "Pulling latest image..."
-            docker compose --env-file .env.qa -f docker-compose.yml pull
-            docker compose --env-file .env.qa -f docker-compose.yml up -d
+            docker compose -p notification-qa --env-file .env.qa -f docker-compose.yml pull
+            docker compose -p notification-qa --env-file .env.qa -f docker-compose.yml up -d
             docker image prune -af
             docker compose ps

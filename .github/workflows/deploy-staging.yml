@@ -114,7 +114,7 @@ jobs:
             cd $APP_PATH
 
             echo "Pulling latest image..."
-            docker compose --env-file .env.staging -f docker-compose.yml pull
-            docker compose --env-file .env.staging -f docker-compose.yml up -d
+            docker compose -p notification-staging --env-file .env.staging -f docker-compose.yml pull
+            docker compose -p notification-staging --env-file .env.staging -f docker-compose.yml up -d
             docker image prune -af
             docker compose ps
