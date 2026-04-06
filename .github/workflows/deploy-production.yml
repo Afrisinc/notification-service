@@ -73,9 +73,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ secrets.GHCR_OWNER }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+            type=raw,value=production
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -112,9 +111,8 @@ jobs:
             set -e
             APP_PATH="${{ secrets.VPS_APP_PATH }}/notification-service/production"
             cd $APP_PATH
-
             echo "Pulling latest image..."
             docker compose -p notification-production --env-file .env.production -f docker-compose.yml pull
-            docker compose -p notification-production --env-file .env.production -f docker-compose.yml up -d 
+            docker compose -p notification-production --env-file .env.production -f docker-compose.yml up -d
             docker image prune -af
-            docker compose ps
+            docker compose -p notification-production --env-file .env.production -f docker-compose.yml ps

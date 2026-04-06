@@ -114,9 +114,8 @@ jobs:
             set -e
             APP_PATH="${{ secrets.VPS_APP_PATH }}/notification-service/qa"
             cd $APP_PATH
-
             echo "Pulling latest image..."
             docker compose -p notification-qa --env-file .env.qa -f docker-compose.yml pull
-            docker compose -p notification-qa --env-file .env.qa -f docker-compose.yml up -d
+            docker compose -p notification-qa --env-file .env.qa -f docker-compose.yml up -d --remove-orphans
             docker image prune -af
-            docker compose ps
+            docker compose -p notification-qa --env-file .env.qa -f docker-compose.yml ps
