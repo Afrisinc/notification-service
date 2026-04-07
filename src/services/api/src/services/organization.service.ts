@@ -190,6 +190,19 @@ export class OrganizationService {
         throw new Error('Organization not found');
       }
 
+      // check if invite exist
+      const invit = await prismaRead.organizationInvite.findUnique({
+        where: {
+          organization_id_email: {
+            organization_id: orgId,
+            email,
+          },
+        },
+      });
+      if (invit) {
+        logger.warn({ orgId, email }, 'An invite for this email already exists for the organization');
+        throw new Error('An invite for this email already exists for the organization');
+      }
       // Generate invite ID and token
       const inviteId = randomUUID();
       const inviteToken = randomUUID();
