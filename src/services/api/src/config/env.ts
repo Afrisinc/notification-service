@@ -37,7 +37,7 @@ export const env = cleanEnv(process.env, {
   SMTP_HOST: str({ default: 'localhost' }),
   SMTP_PORT: port({ default: 587 }),
   SMTP_USER: str({ default: '' }),
-  SMTP_PASS: str({ default: '' }),
+  SMTP_PASSWORD: str({ default: '' }),
   SMTP_FROM: str({ default: 'noreply@afrisinc.com' }),
 
   // RabbitMQ Configuration (optional)
