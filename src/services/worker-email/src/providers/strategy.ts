@@ -72,7 +72,8 @@ export class EmailProviderFactory {
 
     // Add providers in priority order
     // Gmail (SMTP) as primary
-    if (config.SMTP_HOST && config.SMTP_USER && config.SMTP_PASS) {
+    // Correct — matches the zod schema
+    if (config.SMTP_HOST && config.SMTP_USER && config.SMTP_PASSWORD) {
       strategy.addProvider(new SMTPProvider(logger));
       logger.info('Added SMTP provider (Gmail/Custom)');
     }
