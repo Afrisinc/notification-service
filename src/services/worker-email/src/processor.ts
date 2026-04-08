@@ -20,6 +20,8 @@ export class EmailProcessor {
       const emailTo = email.to || email.recipient;
       const tenantId = email.tenantId;
       const templateCode = email.templateCode;
+      const templateId = email.templateId;
+      const accountId = email.accountId || tenantId; // Fallback to tenantId if accountId not provided
 
       this.logger.info({ emailId, to: emailTo }, 'Processing email notification');
 
@@ -33,8 +35,8 @@ export class EmailProcessor {
           // Try to fetch template from user's account first, then system account
           let template = await prismaRead.template.findFirst({
             where: {
-              code: templateCode,
-              account_id: tenantId,
+              id: templateId,
+              account_id: accountId,
             },
           });
 
@@ -43,7 +45,7 @@ export class EmailProcessor {
             template = await prismaRead.template.findFirst({
               where: {
                 code: templateCode,
-                account_id: 'afrisinc-notify-account',
+                account_id: tenantId,
               },
             });
           }
