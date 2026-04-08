@@ -141,6 +141,8 @@ export class AuthService {
           channel: NOTIFICATION_CHANNELS.EMAIL as 'EMAIL',
           recipient: result.user.email,
           templateCode: NOTIFICATION_TEMPLATES.AUTH_VERIFY_EMAIL,
+          templateId: env.VERIFY_EMAIL_TEMPLATE_ID,
+          appId: env.SYSTEM_APP_ID,
           payload: {
             firstName: result.user.firstName,
             verificationUrl,
