@@ -73,6 +73,10 @@ const EnvSchema = z.object({
 
   // Database Logging
   DATABASE_LOG_QUERIES: z.enum(['true', 'false']).optional().default('false'),
+
+  // Assets Service Configuration (for file uploads)
+  ASSETS_API_URL: z.string().default('http://localhost:8080'),
+  ASSETS_API_KEY: z.string().default('dev-api-key'),
 });
 
 export type Environment = z.infer<typeof EnvSchema>;

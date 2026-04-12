@@ -3,6 +3,7 @@ import { verifyDbConnections } from '@shared/database';
 import { createFastifyApp } from './app';
 import { logger } from './config/logger';
 import { initializeNotifyService, getQueuePublisher } from './services/notify.service';
+import { initAssetsClient } from './utils/assets-client';
 
 async function startServer() {
   let fastify: any = null;
@@ -27,6 +28,18 @@ async function startServer() {
     logger.info('===================================================');
 
     await initializeNotifyService();
+
+    logger.info('===================================================');
+    logger.info('[ASSETS] Initializing Assets Client...');
+    logger.info('===================================================');
+
+    try {
+      initAssetsClient(config.ASSETS_API_URL || 'http://localhost:8080', config.ASSETS_API_KEY || 'api-key');
+      logger.info('[OK] Assets Client initialized successfully');
+    } catch (error) {
+      logger.warn('[WARN] Assets Client initialization failed - marketplace features may not work');
+      logger.warn({ error: error instanceof Error ? error.message : error }, 'Proceeding without Assets integration');
+    }
 
     logger.info('===================================================');
     logger.info('[SERVER] Starting Fastify API server...');

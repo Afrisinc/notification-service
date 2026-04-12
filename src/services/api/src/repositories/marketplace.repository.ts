@@ -41,9 +41,16 @@ export class MarketplaceRepository {
       where.category = filters.category.toUpperCase();
     }
 
-    // Filter by price
+    // Filter by price - use separate AND conditions to avoid count() issues
     if (filters.price === 'free') {
-      where.price = { in: [0, null] };
+      // Match templates with price = 0 or price = null
+      if (where.OR) {
+        // Merge with existing OR conditions
+        where.AND = [{ OR: where.OR }, { OR: [{ price: null }, { price: 0 }] }];
+        delete where.OR;
+      } else {
+        where.OR = [{ price: null }, { price: 0 }];
+      }
     } else if (filters.price === 'paid') {
       where.price = { gt: 0 };
     }
@@ -72,6 +79,7 @@ export class MarketplaceRepository {
           category: true,
           description: true,
           thumbnail: true,
+          previewUrl: true,
           rating: true,
           ratingCount: true,
           installs: true,
