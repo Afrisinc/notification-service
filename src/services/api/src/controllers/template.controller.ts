@@ -227,6 +227,7 @@ export class TemplateController {
 
       // Public endpoint - list all active templates with filtering
       const where: any = {
+        visibility: 'marketplace',
         active: true,
         deletedAt: null,
       };
