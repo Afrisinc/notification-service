@@ -38,6 +38,9 @@ importers:
       amqplib:
         specifier: ^0.10.3
         version: 0.10.9
+      axios:
+        specifier: ^1.6.2
+        version: 1.13.5
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
@@ -53,6 +56,9 @@ importers:
       fastify:
         specifier: ^4.25.1
         version: 4.29.1
+      form-data:
+        specifier: ^4.0.0
+        version: 4.0.5
       handlebars:
         specifier: ^4.7.8
         version: 4.7.8
@@ -93,6 +99,9 @@ importers:
       '@types/amqplib':
         specifier: ^0.10.4
         version: 0.10.8
+      '@types/form-data':
+        specifier: ^0.0.33
+        version: 0.0.33
       '@types/jest':
         specifier: ^29.5.10
         version: 29.5.14
@@ -838,6 +847,9 @@ packages:
 
   '@types/babel__traverse@7.28.0':
     resolution: {integrity: sha512-8PvcXf70gTDZBgt9ptxJ8elBeBjcLOAcOtoO/mPJjtji1+CdGbHgm77om1GrsPxsiE+uXIpNSK64UYaIwQXd4Q==}
+
+  '@types/form-data@0.0.33':
+    resolution: {integrity: sha512-8BSvG1kGm83cyJITQMZSulnl6QV8jqAGreJsc5tPu1Jq0vTSOiY/k24Wx82JRpWwZSqrala6sd5rWi6aNXvqcw==}
 
   '@types/graceful-fs@4.1.9':
     resolution: {integrity: sha512-olP3sd1qOEe5dXTSaFvQG+02VdRXcdytWLAZsAq1PecU8uqQAhkrnbli7DagjtXKW/Bl7YJbUsa8MPcuc8LHEQ==}
@@ -3743,6 +3755,10 @@ snapshots:
   '@types/babel__traverse@7.28.0':
     dependencies:
       '@babel/types': 7.29.0
+
+  '@types/form-data@0.0.33':
+    dependencies:
+      '@types/node': 20.19.33
 
   '@types/graceful-fs@4.1.9':
     dependencies:
