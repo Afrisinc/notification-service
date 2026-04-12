@@ -72,6 +72,7 @@ export class MarketplaceRepository {
           category: true,
           description: true,
           thumbnail: true,
+          previewUrl: true,
           rating: true,
           ratingCount: true,
           installs: true,

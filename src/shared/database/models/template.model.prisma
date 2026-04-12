@@ -19,10 +19,11 @@ model Template {
   design_json       Json?             // Template design configuration (layout, styling, blocks, etc.)
   editor_type       EditorType        @default(visual) // visual (drag-drop) or code (HTML only)
   description       String?
-  visibility        String            @default("private") // private | account | marketplace
+  visibility        TemplateVisibility            @default(private) // private | account | marketplace
   is_public         Boolean           @default(false)
+  pricing           TemplatePricing   @default(free) // free | paid
   price             Float?            // Price in cents for marketplace templates
-  currency          String            @default("USD") // Currency code
+  currency          Currency            @default(USD) // Currency code
 
   // Marketplace fields
   thumbnail         String?           // Thumbnail image URL

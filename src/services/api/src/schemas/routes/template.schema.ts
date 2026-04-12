@@ -13,6 +13,7 @@ import {
 } from '../template';
 import { createVersionSchema, activateVersionSchema } from '../template/version';
 import { previewTemplateSchema } from '../template/preview';
+import { publishTemplateRequestBody, publishTemplateResponseBody } from '../template/publish';
 import { templateHeaders } from '../common';
 
 // Template operations
@@ -126,6 +127,26 @@ export const GetAllTemplatesRouteSchema = {
               language: { type: 'string', description: 'Template language' },
               version: { type: 'number', description: 'Template version' },
               active: { type: 'boolean', description: 'Whether template is active' },
+              visibility: {
+                type: 'string',
+                enum: ['private', 'account', 'marketplace'],
+                description: 'Template visibility scope',
+              },
+              isPublic: { type: 'boolean', description: 'Whether template is publicly available' },
+              thumbnail: { type: ['string', 'null'], format: 'uri', description: 'URL to template thumbnail image' },
+              previewImage: { type: ['string', 'null'], format: 'uri', description: 'URL to template preview image' },
+              tags: { type: 'array', items: { type: 'string' }, description: 'Template discovery tags' },
+              pricing: {
+                type: ['string', 'null'],
+                enum: ['free', 'paid', null],
+                description: 'Pricing model',
+              },
+              price: { type: ['number', 'null'], description: 'Price in USD for paid templates' },
+              publishedAt: {
+                type: ['string', 'null'],
+                format: 'date-time',
+                description: 'When template was published to marketplace',
+              },
               createdAt: { type: 'string', format: 'date-time', description: 'Creation timestamp' },
               updatedAt: { type: 'string', format: 'date-time', description: 'Last update timestamp' },
             },
@@ -236,6 +257,25 @@ export const ActivateVersionRouteSchema = activateVersionSchema;
 
 // Template preview operation
 export const PreviewTemplateRouteSchema = previewTemplateSchema;
+
+// Template marketplace publishing
+export const PublishTemplateRouteSchema = {
+  description: 'Publish template to marketplace with metadata and pricing',
+  tags: ['Templates', 'Marketplace'],
+  headers: templateHeaders,
+  body: publishTemplateRequestBody,
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+        data: publishTemplateResponseBody,
+      },
+    },
+  },
+};
 
 // Get templates by organization
 export const GetTemplatesByOrganizationRouteSchema = {

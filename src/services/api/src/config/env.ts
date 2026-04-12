@@ -48,4 +48,8 @@ export const env = cleanEnv(process.env, {
 
   // Logging
   LOG_LEVEL: str({ choices: ['debug', 'info', 'warn', 'error'], default: 'info' }),
+
+  // Assets Service (Marketplace file uploads)
+  ASSETS_API_URL: str({ default: 'http://localhost:8080' }),
+  ASSETS_API_KEY: str({ default: 'dev-api-key' }),
 });

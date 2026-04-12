@@ -77,6 +77,7 @@ export async function registerTemplateRoutes(fastify: FastifyInstance) {
   );
 
   // Publish template to marketplace (specific path BEFORE generic :id) - PROTECTED
+  // Note: No schema validation - supports both JSON and multipart/form-data
   fastify.post(
     '/templates/:id/publish',
     { onRequest: [validateBaseToken] },

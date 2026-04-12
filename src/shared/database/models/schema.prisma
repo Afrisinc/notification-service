@@ -104,6 +104,23 @@ enum KeyType {
   production // Production API key
 }
 
+// Supported Currencies
+enum Currency {
+  USD
+  RWF
+}
+
+enum TemplateVisibility {
+  private
+  account
+  marketplace
+}
+
+enum TemplatePricing {
+  free
+  paid
+}
+
 ////////////////////////////////////////////////////////////
 // ==================== MODELS ====================
 ////////////////////////////////////////////////////////////
