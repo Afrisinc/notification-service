@@ -32,6 +32,9 @@ importers:
       '@sendgrid/mail':
         specifier: ^7.7.0
         version: 7.7.0
+      '@types/africastalking':
+        specifier: ^0.6.2
+        version: 0.6.2
       africastalking:
         specifier: ^0.7.8
         version: 0.7.9
@@ -832,6 +835,9 @@ packages:
 
   '@tsconfig/node16@1.0.4':
     resolution: {integrity: sha512-vxhUy4J8lyeyinH7Azl1pdd43GJhZH/tP2weN8TntQblOY+A0XbT8DJk1/oCPuOOyg/Ja757rG0CgHcWC8OfMA==}
+
+  '@types/africastalking@0.6.2':
+    resolution: {integrity: sha512-9SUZyQEQVUw8ww7Wc24r+pi9OvBHOzWU+/yEdQV0opfaYN9sNb6gVK1ugMxIlBlGGEnTzlCx8roqjL9I3Bbxvw==}
 
   '@types/amqplib@0.10.8':
     resolution: {integrity: sha512-vtDp8Pk1wsE/AuQ8/Rgtm6KUZYqcnTgNvEHwzCkX8rL7AGsC6zqAfKAAJhUZXFhM/Pp++tbnUHiam/8vVpPztA==}
@@ -3730,6 +3736,8 @@ snapshots:
   '@tsconfig/node14@1.0.3': {}
 
   '@tsconfig/node16@1.0.4': {}
+
+  '@types/africastalking@0.6.2': {}
 
   '@types/amqplib@0.10.8':
     dependencies:

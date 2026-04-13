@@ -52,6 +52,7 @@
     "@fastify/swagger-ui": "^1.10.1",
     "@prisma/client": "^5.6.0",
     "@sendgrid/mail": "^7.7.0",
+    "@types/africastalking": "^0.6.2",
     "africastalking": "^0.7.8",
     "amqplib": "^0.10.3",
     "axios": "^1.6.2",
