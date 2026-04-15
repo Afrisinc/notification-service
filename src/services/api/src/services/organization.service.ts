@@ -315,6 +315,91 @@ export class OrganizationService {
   }
 
   /**
+   * Get organization invites with pagination
+   */
+  async getInvites(orgId: string, page: number = 1, limit: number = 10) {
+    try {
+      const skip = (page - 1) * limit;
+
+      const [invites, total] = await Promise.all([
+        prismaRead.organizationInvite.findMany({
+          where: { organization_id: orgId },
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+        }),
+        prismaRead.organizationInvite.count({
+          where: { organization_id: orgId },
+        }),
+      ]);
+
+      const formattedInvites = invites.map((i: any) => ({
+        id: i.id,
+        email: i.email,
+        role: i.role,
+        status: i.status,
+        createdAt: i.createdAt,
+        expiresAt: i.expiresAt,
+        invitationLink: `${env.WEBAPP_URL}/invite/${i.id}/${i.token}`,
+      }));
+
+      return { invites: formattedInvites, total };
+    } catch (error) {
+      logger.error({ error, orgId }, 'Failed to get organization invites');
+      throw error;
+    }
+  }
+
+  /**
+   * Get pending invites for a specific user (by email)
+   */
+  async getUserInvites(userId: string) {
+    try {
+      // Get user email
+      const user = await prismaRead.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Find pending invites for this email
+      const invites = await prismaRead.organizationInvite.findMany({
+        where: {
+          email: user.email,
+          status: 'pending',
+          expiresAt: {
+            gt: new Date(), // Filter out expired invites
+          },
+        },
+        include: {
+          organization: {
+            select: { name: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return invites.map((i: any) => ({
+        id: i.id,
+        orgId: i.organization_id,
+        orgName: i.organization.name,
+        role: i.role,
+        status: i.status,
+        createdAt: i.createdAt,
+        expiresAt: i.expiresAt,
+        token: i.token,
+        invitationLink: `${env.WEBAPP_URL}/invite/${i.id}/${i.token}`,
+      }));
+    } catch (error) {
+      logger.error({ error, userId }, 'Failed to get user invites');
+      throw error;
+    }
+  }
+
+  /**
    * Remove a member from organization
    */
   async removeMember(orgId: string, memberId: string): Promise<void> {

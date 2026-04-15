@@ -225,6 +225,61 @@ export class OrganizationController {
   }
 
   /**
+   * Get all invites of an organization
+   */
+  async getInvites(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { orgId } = request.params as { orgId: string };
+      const { page = 1, limit = 10 } = request.query as { page?: number; limit?: number };
+      const userId = (request as any).user?.id;
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
+      }
+
+      // Verify user is part of the organization
+      const isMember = await this.organizationService.isOrganizationMember(orgId, userId);
+      if (!isMember) {
+        return ApiResponseHelper.forbidden(reply, 'You do not have access to this organization');
+      }
+
+      const result = await this.organizationService.getInvites(orgId, Number(page), Number(limit));
+
+      return ApiResponseHelper.success(reply, 'Invites retrieved successfully', {
+        orgId,
+        invites: result.invites,
+        total: result.total,
+        page: Number(page),
+        limit: Number(limit),
+        pages: Math.ceil(result.total / limit),
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get organization invites');
+      return ApiResponseHelper.internalError(reply, 'Failed to get organization invites');
+    }
+  }
+
+  /**
+   * Get all pending invites for the authenticated user
+   */
+  async getUserInvites(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = (request as any).user?.id;
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
+      }
+
+      const invites = await this.organizationService.getUserInvites(userId);
+
+      return ApiResponseHelper.success(reply, 'User invites retrieved successfully', { invites });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get user invites');
+      return ApiResponseHelper.internalError(reply, 'Failed to get user invites');
+    }
+  }
+
+  /**
    * Remove a member from an organization (Admin/Owner only)
    */
   async removeMember(request: FastifyRequest, reply: FastifyReply) {
