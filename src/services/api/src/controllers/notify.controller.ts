@@ -32,7 +32,7 @@ export class NotifyController {
       ApiResponseHelper.accepted(reply, 'Notification queued for processing', {
         id: notification.id,
         status: notification.status,
-        channel: body.channel.toLowerCase(),
+        channel: body.channel,
         created_at: notification.createdAt,
       });
     } catch (error) {
@@ -125,7 +125,7 @@ export class NotifyController {
       }
 
       // Validate all notifications have app_id
-      if (body.notifications.some((n) => !n.app_id)) {
+      if (body.notifications.some((n: SendNotificationRequest) => !n.app_id)) {
         return ApiResponseHelper.badRequest(reply, 'All notifications must have app_id in request body');
       }
 

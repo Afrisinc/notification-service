@@ -56,37 +56,85 @@ async function startSMSWorker() {
     // Consume messages
     await channel.consume(queueName, async (msg: any) => {
       if (!msg) {
+        logger.warn('Received empty message from queue');
         return;
       }
 
+      let smsData: any;
+      const startTime = Date.now();
+
       try {
         const content = JSON.parse(msg.content.toString());
-        const smsData = content.msg;
+        smsData = content.msg;
 
         logger.info(
-          { notificationId: smsData.notificationId, recipient: smsData.recipient },
-          '🔄 Processing SMS from queue'
+          {
+            notificationId: smsData.notificationId,
+            recipient: smsData.recipient,
+            channel: smsData.channel,
+            templateCode: smsData.templateCode,
+            deliveryTag: msg.fields?.deliveryTag,
+          },
+          '📨 [SMS WORKER] Received message from queue'
         );
 
+        // Process the SMS
         await processor.process(smsData);
 
-        // Acknowledge message
+        // Acknowledge message only after successful processing
         channel!.ack(msg);
 
-        logger.info({ notificationId: smsData.notificationId }, '✅ SMS job completed and acknowledged');
+        const duration = Date.now() - startTime;
+        logger.info(
+          {
+            notificationId: smsData.notificationId,
+            recipient: smsData.recipient,
+            duration: `${duration}ms`,
+            deliveryTag: msg.fields?.deliveryTag,
+          },
+          '✅ [SMS WORKER] Message processed and acknowledged successfully'
+        );
       } catch (error) {
-        logger.error({ error, message: msg.content.toString() }, '❌ Failed to process SMS job');
+        const duration = Date.now() - startTime;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        logger.error(
+          {
+            notificationId: smsData?.notificationId || 'unknown',
+            recipient: smsData?.recipient || 'unknown',
+            error: errorMessage,
+            duration: `${duration}ms`,
+            deliveryTag: msg.fields?.deliveryTag,
+            messageContent: msg.content.toString(),
+          },
+          '❌ [SMS WORKER] Failed to process SMS message'
+        );
 
         // Reject and requeue message (up to 3 times)
         const retryCount = (msg.properties?.headers?.['x-retry-count'] as number) || 0;
 
         if (retryCount < 3) {
           await channel!.nack(msg, false, true); // Requeue
-          logger.info({ retryCount }, 'Message requeued');
+          logger.warn(
+            {
+              notificationId: smsData?.notificationId,
+              retryCount: retryCount + 1,
+              maxRetries: 3,
+              deliveryTag: msg.fields?.deliveryTag,
+            },
+            '🔄 [SMS WORKER] Message requeued for retry'
+          );
         } else {
           // Discard after 3 retries
           channel!.nack(msg, false, false);
-          logger.error('Max retries exceeded, message discarded');
+          logger.error(
+            {
+              notificationId: smsData?.notificationId,
+              recipient: smsData?.recipient,
+              deliveryTag: msg.fields?.deliveryTag,
+            },
+            '🚫 [SMS WORKER] Max retries exceeded, message discarded'
+          );
         }
       }
     });

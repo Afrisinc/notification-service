@@ -77,6 +77,24 @@ const EnvSchema = z.object({
   // Assets Service Configuration (for file uploads)
   ASSETS_API_URL: z.string().default('http://localhost:8080'),
   ASSETS_API_KEY: z.string().default('dev-api-key'),
+
+  // SMS Provider Configuration
+  // Africa's Talking
+  AFRICAS_TALKING_API_KEY: z.string().optional(),
+  AFRICAS_TALKING_USERNAME: z.string().optional(),
+  AFRICAS_TALKING_SENDER_ID: z.string().optional(),
+
+  // Twilio
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  TWILIO_PHONE_NUMBER: z.string().optional(),
+  TWILIO_MAX_PRICE: z.string().optional(),
+  TWILIO_VALIDITY_PERIOD: z.string().optional(),
+
+  // Vonage/Nexmo
+  VONAGE_API_KEY: z.string().optional(),
+  VONAGE_API_SECRET: z.string().optional(),
+  VONAGE_SENDER_ID: z.string().optional(),
 });
 
 export type Environment = z.infer<typeof EnvSchema>;

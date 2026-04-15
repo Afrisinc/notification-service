@@ -18,7 +18,7 @@
 export const sendNotificationRequestBody = {
   type: 'object',
   description: 'Request to send a single notification',
-  required: ['channel', 'recipient', 'templateId', 'app_id', 'payload'],
+  required: ['channel', 'recipient', 'app_id', 'payload'],
   properties: {
     channel: {
       type: 'string',

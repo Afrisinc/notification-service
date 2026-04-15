@@ -1,4 +1,5 @@
 import pino from 'pino';
+import { prismaRead } from '@shared/database';
 import { AfricasTalkingProvider } from './africas-talking';
 import { TwilioProvider } from './twilio';
 import { VonageProvider } from './vonage';
@@ -29,6 +30,7 @@ export class SMSProviderStrategy {
 
   /**
    * Send SMS with fallback to next provider on failure
+   * Includes professional queue deduplication and idempotency checks
    */
   async send(smsData: any): Promise<{ messageId: string; provider: string }> {
     if (this.providers.length === 0) {
@@ -37,6 +39,83 @@ export class SMSProviderStrategy {
       );
     }
 
+    const smsId = smsData.id || smsData.notificationId || 'unknown';
+    const smsTo = smsData.to || smsData.recipient || 'unknown';
+
+    // PROFESSIONAL QUEUE DEDUPLICATION: Check notification logs before sending
+    try {
+      const existingSentLog = await prismaRead.notificationLog.findFirst({
+        where: {
+          notificationId: smsId,
+          status: 'SENT',
+        },
+      });
+
+      if (existingSentLog) {
+        const responseData = existingSentLog.response as any;
+        this.logger.warn(
+          {
+            smsId,
+            to: smsTo,
+            messageId: responseData?.messageId,
+            provider: existingSentLog.provider,
+            sentAt: existingSentLog.createdAt,
+          },
+          '⏭️ [SMS STRATEGY] SMS already sent successfully - skipping from queue (idempotency)'
+        );
+
+        // Return the previous successful result
+        return {
+          messageId: responseData?.messageId || 'cached',
+          provider: existingSentLog.provider || 'unknown',
+        };
+      }
+
+      // Check for excessive failed attempts
+      const failedAttempts = await prismaRead.notificationLog.count({
+        where: {
+          notificationId: smsId,
+          status: 'FAILED',
+        },
+      });
+
+      if (failedAttempts >= 3) {
+        this.logger.error(
+          {
+            smsId,
+            to: smsTo,
+            failedAttempts,
+            maxRetries: 3,
+          },
+          '🚫 [SMS STRATEGY] Max retry attempts exceeded - notification will be marked for manual review'
+        );
+        throw new Error(`SMS delivery failed after ${failedAttempts} attempts. Notification: ${smsId}`);
+      }
+    } catch (checkError) {
+      if (checkError instanceof Error && checkError.message.includes('Max retry')) {
+        throw checkError; // Re-throw max retry errors
+      }
+
+      this.logger.warn(
+        {
+          smsId,
+          error: checkError instanceof Error ? checkError.message : checkError,
+        },
+        '⚠️ [SMS STRATEGY] Idempotency check encountered error, proceeding with send'
+      );
+      // Continue with sending if check fails - don't block
+    }
+
+    this.logger.info(
+      {
+        smsId,
+        to: smsTo,
+        totalProviders: this.providers.length,
+        providers: Array.from(this.providerNames.values()),
+      },
+      '📤 [SMS STRATEGY] Starting multi-provider SMS sending attempt'
+    );
+
     let lastError: Error | null = null;
 
     for (let i = 0; i < this.providers.length; i++) {
@@ -44,16 +123,28 @@ export class SMSProviderStrategy {
       const providerName = this.providerNames.get(provider) || provider.constructor.name;
 
       try {
-        this.logger.debug(
-          { provider: providerName, smsId: smsData.id, to: smsData.to },
-          `Attempting to send SMS with ${providerName}`
+        this.logger.info(
+          {
+            provider: providerName,
+            smsId,
+            to: smsTo,
+            attempt: i + 1,
+            totalProviders: this.providers.length,
+          },
+          `📤 [SMS STRATEGY] Attempting to send SMS with ${providerName}`
         );
 
         const result = await provider.send(smsData);
 
         this.logger.info(
-          { provider: providerName, messageId: result.messageId, to: smsData.to },
-          `SMS sent successfully via ${providerName}`
+          {
+            provider: providerName,
+            messageId: result.messageId,
+            to: smsTo,
+            smsId,
+            attempt: i + 1,
+          },
+          `✅ [SMS STRATEGY] SMS sent successfully via ${providerName}`
         );
 
         return { ...result, provider: providerName };
@@ -64,12 +155,13 @@ export class SMSProviderStrategy {
           {
             provider: providerName,
             error: lastError.message,
-            smsId: smsData.id,
-            to: smsData.to,
+            smsId,
+            to: smsTo,
             attempt: i + 1,
             totalProviders: this.providers.length,
+            nextProvider: i < this.providers.length - 1 ? this.providerNames.get(this.providers[i + 1]) : 'none',
           },
-          `Failed to send SMS with ${providerName}, trying next provider...`
+          `⚠️ [SMS STRATEGY] Failed to send SMS with ${providerName}, attempting next provider...`
         );
 
         // Continue to next provider
@@ -80,9 +172,19 @@ export class SMSProviderStrategy {
     }
 
     // All providers failed
-    throw new Error(
-      `All SMS providers failed. Last error: ${lastError?.message}. Configured providers: ${Array.from(this.providerNames.values()).join(', ')}`
+    const failureMessage = `All SMS providers failed. Last error: ${lastError?.message}. Configured providers: ${Array.from(this.providerNames.values()).join(', ')}`;
+
+    this.logger.error(
+      {
+        smsId,
+        to: smsTo,
+        lastError: lastError?.message,
+        providers: Array.from(this.providerNames.values()),
+      },
+      `🚫 [SMS STRATEGY] ${failureMessage}`
     );
+
+    throw new Error(failureMessage);
   }
 }
 

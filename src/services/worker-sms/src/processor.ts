@@ -16,14 +16,25 @@ export class SMSProcessor {
   async process(sms: any): Promise<void> {
     try {
       // Map incoming message format to SMS notification
-      const smsId = sms.id || sms.notificationId;
+      const smsId = sms.notificationId || sms.id;
       const smsTo = sms.to || sms.recipient;
       const tenantId = sms.tenantId;
       const templateCode = sms.templateCode;
       const templateId = sms.templateId;
       const accountId = sms.accountId || tenantId;
 
-      this.logger.info({ smsId, to: smsTo }, 'Processing SMS notification');
+      this.logger.debug(
+        {
+          smsId,
+          to: smsTo,
+          templateCode,
+          templateId,
+          tenantId,
+          accountId,
+          hasBody: !!sms.body,
+        },
+        '🔍 [SMS PROCESSOR] Starting SMS processing'
+      );
 
       // Prepare SMS data - fetch and render template if body not provided
       let body = sms.body;
@@ -78,59 +89,105 @@ export class SMSProcessor {
       );
 
       // Send using provider strategy (tries providers in order with fallback)
+      this.logger.info(
+        { smsId, to: smsData.to, provider: 'multi-provider-strategy' },
+        '📤 [SMS PROCESSOR] Attempting to send SMS via provider strategy'
+      );
+
       const result = await this.providerStrategy.send(smsData);
-      this.logger.info({ smsId, messageId: result.messageId, provider: result.provider }, 'SMS sent successfully');
+
+      this.logger.info(
+        {
+          smsId,
+          messageId: result.messageId,
+          provider: result.provider,
+          recipient: smsData.to,
+          status: 'SENT',
+        },
+        '✅ [SMS PROCESSOR] SMS sent successfully'
+      );
 
       // Record success log to database
       try {
+        const sentAt = new Date();
         await prismaWrite.notificationLog.create({
           data: {
             notificationId: smsId,
             provider: result.provider || 'multi-provider-strategy',
+            channel: 'SMS',
             status: 'SENT',
             response: {
               messageId: result.messageId || 'unknown',
-              sentAt: new Date().toISOString(),
+              sentAt: sentAt.toISOString(),
               to: sms.to,
               type: 'SMS',
             },
           },
         });
 
-        this.logger.debug({ smsId }, 'SMS notification log recorded');
+        this.logger.info(
+          {
+            smsId,
+            messageId: result.messageId,
+            provider: result.provider,
+            sentAt: sentAt.toISOString(),
+          },
+          '💾 [SMS PROCESSOR] Notification log recorded in database'
+        );
       } catch (logError) {
-        this.logger.warn({ smsId, error: logError }, 'Failed to record SMS notification log (non-blocking)');
+        this.logger.warn(
+          {
+            smsId,
+            error: logError instanceof Error ? logError.message : logError,
+          },
+          '⚠️ [SMS PROCESSOR] Failed to record SMS notification log (non-blocking)'
+        );
       }
     } catch (error) {
       const smsId = sms?.id || sms?.notificationId || 'unknown';
       const smsTo = sms?.to || sms?.recipient || 'unknown';
+      const errorMessage = error instanceof Error ? error.message : String(error);
 
       this.logger.error(
         {
           smsId,
           to: smsTo,
-          error: error instanceof Error ? error.message : error,
+          error: errorMessage,
+          errorStack: error instanceof Error ? error.stack : undefined,
         },
-        'Failed to process SMS notification'
+        '❌ [SMS PROCESSOR] Failed to process SMS notification'
       );
 
       // Record failure log to database
       try {
+        const failedAt = new Date();
         await prismaWrite.notificationLog.create({
           data: {
             notificationId: smsId,
             provider: 'multi-provider-strategy',
+            channel: 'SMS',
             status: 'FAILED',
             response: {
               error: error instanceof Error ? error.message : String(error),
-              failedAt: new Date().toISOString(),
+              failedAt: failedAt.toISOString(),
               to: smsTo,
               type: 'SMS',
             },
           },
         });
+
+        this.logger.warn(
+          { smsId, to: smsTo, failedAt: failedAt.toISOString() },
+          '💾 [SMS PROCESSOR] Failure log recorded in database'
+        );
       } catch (logError) {
-        this.logger.warn({ smsId, error: logError }, 'Failed to record SMS failure log');
+        this.logger.error(
+          {
+            smsId,
+            logError: logError instanceof Error ? logError.message : logError,
+          },
+          '⚠️ [SMS PROCESSOR] Failed to record SMS failure log'
+        );
       }
 
       // Re-throw to trigger RabbitMQ retry logic

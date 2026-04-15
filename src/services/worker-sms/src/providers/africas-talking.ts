@@ -57,36 +57,112 @@ export class AfricasTalkingProvider implements ISMSProvider {
         this.logger.warn({ to }, 'Phone number should start with +, but continuing anyway');
       }
 
-      this.logger.debug({ to, bodyLength: body.length }, "Sending SMS via Africa's Talking");
+      this.logger.info(
+        {
+          to,
+          bodyLength: body.length,
+          smsId: smsData.id || smsData.notificationId,
+          senderId: this.config.AFRICAS_TALKING_SENDER_ID || 'default',
+        },
+        '📤 [AFRICAS TALKING] Preparing to send SMS'
+      );
 
-      // Send SMS
-      const result = await this.smsService.send({
-        recipients: [to],
-        message: body,
-        // Optional: use sender ID if configured
-        from: this.config.AFRICAS_TALKING_SENDER_ID || 'NOTIFY',
+      // Send SMS via callback-based API
+      // Note: Africa's Talking SDK only accepts 'to' and 'message' parameters
+      // Sender ID must be configured at the account level in Africa's Talking dashboard
+      // Environment variable AFRICAS_TALKING_SENDER_ID is stored for reference but
+      // must be applied through the Africa's Talking web interface
+      return new Promise((resolve, reject) => {
+        const sendPayload: any = {
+          to: [to],
+          message: body,
+        };
+
+        this.logger.debug(
+          {
+            to,
+            senderIdConfig: this.config.AFRICAS_TALKING_SENDER_ID || 'not configured',
+            smsId: smsData.id || smsData.notificationId,
+          },
+          '📤 [AFRICAS TALKING] SMS payload prepared (sender ID: account level setting)'
+        );
+
+        this.smsService.send(sendPayload, (error: any, result: any) => {
+          if (error) {
+            this.logger.error(
+              {
+                error: error.message || error,
+                to,
+                smsId: smsData.id || smsData.notificationId,
+              },
+              '❌ [AFRICAS TALKING] API error occurred'
+            );
+            reject(error);
+            return;
+          }
+
+          // Handle response
+          if (
+            result &&
+            result.SMSMessageData &&
+            result.SMSMessageData.Recipients &&
+            result.SMSMessageData.Recipients.length > 0
+          ) {
+            const recipient = result.SMSMessageData.Recipients[0];
+
+            if (recipient.status === 'Success' || recipient.statusCode === 101) {
+              const messageId = recipient.messageId || `AT-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+
+              this.logger.info(
+                {
+                  messageId,
+                  to,
+                  status: recipient.status,
+                  statusCode: recipient.statusCode,
+                  smsId: smsData.id || smsData.notificationId,
+                },
+                '✅ [AFRICAS TALKING] SMS sent successfully'
+              );
+
+              resolve({ messageId, provider: this.name });
+            } else {
+              const errorMsg = `Africa's Talking API error: ${recipient.status || recipient.statusCode} - ${recipient.statusMessage || ''}`;
+              this.logger.error(
+                {
+                  to,
+                  status: recipient.status,
+                  statusCode: recipient.statusCode,
+                  statusMessage: recipient.statusMessage,
+                  smsId: smsData.id || smsData.notificationId,
+                },
+                `❌ [AFRICAS TALKING] ${errorMsg}`
+              );
+              reject(new Error(errorMsg));
+            }
+          } else {
+            const errorMsg = "Africa's Talking returned invalid response";
+            this.logger.error(
+              {
+                to,
+                smsId: smsData.id || smsData.notificationId,
+                result: JSON.stringify(result),
+              },
+              `❌ [AFRICAS TALKING] ${errorMsg}`
+            );
+            reject(new Error(errorMsg));
+          }
+        });
       });
-
-      // Handle response
-      if (result.SMSMessageData.Recipients && result.SMSMessageData.Recipients.length > 0) {
-        const recipient = result.SMSMessageData.Recipients[0];
-
-        if (recipient.status === 'Success' || recipient.statusCode === 101) {
-          const messageId = recipient.messageId || `AT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-          this.logger.debug({ messageId, to, status: recipient.status }, "SMS sent successfully via Africa's Talking");
-
-          return { messageId, provider: this.name };
-        } else {
-          throw new Error(
-            `Africa's Talking API error: ${recipient.status || recipient.statusCode} - ${recipient.statusMessage || ''}`
-          );
-        }
-      } else {
-        throw new Error("Africa's Talking returned no recipients in response");
-      }
     } catch (error) {
-      this.logger.error({ error, to: smsData.to }, "Africa's Talking provider failed to send SMS");
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        {
+          error: errorMsg,
+          to: smsData.to,
+          smsId: smsData.id || smsData.notificationId,
+        },
+        '❌ [AFRICAS TALKING] Provider failed to send SMS'
+      );
       throw error;
     }
   }

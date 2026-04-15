@@ -9,7 +9,8 @@ model Notification {
   app_id       String?
   channel      Channel
   recipient    String
-  templateCode String
+  templateId   String?
+  templateCode String?
   payload      Json
   status       NotificationStatus   @default(PENDING)
   priority     NotificationPriority @default(NORMAL)

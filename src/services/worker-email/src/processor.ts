@@ -16,7 +16,7 @@ export class EmailProcessor {
   async process(email: any): Promise<void> {
     try {
       // Map incoming message format to EmailNotification
-      const emailId = email.id || email.notificationId;
+      const emailId = email.notificationId || email.id;
       const emailTo = email.to || email.recipient;
       const tenantId = email.tenantId;
       const templateCode = email.templateCode;
