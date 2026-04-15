@@ -71,6 +71,20 @@ export async function registerOrganizationRoutes(fastify: FastifyInstance) {
     asyncWrapper(orgController.getMembers.bind(orgController))
   );
 
+  // Get organization invites
+  fastify.get(
+    '/organizations/:orgId/invites',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(orgController.getInvites.bind(orgController))
+  );
+
+  // Get user pending invites
+  fastify.get(
+    '/user/invites',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(orgController.getUserInvites.bind(orgController))
+  );
+
   // Remove organization member
   fastify.delete(
     '/organizations/:orgId/members/:memberId',

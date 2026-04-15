@@ -25,6 +25,7 @@ model App {
   campaigns         Campaign[]
   settings          AppSettings?
   emailConfig       AppEmailConfig?
+  customDomains     CustomerDomain[]
 
   @@index([account_id])
   @@index([organization_id])

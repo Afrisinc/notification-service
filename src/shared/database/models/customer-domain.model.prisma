@@ -1,0 +1,30 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: CUSTOM EMAIL DOMAINS
+// Customer custom email domain configuration for SMTP sending
+////////////////////////////////////////////////////////////
+
+model CustomerDomain {
+  id                  String   @id @default(uuid())
+  app_id              String
+  domain              String   @unique
+  from_name           String
+  from_email          String
+  selector            String   @default("afrisinc")
+  public_key          String
+  private_key_path    String
+  spf_verified        Boolean  @default(false)
+  dkim_verified       Boolean  @default(false)
+  dmarc_verified      Boolean  @default(false)
+  status              CustomerDomainStatus   @default(pending)
+  verified_at         DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  app                 App      @relation(fields: [app_id], references: [id], onDelete: Cascade)
+
+  @@unique([app_id, domain])
+  @@index([app_id])
+  @@index([status])
+  @@map("customer_domains")
+}
