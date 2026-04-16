@@ -88,23 +88,35 @@ export class EmailProcessor {
 
       // Record success log to database
       try {
-        await prismaWrite.notificationLog.create({
-          data: {
-            notificationId: emailId,
-            provider: 'multi-provider-strategy',
-            status: 'SENT',
-            response: {
-              messageId: result.messageId || 'unknown',
-              sentAt: new Date().toISOString(),
-              to: email.to,
-              from: email.appId ? `${(email as any).fromName || 'Afrisinc'} <${(email as any).fromEmail}>` : undefined,
-            },
-          },
+        const notificationExists = await prismaRead.notification.findUnique({
+          where: { id: emailId },
         });
-        this.logger.debug({ emailId, messageId: result.messageId }, 'Notification log recorded');
+
+        if (notificationExists) {
+          await prismaWrite.notificationLog.create({
+            data: {
+              notificationId: emailId,
+              provider: 'multi-provider-strategy',
+              status: 'SENT',
+              response: {
+                messageId: result.messageId || 'unknown',
+                sentAt: new Date().toISOString(),
+                to: email.to,
+                from: email.appId
+                  ? `${(email as any).fromName || 'Afrisinc'} <${(email as any).fromEmail}>`
+                  : undefined,
+              },
+            },
+          });
+          this.logger.debug({ emailId, messageId: result.messageId }, 'Notification log recorded');
+        } else {
+          this.logger.debug(
+            { emailId },
+            'Skipped recording success log because no parent Notification record exists (ad-hoc email)'
+          );
+        }
       } catch (logError) {
         this.logger.warn({ emailId, error: logError }, 'Failed to record notification log');
-        // Don't throw - email was sent successfully even if logging failed
       }
     } catch (error) {
       const emailId = email?.id || email?.notificationId;
@@ -113,20 +125,31 @@ export class EmailProcessor {
 
       this.logger.error({ error, emailId }, 'Failed to process email');
 
-      // Record failure log to database
+      // Record failure log to database ONLY if the notification exists (prevents P2003 Foreign Key crash on ad-hoc emails like reset links)
       try {
-        await prismaWrite.notificationLog.create({
-          data: {
-            notificationId: emailId,
-            provider: emailConfig.EMAIL_PROVIDER || 'unknown',
-            status: 'FAILED',
-            response: {
-              error: errorMessage,
-              failedAt: new Date().toISOString(),
-              to: email.to,
-            },
-          },
+        const notificationExists = await prismaRead.notification.findUnique({
+          where: { id: emailId },
         });
+
+        if (notificationExists) {
+          await prismaWrite.notificationLog.create({
+            data: {
+              notificationId: emailId,
+              provider: emailConfig.EMAIL_PROVIDER || 'unknown',
+              status: 'FAILED',
+              response: {
+                error: errorMessage,
+                failedAt: new Date().toISOString(),
+                to: email.to,
+              },
+            },
+          });
+        } else {
+          this.logger.debug(
+            { emailId },
+            'Skipped recording failure log because no parent Notification record exists (ad-hoc email)'
+          );
+        }
       } catch (logError) {
         this.logger.warn({ emailId, error: logError }, 'Failed to record failure log');
       }

@@ -119,4 +119,11 @@ export async function registerOrganizationRoutes(fastify: FastifyInstance) {
     { onRequest: [validateBaseToken], schema: AcceptInviteSchema },
     asyncWrapper(orgController.acceptInvite.bind(orgController))
   );
+
+  // Decline invitation (auth required)
+  fastify.post(
+    '/invites/:inviteId/:token/decline',
+    { onRequest: [validateBaseToken], schema: AcceptInviteSchema },
+    asyncWrapper(orgController.declineInvite.bind(orgController))
+  );
 }

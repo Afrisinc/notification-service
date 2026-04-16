@@ -179,13 +179,18 @@ export class OrganizationController {
       });
     } catch (error: any) {
       logger.error({ error }, 'Failed to create invite');
+      const message = error.message || 'Failed to create invite';
+
+      // Let's temporary return the actual internal error message to the frontend so we can see EXACTLY what's breaking
       if (
-        error.message === 'Organization not found' ||
-        error.message === 'An invite for this email already exists for the organization'
+        message === 'Organization not found' ||
+        message.includes('already exists') ||
+        message.includes('already a member')
       ) {
-        return ApiResponseHelper.badRequest(reply, error.message);
+        return ApiResponseHelper.badRequest(reply, message);
       }
-      return ApiResponseHelper.internalError(reply, 'Failed to create invite');
+
+      return ApiResponseHelper.internalError(reply, `Failed to create invite: ${message}`);
     }
   }
 
@@ -445,6 +450,40 @@ export class OrganizationController {
 
       if (message.includes('already a member')) {
         return ApiResponseHelper.badRequest(reply, 'User is already a member of this organization');
+      }
+
+      return ApiResponseHelper.internalError(reply, message);
+    }
+  }
+
+  /**
+   * Decline an organization invitation (auth required)
+   */
+  async declineInvite(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { inviteId, token } = request.params as { inviteId: string; token: string };
+      const userId = (request as any).user?.id;
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
+      }
+
+      const result = await this.organizationService.declineInvite(inviteId, token, userId);
+
+      if (!result) {
+        return ApiResponseHelper.badRequest(reply, 'Failed to decline invitation');
+      }
+
+      return ApiResponseHelper.success(reply, 'Invitation declined successfully', {
+        inviteId: result.inviteId,
+        status: result.status,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to decline invitation';
+      logger.error({ error }, message);
+
+      if (message.includes('expired')) {
+        return ApiResponseHelper.badRequest(reply, 'Invitation has expired');
       }
 
       return ApiResponseHelper.internalError(reply, message);
