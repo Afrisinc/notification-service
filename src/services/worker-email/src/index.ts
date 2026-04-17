@@ -81,11 +81,21 @@ async function startEmailWorker() {
         const retryCount = (msg.properties?.headers?.['x-retry-count'] as number) || 0;
 
         if (retryCount < 3) {
-          await channel!.nack(msg, false, true); // Requeue
-          logger.info({ retryCount }, 'Message requeued');
+          // Acknowledge the original message so it doesn't get stuck in an infinite loop
+          channel!.ack(msg);
+
+          // Republish with incremented retry count
+          const nextRetryCount = retryCount + 1;
+          channel!.publish(exchangeName, routingKey, msg.content, {
+            headers: {
+              ...msg.properties?.headers,
+              'x-retry-count': nextRetryCount,
+            },
+          });
+          logger.info({ retryCount: nextRetryCount }, 'Message requeued with incremented retry count');
         } else {
-          // Discard after 3 retries
-          channel!.nack(msg, false, false);
+          // Discard after 3 retries by acknowledging it
+          channel!.ack(msg);
           logger.error('Max retries exceeded, message discarded');
         }
       }

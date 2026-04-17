@@ -34,6 +34,7 @@ export const env = cleanEnv(process.env, {
   RESET_PASSWORD_TEMPLATE_ID: str({ default: 'system-reset-password' }),
   VERIFY_EMAIL_TEMPLATE_ID: str({ default: 'system-verify-email' }),
   WELCOME_EMAIL_TEMPLATE_ID: str({ default: 'system-welcome-email' }),
+  INVITE_MEMBER_TEMPLATE_ID: str({ default: 'system-invite-member' }),
 
   // SMTP Configuration (optional)
   SMTP_HOST: str({ default: 'localhost' }),
