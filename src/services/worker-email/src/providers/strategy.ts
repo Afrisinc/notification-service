@@ -1,5 +1,5 @@
 import pino from 'pino';
-import { SMTPProvider } from './smtp';
+import { MainSMTPProvider } from './main-smtp';
 import { SendGridProvider } from './sendgrid';
 
 export interface IEmailProvider {
@@ -71,11 +71,10 @@ export class EmailProviderFactory {
     const strategy = new EmailProviderStrategy(logger);
 
     // Add providers in priority order
-    // Gmail (SMTP) as primary
-    // Correct — matches the zod schema
-    if (config.SMTP_HOST && config.SMTP_USER && config.SMTP_PASSWORD) {
-      strategy.addProvider(new SMTPProvider(logger));
-      logger.info('Added SMTP provider (Gmail/Custom)');
+    // Main SMTP (Postfix) as primary
+    if (config.SMTP_HOST && config.SMTP_PORT) {
+      strategy.addProvider(new MainSMTPProvider(logger));
+      logger.info('Added Main SMTP provider (Postfix)');
     }
 
     // SendGrid as fallback
