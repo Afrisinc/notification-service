@@ -96,6 +96,7 @@ export class EmailProcessor {
           await prismaWrite.notificationLog.create({
             data: {
               notificationId: emailId,
+              channel: 'EMAIL',
               provider: 'multi-provider-strategy',
               status: 'SENT',
               response: {
@@ -135,6 +136,7 @@ export class EmailProcessor {
           await prismaWrite.notificationLog.create({
             data: {
               notificationId: emailId,
+              channel: 'EMAIL',
               provider: emailConfig.EMAIL_PROVIDER || 'unknown',
               status: 'FAILED',
               response: {

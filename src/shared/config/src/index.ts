@@ -95,6 +95,14 @@ const EnvSchema = z.object({
   VONAGE_API_KEY: z.string().optional(),
   VONAGE_API_SECRET: z.string().optional(),
   VONAGE_SENDER_ID: z.string().optional(),
+
+  // Database Encryption
+  DATABASE_ENCRYPTION_KEY: z.string().optional(),
+
+  // Google OAuth Configuration
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_REDIRECT_URI: z.string().optional(),
 });
 
 export type Environment = z.infer<typeof EnvSchema>;

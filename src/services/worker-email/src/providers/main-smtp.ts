@@ -53,17 +53,14 @@ export class MainSMTPProvider implements EmailProvider {
       // Priority 1: Custom Domain (if app has one and it's verified)
       if (email.appId) {
         try {
-          const customDomain = await prismaRead.customerDomain.findFirst({
-            where: {
-              app_id: email.appId,
-              status: 'verified',
-            },
+          const customDomain = await prismaRead.appEmailProvider.findUnique({
+            where: { app_id: email.appId },
           });
 
-          if (customDomain) {
-            fromEmail = customDomain.from_email;
+          if (customDomain && customDomain.provider === 'custom_domain' && customDomain.domain_status === 'verified') {
+            fromEmail = customDomain.from_email || 'noreply@afrisinc.com';
             fromName = customDomain.from_name || undefined;
-            replyTo = customDomain.from_email;
+            replyTo = customDomain.from_email || undefined;
             this.logger.debug(
               { appId: email.appId, domain: customDomain.domain, from: fromEmail },
               'Using custom domain for email'
@@ -80,11 +77,11 @@ export class MainSMTPProvider implements EmailProvider {
       // Priority 2: App-specific email config (if no custom domain)
       if (!replyTo && email.appId) {
         try {
-          const emailConfig = await prismaRead.appEmailConfig.findUnique({
+          const emailConfig = await prismaRead.appEmailProvider.findUnique({
             where: { app_id: email.appId },
           });
 
-          if (emailConfig) {
+          if (emailConfig && emailConfig.from_email) {
             fromEmail = emailConfig.from_email;
             fromName = emailConfig.from_name || undefined;
             this.logger.debug({ appId: email.appId, from: fromEmail }, 'Using app-specific email config');

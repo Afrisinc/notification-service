@@ -108,10 +108,10 @@ export class NotifyService {
     let fromEmail: string | undefined;
     let fromName: string | undefined;
     try {
-      const emailConfig = await prismaRead.appEmailConfig.findUnique({
+      const emailConfig = await prismaRead.appEmailProvider.findUnique({
         where: { app_id: appId },
       });
-      if (emailConfig) {
+      if (emailConfig && emailConfig.from_email) {
         fromEmail = emailConfig.from_email;
         fromName = emailConfig.from_name || undefined;
       }

@@ -30,7 +30,7 @@ export class SendGridProvider implements EmailProvider {
         try {
           const database = await import('@shared/database');
           if (database && database.prismaRead) {
-            const emailConfig = await database.prismaRead.appEmailConfig.findUnique({
+            const emailConfig = await database.prismaRead.appEmailProvider.findUnique({
               where: { app_id: email.appId },
             });
 

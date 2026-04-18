@@ -41,17 +41,14 @@ export class SMTPProvider implements EmailProvider {
       if (email.appId) {
         try {
           const { prismaRead } = await import('@shared/database');
-          const customDomain = await prismaRead.customerDomain.findFirst({
-            where: {
-              app_id: email.appId,
-              status: 'verified',
-            },
+          const customDomain = await prismaRead.appEmailProvider.findUnique({
+            where: { app_id: email.appId },
           });
 
-          if (customDomain) {
-            fromEmail = customDomain.from_email;
+          if (customDomain && customDomain.provider === 'custom_domain' && customDomain.domain_status === 'verified') {
+            fromEmail = customDomain.from_email || 'noreply@notification.local';
             fromName = customDomain.from_name || undefined;
-            replyTo = customDomain.from_email;
+            replyTo = customDomain.from_email || undefined;
             this.logger.debug(
               { appId: email.appId, domain: customDomain.domain, from: fromEmail },
               'Using app custom domain for email'
@@ -70,11 +67,11 @@ export class SMTPProvider implements EmailProvider {
       if (!replyTo && email.appId) {
         try {
           const { prismaRead } = await import('@shared/database');
-          const emailConfig = await prismaRead.appEmailConfig.findUnique({
+          const emailConfig = await prismaRead.appEmailProvider.findUnique({
             where: { app_id: email.appId },
           });
 
-          if (emailConfig) {
+          if (emailConfig && emailConfig.from_email) {
             fromEmail = emailConfig.from_email;
             fromName = emailConfig.from_name || undefined;
             this.logger.debug({ appId: email.appId, from: fromEmail }, 'Using app-specific email configuration');

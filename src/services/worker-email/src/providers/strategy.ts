@@ -1,6 +1,7 @@
 import pino from 'pino';
 import { MainSMTPProvider } from './main-smtp';
 import { SendGridProvider } from './sendgrid';
+import { GmailProvider } from './gmail.provider';
 
 export interface IEmailProvider {
   send(emailData: any): Promise<{ messageId: string }>;
@@ -71,6 +72,10 @@ export class EmailProviderFactory {
     const strategy = new EmailProviderStrategy(logger);
 
     // Add providers in priority order
+    // Gmail per-app as highest priority (if configured)
+    strategy.addProvider(new GmailProvider(logger));
+    logger.info('Added Gmail provider (per-app priority)');
+
     // Main SMTP (Postfix) as primary
     if (config.SMTP_HOST && config.SMTP_PORT) {
       strategy.addProvider(new MainSMTPProvider(logger));
