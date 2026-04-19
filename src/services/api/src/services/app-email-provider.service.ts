@@ -74,7 +74,7 @@ export class AppEmailProviderService {
         client_id: config.GOOGLE_CLIENT_ID,
         redirect_uri: config.GOOGLE_REDIRECT_URI,
         response_type: 'code',
-        scope: 'https://www.googleapis.com/auth/gmail.send',
+        scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email',
         state,
         access_type: 'offline',
         prompt: 'consent',
@@ -92,7 +92,7 @@ export class AppEmailProviderService {
   /**
    * Handle Gmail OAuth callback and store encrypted tokens
    */
-  async handleGmailOAuthCallback(appId: string, code: string, state: string) {
+  async handleGmailOAuthCallback(appId: string, code: string, state: string, accountId?: string) {
     try {
       const config = getConfig();
       if (!config.GOOGLE_CLIENT_ID || !config.GOOGLE_CLIENT_SECRET || !config.GOOGLE_REDIRECT_URI) {

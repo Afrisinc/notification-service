@@ -136,7 +136,7 @@ export async function handleGmailOAuthCallback(request: FastifyRequest, reply: F
     }
 
     try {
-      const emailConfig = await appEmailProviderService.handleGmailOAuthCallback(appId, code, state);
+      const emailConfig = await appEmailProviderService.handleGmailOAuthCallback(appId, code, state, accountId);
       return ApiResponseHelper.success(reply, 'Gmail account connected successfully', {
         id: emailConfig.id,
         provider: emailConfig.provider,
