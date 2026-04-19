@@ -141,5 +141,3 @@ dist
 .yarn/install-state.gz
 .pnp.*
 .claude
-
-GMAIL_OAUTH_SETUP.md

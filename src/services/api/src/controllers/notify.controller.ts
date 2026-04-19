@@ -6,7 +6,6 @@ import { ApiResponseHelper } from '../utils';
 
 export class NotifyController {
   async sendNotification(request: FastifyRequest, reply: FastifyReply) {
-    console.log('Received send notification request with body:', request.body);
     try {
       const body = request.body as SendNotificationRequest;
       const accountId = request.headers['x-account-id'] as string;
@@ -20,8 +19,6 @@ export class NotifyController {
       }
 
       const notification = await notifyService.sendNotification(accountId, body.app_id, body);
-
-      console.log('Notification created with ID:', notification);
 
       logger.info({ notificationId: notification.id, correlationId: request.id }, 'Notification sent successfully');
 

@@ -7,7 +7,6 @@ export async function getEmailProvider(request: FastifyRequest, reply: FastifyRe
   try {
     const { appId } = request.params as { appId: string };
     const accountId = request.headers['x-account-id'] as string | undefined;
-    console.log('Getting email provider for appId:', appId, 'accountId:', accountId);
 
     const owns = await appEmailProviderService.verifyAppOwnership(appId, accountId);
     if (!owns) {
