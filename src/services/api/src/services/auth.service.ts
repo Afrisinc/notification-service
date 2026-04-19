@@ -126,8 +126,6 @@ export class AuthService {
       // Publish email verification message to notify service
       try {
         // Generate verification token and URL
-        console.log('User registered successfully:', { userId: result.user.id, email: result });
-
         const verificationToken = generateResetToken(result.user.id, result.user.email);
         const verificationUrl = `${env.WEBAPP_URL}/verify-email?token=${verificationToken}`;
 
@@ -159,7 +157,6 @@ export class AuthService {
         const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
         logger.warn({ error: errorMessage, userId: result.user.id }, 'Failed to publish verification email');
       }
-      console.log('User registered successfully:', { userId: result.user.id, email: result });
       const token = generateBaseToken(result.user.id, result.user.email, [result.account.id]);
 
       const response: any = {
@@ -178,7 +175,6 @@ export class AuthService {
 
       return response;
     } catch (error) {
-      console.error('❌ Registration error:', error);
       throw error;
     }
   }
@@ -364,10 +360,7 @@ export class AuthService {
       throw new Error('Invalid token payload');
     }
 
-    console.log('Decoded token data:', userData);
-
     const user = await userRepo.findById(userId, true);
-    console.log('Found user:', user);
 
     if (!user) {
       throw new Error('User not found');

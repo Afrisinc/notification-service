@@ -481,10 +481,7 @@ export class AppService {
       throw new Error('App not found');
     }
 
-    console.log('App =================================\n ', app, '\n Account ID: ', accountId);
-
     const account = await appRepo.findAccountById(accountId);
-    console.log('Account =================================\n ', account);
     if (!account) {
       throw new Error('Account not found');
     }

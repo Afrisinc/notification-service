@@ -512,15 +512,6 @@ export class AssetsClient {
    * Use this to verify the Assets service is accessible before operations.
    *
    * @returns true if service is healthy, false otherwise
-   *
-   * @example
-   * ```typescript
-   * if (await assetsClient.healthCheck()) {
-   *   console.log('Assets service is healthy');
-   * } else {
-   *   console.log('Assets service is down');
-   * }
-   * ```
    */
   async healthCheck(): Promise<boolean> {
     try {
