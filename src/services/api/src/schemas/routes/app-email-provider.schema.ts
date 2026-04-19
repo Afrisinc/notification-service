@@ -205,3 +205,123 @@ export const ResetEmailProviderSchema: FastifySchema = {
     },
   },
 };
+
+export const SetCustomDomainSchema: FastifySchema = {
+  tags: ['Email Provider'],
+  description: 'Configure custom email domain',
+  params: {
+    type: 'object',
+    required: ['appId'],
+    properties: {
+      appId: { type: 'string', description: 'App ID (UUID)' },
+    },
+  },
+  body: {
+    type: 'object',
+    required: ['domain'],
+    properties: {
+      domain: { type: 'string', description: 'Custom domain (e.g., mail.example.com)' },
+      selector: { type: 'string', description: 'DKIM selector (default: afrisinc)' },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        ...StandardResponseProperties,
+        data: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            domain: { type: 'string' },
+            selector: { type: 'string' },
+            domainStatus: { type: 'string' },
+            spfVerified: { type: 'boolean' },
+            dkimVerified: { type: 'boolean' },
+            dmarcVerified: { type: 'boolean' },
+          },
+        },
+      },
+    },
+  },
+};
+
+export const GetCustomDomainRecordsSchema: FastifySchema = {
+  tags: ['Email Provider'],
+  description: 'Get DNS records for custom domain verification',
+  params: {
+    type: 'object',
+    required: ['appId'],
+    properties: {
+      appId: { type: 'string', description: 'App ID (UUID)' },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        ...StandardResponseProperties,
+        data: {
+          type: 'object',
+          properties: {
+            domain: { type: 'string' },
+            spf: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                value: { type: 'string' },
+                verified: { type: 'boolean' },
+              },
+            },
+            dkim: {
+              type: 'object',
+              properties: {
+                selector: { type: 'string' },
+                name: { type: 'string' },
+                value: { type: 'string' },
+                verified: { type: 'boolean' },
+              },
+            },
+            dmarc: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                value: { type: 'string' },
+                verified: { type: 'boolean' },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+export const VerifyCustomDomainSchema: FastifySchema = {
+  tags: ['Email Provider'],
+  description: 'Verify DNS records for custom domain',
+  params: {
+    type: 'object',
+    required: ['appId'],
+    properties: {
+      appId: { type: 'string', description: 'App ID (UUID)' },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        ...StandardResponseProperties,
+        data: {
+          type: 'object',
+          properties: {
+            domain: { type: 'string' },
+            spfVerified: { type: 'boolean' },
+            dkimVerified: { type: 'boolean' },
+            dmarcVerified: { type: 'boolean' },
+          },
+        },
+      },
+    },
+  },
+};

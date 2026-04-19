@@ -4,14 +4,7 @@ import { getConfig } from '@shared/config';
 import { EmailProviderFactory } from './providers/strategy';
 
 export class EmailProcessor {
-  private providerStrategy;
-
-  constructor(private logger: pino.Logger) {
-    const config = getConfig();
-
-    // Initialize provider strategy with fallback support
-    this.providerStrategy = EmailProviderFactory.createStrategy(config, logger);
-  }
+  constructor(private logger: pino.Logger) {}
 
   async process(email: any): Promise<void> {
     try {
@@ -22,8 +15,13 @@ export class EmailProcessor {
       const templateCode = email.templateCode;
       const templateId = email.templateId;
       const accountId = email.accountId || tenantId; // Fallback to tenantId if accountId not provided
+      const appId = email.appId;
 
-      this.logger.info({ emailId, to: emailTo }, 'Processing email notification');
+      this.logger.info({ emailId, to: emailTo, appId }, 'Processing email notification');
+
+      // Create provider strategy for this specific app (checks configured provider)
+      const config = getConfig();
+      const providerStrategy = await EmailProviderFactory.createStrategy(appId, config, this.logger);
 
       // Prepare email data - fetch and render template if body/subject not provided
       let subject = email.subject;
@@ -83,7 +81,7 @@ export class EmailProcessor {
       );
 
       // Send using provider strategy (tries providers in order with fallback)
-      const result = await this.providerStrategy.send(emailData);
+      const result = await providerStrategy.send(emailData);
       this.logger.info({ emailId, messageId: result.messageId }, 'Email sent successfully');
 
       // Record success log to database

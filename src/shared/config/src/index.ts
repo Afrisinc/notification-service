@@ -103,6 +103,13 @@ const EnvSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().optional(),
+
+  // Mail Server SSH Configuration (for DKIM key generation)
+  MAIL_SERVER_HOST: z.string().optional(),
+  MAIL_SERVER_PORT: z.coerce.number().optional().default(22),
+  MAIL_SERVER_USER: z.string().optional().default('root'),
+  MAIL_SERVER_SSH_KEY: z.string().optional(),
+  MAIL_SERVER_SSH_PASSWORD: z.string().optional(),
 });
 
 export type Environment = z.infer<typeof EnvSchema>;

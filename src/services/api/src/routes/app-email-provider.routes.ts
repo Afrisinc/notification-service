@@ -9,6 +9,9 @@ import {
   SaveGmailOAuthCallbackSchema,
   SetGmailAppPasswordSchema,
   ResetEmailProviderSchema,
+  SetCustomDomainSchema,
+  GetCustomDomainRecordsSchema,
+  VerifyCustomDomainSchema,
 } from '../schemas/routes/app-email-provider.schema';
 
 /**
@@ -74,5 +77,35 @@ export async function registerAppEmailProviderRoutes(fastify: FastifyInstance) {
       schema: ResetEmailProviderSchema,
     },
     asyncWrapper(EmailProviderController.resetEmailProvider)
+  );
+
+  // POST /api/apps/:appId/email-provider/custom-domain
+  fastify.post(
+    '/apps/:appId/email-provider/custom-domain',
+    {
+      onRequest: [validateBaseToken],
+      schema: SetCustomDomainSchema,
+    },
+    asyncWrapper(EmailProviderController.setCustomDomain)
+  );
+
+  // GET /api/apps/:appId/email-provider/custom-domain/records
+  fastify.get(
+    '/apps/:appId/email-provider/custom-domain/records',
+    {
+      onRequest: [validateBaseToken],
+      schema: GetCustomDomainRecordsSchema,
+    },
+    asyncWrapper(EmailProviderController.getCustomDomainRecords)
+  );
+
+  // POST /api/apps/:appId/email-provider/custom-domain/verify
+  fastify.post(
+    '/apps/:appId/email-provider/custom-domain/verify',
+    {
+      onRequest: [validateBaseToken],
+      schema: VerifyCustomDomainSchema,
+    },
+    asyncWrapper(EmailProviderController.verifyCustomDomain)
   );
 }

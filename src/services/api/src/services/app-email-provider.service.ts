@@ -1,9 +1,11 @@
 import { AppEmailProviderRepository } from '../repositories/app-email-provider.repository';
-import { prismaRead } from '@shared/database';
+import { prismaRead, prismaWrite } from '@shared/database';
 import { getConfig } from '@shared/config';
 import { encrypt } from '@shared/utils/encryption';
 import { logger } from '../config/logger';
 import nodemailer from 'nodemailer';
+import { dkimService } from './dkim.service';
+import { dnsVerifyService } from './dns-verify.service';
 
 export class AppEmailProviderService {
   async getEmailProvider(appId: string) {
@@ -258,6 +260,159 @@ export class AppEmailProviderService {
     } catch (error) {
       logger.error({ error, appId, accountId }, 'Failed to verify app ownership');
       return false;
+    }
+  }
+
+  /**
+   * Configure custom email domain with DKIM key generation
+   */
+  async setCustomDomain(appId: string, domain: string, selector?: string) {
+    try {
+      const sel = selector || 'afrisinc';
+
+      // Generate DKIM key pair on server
+      logger.info({ appId, domain }, 'Generating DKIM key pair...');
+      const { publicKey, privateKeyPath } = await dkimService.generateKeyPair(domain, sel);
+
+      // Add domain to OpenDKIM tables
+      await dkimService.addToSigningTable(domain);
+      await dkimService.addToKeysTable(domain, sel);
+
+      // Reload OpenDKIM
+      await dkimService.reloadOpenDKIM();
+
+      // Store config in database
+      const emailConfig = await prismaWrite.appEmailProvider.upsert({
+        where: { app_id: appId },
+        create: {
+          app_id: appId,
+          provider: 'custom_domain',
+          method: null,
+          domain: domain,
+          selector: sel,
+          public_key: publicKey,
+          private_key_path: privateKeyPath,
+          domain_status: 'pending',
+          is_active: true,
+          spf_verified: false,
+          dkim_verified: false,
+          dmarc_verified: false,
+        },
+        update: {
+          provider: 'custom_domain',
+          method: null,
+          domain: domain,
+          selector: sel,
+          public_key: publicKey,
+          private_key_path: privateKeyPath,
+          domain_status: 'pending',
+          is_active: true,
+          spf_verified: false,
+          dkim_verified: false,
+          dmarc_verified: false,
+          from_email: null,
+          from_name: null,
+          gmail_email: null,
+          oauth_access_token: null,
+          oauth_refresh_token: null,
+          oauth_token_expiry: null,
+          app_password: null,
+        },
+      });
+
+      logger.info({ appId, domain }, 'Custom domain configured with DKIM keys');
+      return emailConfig;
+    } catch (error) {
+      logger.error({ error, appId, domain }, 'Failed to set custom domain');
+      throw error;
+    }
+  }
+
+  /**
+   * Get DNS records for custom domain verification
+   */
+  async getCustomDomainRecords(appId: string) {
+    try {
+      const config = await AppEmailProviderRepository.findByAppId(appId);
+
+      if (!config || config.provider !== 'custom_domain' || !config.domain) {
+        return null;
+      }
+
+      const domain = config.domain;
+      const selector = config.selector || 'afrisinc';
+      const publicKey = config.public_key || '';
+
+      return {
+        domain,
+        spf: {
+          name: domain,
+          value: `v=spf1 include:mail.afrisinc.com ~all`,
+          verified: config.spf_verified,
+        },
+        dkim: {
+          selector,
+          name: `${selector}._domainkey.${domain}`,
+          value: publicKey || '(Public key will be generated after domain verification)',
+          verified: config.dkim_verified,
+        },
+        dmarc: {
+          name: `_dmarc.${domain}`,
+          value: `v=DMARC1; p=quarantine; rua=mailto:dmarc@afrisinc.com`,
+          verified: config.dmarc_verified,
+        },
+      };
+    } catch (error) {
+      logger.error({ error, appId }, 'Failed to get custom domain records');
+      throw error;
+    }
+  }
+
+  /**
+   * Verify DNS records for custom domain
+   */
+  async verifyCustomDomain(appId: string) {
+    try {
+      const config = await AppEmailProviderRepository.findByAppId(appId);
+
+      if (!config || config.provider !== 'custom_domain' || !config.domain) {
+        return null;
+      }
+
+      const domain = config.domain;
+      const selector = config.selector || 'afrisinc';
+
+      // Check DNS records
+      logger.info({ domain }, 'Verifying DNS records...');
+      const spfVerified = await dnsVerifyService.verifySPF(domain);
+      const dkimVerified = await dnsVerifyService.verifyDKIM(selector, domain);
+      const dmarcVerified = await dnsVerifyService.verifyDMARC(domain);
+
+      logger.info(
+        { domain, spfVerified, dkimVerified, dmarcVerified },
+        'DNS verification completed'
+      );
+
+      // Update database with verification results
+      await prismaWrite.appEmailProvider.update({
+        where: { app_id: appId },
+        data: {
+          spf_verified: spfVerified,
+          dkim_verified: dkimVerified,
+          dmarc_verified: dmarcVerified,
+          domain_status: spfVerified && dkimVerified && dmarcVerified ? 'verified' : 'pending',
+        },
+      });
+
+      return {
+        domain,
+        spfVerified,
+        dkimVerified,
+        dmarcVerified,
+      };
+    } catch (error) {
+      logger.error({ error, appId }, 'Failed to verify custom domain');
+      throw error;
     }
   }
 }

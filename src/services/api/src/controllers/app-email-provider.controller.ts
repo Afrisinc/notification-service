@@ -233,3 +233,120 @@ export async function resetEmailProvider(request: FastifyRequest, reply: Fastify
     return ApiResponseHelper.internalError(reply, 'Failed to reset email provider');
   }
 }
+
+/**
+ * POST /api/apps/:appId/email-provider/custom-domain
+ * Configure custom email domain
+ */
+export async function setCustomDomain(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { appId } = request.params as { appId: string };
+    const { domain, selector } = request.body as { domain: string; selector?: string };
+    const accountId = request.headers['x-account-id'] as string | undefined;
+
+    if (!domain) {
+      return ApiResponseHelper.missingFields(reply, 'Domain is required');
+    }
+
+    const owns = await appEmailProviderService.verifyAppOwnership(appId, accountId);
+    if (!owns) {
+      return ApiResponseHelper.forbidden(reply, 'You do not own this app');
+    }
+
+    try {
+      const config = await appEmailProviderService.setCustomDomain(appId, domain, selector);
+      logger.info({ appId, domain }, 'Custom domain configured');
+
+      return ApiResponseHelper.success(reply, 'Custom domain configured', {
+        id: config.id,
+        domain: config.domain,
+        selector: config.selector,
+        domainStatus: config.domain_status,
+        spfVerified: config.spf_verified,
+        dkimVerified: config.dkim_verified,
+        dmarcVerified: config.dmarc_verified,
+      });
+    } catch (error) {
+      return ApiResponseHelper.badRequest(
+        reply,
+        error instanceof Error ? error.message : 'Failed to configure custom domain'
+      );
+    }
+  } catch (error) {
+    logger.error({ error }, 'Failed to set custom domain');
+    return ApiResponseHelper.internalError(reply, 'Failed to configure custom domain');
+  }
+}
+
+/**
+ * GET /api/apps/:appId/email-provider/custom-domain/records
+ * Get DNS records for custom domain verification
+ */
+export async function getCustomDomainRecords(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { appId } = request.params as { appId: string };
+    const accountId = request.headers['x-account-id'] as string | undefined;
+
+    const owns = await appEmailProviderService.verifyAppOwnership(appId, accountId);
+    if (!owns) {
+      return ApiResponseHelper.forbidden(reply, 'You do not own this app');
+    }
+
+    try {
+      const records = await appEmailProviderService.getCustomDomainRecords(appId);
+      if (!records) {
+        return ApiResponseHelper.success(reply, 'No custom domain configured', null);
+      }
+
+      return ApiResponseHelper.success(reply, 'DNS records retrieved', records);
+    } catch (error) {
+      return ApiResponseHelper.badRequest(
+        reply,
+        error instanceof Error ? error.message : 'Failed to get DNS records'
+      );
+    }
+  } catch (error) {
+    logger.error({ error }, 'Failed to get custom domain records');
+    return ApiResponseHelper.internalError(reply, 'Failed to retrieve DNS records');
+  }
+}
+
+/**
+ * POST /api/apps/:appId/email-provider/custom-domain/verify
+ * Verify DNS records for custom domain
+ */
+export async function verifyCustomDomain(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { appId } = request.params as { appId: string };
+    const accountId = request.headers['x-account-id'] as string | undefined;
+
+    const owns = await appEmailProviderService.verifyAppOwnership(appId, accountId);
+    if (!owns) {
+      return ApiResponseHelper.forbidden(reply, 'You do not own this app');
+    }
+
+    try {
+      const result = await appEmailProviderService.verifyCustomDomain(appId);
+      if (!result) {
+        return ApiResponseHelper.badRequest(reply, 'No custom domain configured');
+      }
+
+      logger.info({ appId, ...result }, 'Custom domain verification completed');
+
+      return ApiResponseHelper.success(reply, 'DNS verification completed', {
+        domain: result.domain,
+        spfVerified: result.spfVerified,
+        dkimVerified: result.dkimVerified,
+        dmarcVerified: result.dmarcVerified,
+      });
+    } catch (error) {
+      return ApiResponseHelper.badRequest(
+        reply,
+        error instanceof Error ? error.message : 'Failed to verify domain'
+      );
+    }
+  } catch (error) {
+    logger.error({ error }, 'Failed to verify custom domain');
+    return ApiResponseHelper.internalError(reply, 'Failed to verify domain');
+  }
+}

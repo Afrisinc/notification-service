@@ -2,6 +2,7 @@ import pino from 'pino';
 import { MainSMTPProvider } from './main-smtp';
 import { SendGridProvider } from './sendgrid';
 import { GmailProvider } from './gmail.provider';
+import { AppEmailProviderRepository } from '../../../api/src/repositories/app-email-provider.repository';
 
 export interface IEmailProvider {
   send(emailData: any): Promise<{ messageId: string }>;
@@ -66,26 +67,74 @@ export class EmailProviderStrategy {
 
 /**
  * Factory to create provider strategy based on configuration
+ * Checks app-specific email provider config first, falls back to defaults
  */
 export class EmailProviderFactory {
-  static createStrategy(config: any, logger: pino.Logger): EmailProviderStrategy {
+  static async createStrategy(appId: string, config: any, logger: pino.Logger): Promise<EmailProviderStrategy> {
     const strategy = new EmailProviderStrategy(logger);
+    const addedProviders = new Set<string>();
 
-    // Add providers in priority order
-    // Gmail per-app as highest priority (if configured)
-    strategy.addProvider(new GmailProvider(logger));
-    logger.info('Added Gmail provider (per-app priority)');
+    try {
+      // Check if app has configured email provider
+      const appEmailConfig = await AppEmailProviderRepository.findByAppId(appId);
 
-    // Main SMTP (Postfix) as primary
-    if (config.SMTP_HOST && config.SMTP_PORT) {
-      strategy.addProvider(new MainSMTPProvider(logger));
-      logger.info('Added Main SMTP provider (Postfix)');
+      if (appEmailConfig && appEmailConfig.is_active) {
+        logger.debug({ appId, provider: appEmailConfig.provider }, 'Using configured email provider for app');
+
+        // Add configured provider first (highest priority)
+        switch (appEmailConfig.provider) {
+          case 'gmail':
+            strategy.addProvider(new GmailProvider(logger));
+            addedProviders.add('GmailProvider');
+            logger.info({ appId }, 'Added Gmail provider (app-configured)');
+            break;
+
+          case 'custom_domain':
+          case 'notify':
+            // Use MainSMTPProvider for custom domain and default notify
+            if (config.SMTP_HOST && config.SMTP_PORT) {
+              strategy.addProvider(new MainSMTPProvider(logger));
+              addedProviders.add('MainSMTPProvider');
+              logger.info({ appId }, 'Added Main SMTP provider (app-configured)');
+            }
+            break;
+
+          case 'sendgrid':
+            if (config.SENDGRID_API_KEY) {
+              strategy.addProvider(new SendGridProvider(logger));
+              addedProviders.add('SendGridProvider');
+              logger.info({ appId }, 'Added SendGrid provider (app-configured)');
+            }
+            break;
+
+          default:
+            logger.warn({ appId, provider: appEmailConfig.provider }, 'Unknown provider type, using defaults');
+            break;
+        }
+      } else {
+        logger.debug({ appId }, 'No configured provider for app, using defaults');
+      }
+    } catch (error) {
+      logger.warn({ appId, error }, 'Failed to fetch app email config, using defaults');
     }
 
-    // SendGrid as fallback
-    if (config.SENDGRID_API_KEY) {
-      strategy.addProvider(new SendGridProvider(logger));
-      logger.info('Added SendGrid provider as fallback');
+    // Add fallback providers
+    // If no configured provider or missing credentials, add MainSMTP
+    if (!addedProviders.has('MainSMTPProvider')) {
+      if (config.SMTP_HOST && config.SMTP_PORT) {
+        strategy.addProvider(new MainSMTPProvider(logger));
+        addedProviders.add('MainSMTPProvider');
+        logger.info('Added Main SMTP provider (fallback)');
+      }
+    }
+
+    // Add SendGrid as final fallback
+    if (!addedProviders.has('SendGridProvider')) {
+      if (config.SENDGRID_API_KEY) {
+        strategy.addProvider(new SendGridProvider(logger));
+        addedProviders.add('SendGridProvider');
+        logger.info('Added SendGrid provider (fallback)');
+      }
     }
 
     return strategy;
