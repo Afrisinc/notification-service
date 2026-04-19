@@ -6,7 +6,6 @@ import { ApiResponseHelper } from '../utils';
 
 export class NotifyController {
   async sendNotification(request: FastifyRequest, reply: FastifyReply) {
-    console.log('Received send notification request with body:', request.body);
     try {
       const body = request.body as SendNotificationRequest;
       const accountId = request.headers['x-account-id'] as string;
@@ -21,8 +20,6 @@ export class NotifyController {
 
       const notification = await notifyService.sendNotification(accountId, body.app_id, body);
 
-      console.log('Notification created with ID:', notification);
-
       logger.info({ notificationId: notification.id, correlationId: request.id }, 'Notification sent successfully');
 
       // Track usage
@@ -32,7 +29,7 @@ export class NotifyController {
       ApiResponseHelper.accepted(reply, 'Notification queued for processing', {
         id: notification.id,
         status: notification.status,
-        channel: body.channel.toLowerCase(),
+        channel: body.channel,
         created_at: notification.createdAt,
       });
     } catch (error) {
@@ -125,7 +122,7 @@ export class NotifyController {
       }
 
       // Validate all notifications have app_id
-      if (body.notifications.some((n) => !n.app_id)) {
+      if (body.notifications.some((n: SendNotificationRequest) => !n.app_id)) {
         return ApiResponseHelper.badRequest(reply, 'All notifications must have app_id in request body');
       }
 

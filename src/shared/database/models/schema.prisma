@@ -1,7 +1,3 @@
-////////////////////////////////////////////////////////////
-// GENERATOR & DATASOURCE
-////////////////////////////////////////////////////////////
-
 generator client {
   provider = "prisma-client-js"
   previewFeatures = ["prismaSchemaFolder"]
@@ -127,8 +123,14 @@ enum CustomerDomainStatus {
   suspended
 }
 
-////////////////////////////////////////////////////////////
-// ==================== MODELS ====================
-////////////////////////////////////////////////////////////
-// Individual model files are in this directory
-// Prisma will automatically merge them with this schema
+enum GmailAuthMethod {
+  oauth2
+  app_password
+}
+
+enum EmailProvider {
+  gmail         
+  sendgrid       
+  notify          // Your own SMTP server
+  custom_domain   // Custom domain with DKIM/SPF/DMARC
+}

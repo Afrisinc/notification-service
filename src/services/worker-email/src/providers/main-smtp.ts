@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { EmailNotification, EmailProvider } from '@shared/common';
 import { getConfig } from '@shared/config';
 import { prismaRead } from '@shared/database';
+import { dkimService } from '../../../api/src/services/dkim.service';
 
 /**
  * Main SMTP Provider - Afrisinc's Primary Postfix Server
@@ -49,25 +50,51 @@ export class MainSMTPProvider implements EmailProvider {
       let fromEmail = config.FROM_EMAIL || config.SMTP_FROM || 'noreply@afrisinc.com';
       let fromName: string | undefined = undefined;
       let replyTo: string | undefined = undefined;
+      let dkimConfig: any = undefined;
+      let isCustomDomain = false;
 
       // Priority 1: Custom Domain (if app has one and it's verified)
       if (email.appId) {
         try {
-          const customDomain = await prismaRead.customerDomain.findFirst({
-            where: {
-              app_id: email.appId,
-              status: 'verified',
-            },
+          const customDomain = await prismaRead.appEmailProvider.findUnique({
+            where: { app_id: email.appId },
           });
 
-          if (customDomain) {
-            fromEmail = customDomain.from_email;
+          if (customDomain && customDomain.provider === 'custom_domain' && customDomain.domain_status === 'verified') {
+            isCustomDomain = true;
+            const domain = customDomain.domain;
+            const selector = customDomain.selector || 'afrisinc';
+
+            // Set FROM address: use from_email if set, else noreply@domain
+            fromEmail = customDomain.from_email || `noreply@${domain}`;
             fromName = customDomain.from_name || undefined;
-            replyTo = customDomain.from_email;
-            this.logger.debug(
-              { appId: email.appId, domain: customDomain.domain, from: fromEmail },
-              'Using custom domain for email'
-            );
+            replyTo = fromEmail;
+
+            this.logger.debug({ appId: email.appId, domain, from: fromEmail }, 'Using custom domain for email');
+
+            // Load and configure DKIM signing
+            try {
+              const result = await dkimService.getPrivateKey(domain!, selector);
+              const privateKey = result.key;
+
+              if (privateKey) {
+                dkimConfig = {
+                  domainName: domain,
+                  keySelector: selector,
+                  privateKey,
+                  cacheDir: false, // Disable caching to ensure fresh keys
+                };
+                this.logger.info({ domain, selector }, 'DKIM signing configured for custom domain');
+              } else {
+                this.logger.warn(
+                  { domain, selector, error: result.error },
+                  'Failed to load private key for DKIM signing - email will be sent without signature'
+                );
+              }
+            } catch (dkimError) {
+              const errorMsg = dkimError instanceof Error ? dkimError.message : String(dkimError);
+              this.logger.error({ domain, selector, error: errorMsg }, 'Exception while configuring DKIM signing');
+            }
           }
         } catch (customDomainError) {
           this.logger.warn(
@@ -78,13 +105,13 @@ export class MainSMTPProvider implements EmailProvider {
       }
 
       // Priority 2: App-specific email config (if no custom domain)
-      if (!replyTo && email.appId) {
+      if (!isCustomDomain && email.appId) {
         try {
-          const emailConfig = await prismaRead.appEmailConfig.findUnique({
+          const emailConfig = await prismaRead.appEmailProvider.findUnique({
             where: { app_id: email.appId },
           });
 
-          if (emailConfig) {
+          if (emailConfig && emailConfig.from_email) {
             fromEmail = emailConfig.from_email;
             fromName = emailConfig.from_name || undefined;
             this.logger.debug({ appId: email.appId, from: fromEmail }, 'Using app-specific email config');
@@ -110,12 +137,20 @@ export class MainSMTPProvider implements EmailProvider {
         mailOptions.replyTo = replyTo;
       }
 
-      this.logger.debug({ to: email.to, from: fromEmail, appId: email.appId }, 'Sending email via Main SMTP');
+      // Add DKIM signing if configured for custom domain
+      if (dkimConfig) {
+        mailOptions.dkim = dkimConfig;
+      }
+
+      this.logger.debug(
+        { to: email.to, from: fromEmail, appId: email.appId, hasDkim: !!dkimConfig },
+        'Sending email via Main SMTP'
+      );
 
       const result = await this.transporter.sendMail(mailOptions);
 
       this.logger.info(
-        { messageId: result.messageId, to: email.to, from: fromEmail },
+        { messageId: result.messageId, to: email.to, from: fromEmail, dkimSigned: !!dkimConfig },
         'Email sent successfully via Main SMTP'
       );
 

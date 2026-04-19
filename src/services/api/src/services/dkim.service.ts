@@ -1,201 +1,218 @@
-import { execSync } from 'child_process';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
+// @ts-expect-error ssh2 has no TypeScript definitions
+import { Client as SSHClient } from 'ssh2';
+import path from 'path';
+import fs from 'fs';
 import { logger } from '../config/logger';
+import { getConfig } from '@shared/config';
 
-interface DKIMKeyPair {
-  publicKey: string;
-  privateKeyPath: string;
-}
+const OPENDKIM_KEYS_DIR = '/etc/opendkim/keys';
+const SIGNING_TABLE = '/etc/opendkim/signing.table';
+const KEYS_TABLE = '/etc/opendkim/keys.table';
 
 export class DKIMService {
-  private readonly OPENDKIM_KEYS_DIR = '/etc/opendkim/keys';
-  private readonly SIGNING_TABLE_PATH = '/etc/opendkim/signing.table';
-  private readonly KEY_TABLE_PATH = '/etc/opendkim/key.table';
+  private async executeRemoteCommand(command: string): Promise<string> {
+    const config = getConfig();
+    const { MAIL_SERVER_HOST, MAIL_SERVER_PORT, MAIL_SERVER_USER, MAIL_SERVER_SSH_KEY, MAIL_SERVER_SSH_PASSWORD } =
+      config;
 
-  /**
-   * Generate a 2048-bit DKIM key pair for a domain
-   * Returns the public key and path to the private key
-   */
-  async generateKeyPair(domain: string, selector: string = 'afrisinc'): Promise<DKIMKeyPair> {
-    try {
-      const domainKeyDir = join(this.OPENDKIM_KEYS_DIR, domain);
+    if (!MAIL_SERVER_HOST) {
+      throw new Error('MAIL_SERVER_HOST not configured');
+    }
 
-      // Create directory
-      try {
-        mkdirSync(domainKeyDir, { recursive: true });
-      } catch (err) {
-        // Directory may already exist, continue
-      }
+    return new Promise((resolve, reject) => {
+      const conn = new SSHClient();
 
-      // Generate keys using opendkim-genkey
-      const cmd = `opendkim-genkey -b 2048 -d ${domain} -D ${domainKeyDir} -s ${selector} -v`;
+      conn.on('ready', () => {
+        conn.exec(command, (err: any, stream: any) => {
+          if (err) {
+            conn.end();
+            reject(err);
+            return;
+          }
 
-      try {
-        execSync(cmd, { stdio: 'pipe' });
-      } catch (error) {
-        logger.error({ error, domain, cmd }, 'Failed to generate DKIM keys');
-        throw new Error(`DKIM key generation failed for domain ${domain}`);
-      }
+          let stdout = '';
+          let stderr = '';
 
-      // Change ownership to opendkim user
-      try {
-        execSync(`chown -R opendkim:opendkim ${domainKeyDir}`);
-      } catch (error) {
-        logger.warn({ error }, 'Failed to change ownership to opendkim user');
-      }
+          stream.on('close', (code: number) => {
+            conn.end();
+            if (code === 0) {
+              resolve(stdout);
+            } else {
+              reject(new Error(`Command failed (exit ${code}): ${stderr || stdout}`));
+            }
+          });
 
-      // Read the public key from the generated .txt file
-      const publicKeyPath = join(domainKeyDir, `${selector}.txt`);
-      const publicKeyContent = readFileSync(publicKeyPath, 'utf-8');
+          stream.on('data', (data: Buffer) => {
+            stdout += data.toString();
+          });
 
-      // Extract the p= value from the public key
-      const publicKey = this.extractPublicKey(publicKeyContent);
+          stream.stderr.on('data', (data: Buffer) => {
+            stderr += data.toString();
+          });
+        });
+      });
 
-      // Private key path for storage in database
-      const privateKeyPath = join(domainKeyDir, `${selector}.private`);
+      conn.on('error', reject);
 
-      return {
-        publicKey,
-        privateKeyPath,
+      const sshConfig: any = {
+        host: MAIL_SERVER_HOST,
+        port: MAIL_SERVER_PORT || 22,
+        username: MAIL_SERVER_USER || 'root',
       };
-    } catch (error) {
-      logger.error({ error, domain }, 'DKIM key generation error');
-      throw error;
-    }
-  }
 
-  /**
-   * Extract the p= value from OpenDKIM public key file
-   */
-  private extractPublicKey(keyContent: string): string {
-    const match = keyContent.match(/p=([^;]+)/);
-    if (!match || !match[1]) {
-      throw new Error('Failed to extract public key from DKIM key file');
-    }
-    return match[1].trim();
-  }
-
-  /**
-   * Add domain to OpenDKIM signing table
-   */
-  async addToSigningTable(domain: string, selector: string, privateKeyPath: string): Promise<void> {
-    try {
-      // Read current signing table
-      let content = '';
-      try {
-        content = readFileSync(this.SIGNING_TABLE_PATH, 'utf-8');
-      } catch (error) {
-        // File may not exist, continue with empty content
-        logger.info('Signing table does not exist, creating new');
-      }
-
-      // Check if domain already exists in the file
-      const domainPattern = new RegExp(`^\\*@${domain.replace(/\./g, '\\.')}\\s`, 'm');
-      if (domainPattern.test(content)) {
-        logger.info({ domain }, 'Domain already in signing table');
+      if (MAIL_SERVER_SSH_KEY) {
+        sshConfig.privateKey = fs.readFileSync(MAIL_SERVER_SSH_KEY);
+      } else if (MAIL_SERVER_SSH_PASSWORD) {
+        sshConfig.password = MAIL_SERVER_SSH_PASSWORD;
+      } else {
+        reject(new Error('SSH authentication not configured'));
         return;
       }
 
-      // Append new entry
-      const entry = `*@${domain}    ${domain}:${selector}:${privateKeyPath}\n`;
-      writeFileSync(this.SIGNING_TABLE_PATH, content + entry);
+      conn.connect(sshConfig);
+    });
+  }
 
-      logger.info({ domain }, 'Added domain to signing table');
+  async generateKeyPair(
+    domain: string,
+    selector: string = 'default'
+  ): Promise<{ publicKey: string; privateKeyPath: string }> {
+    try {
+      const domainDir = path.posix.join(OPENDKIM_KEYS_DIR, domain);
+      const privateKeyPath = path.posix.join(domainDir, `${selector}.private`);
+
+      await this.executeRemoteCommand(`sudo mkdir -p ${domainDir}`);
+      await this.executeRemoteCommand(`sudo opendkim-genkey -b 2048 -d ${domain} -s ${selector} -D ${domainDir}`);
+
+      try {
+        await this.executeRemoteCommand(`sudo chown -R opendkim:opendkim ${domainDir}`);
+        await this.executeRemoteCommand(`sudo chmod -R 770 ${domainDir}`);
+      } catch (chownError) {
+        logger.warn({ domain }, 'Could not change directory ownership');
+      }
+
+      logger.info({ domain, selector }, 'DKIM key pair generated via SSH');
+
+      const publicKeyPath = path.posix.join(domainDir, `${selector}.txt`);
+      const publicKeyContent = await this.executeRemoteCommand(`sudo cat ${publicKeyPath}`);
+
+      logger.debug({ contentLength: publicKeyContent.length }, 'Raw public key file content');
+
+      // Extract clean DKIM record: v=DKIM1; ... p=<key>
+      // Zone file format: afrisinc._domainkey IN TXT ( "v=DKIM1..." "p=..." ) ; comment
+      // Extract just the content between quotes, removing tabs and line breaks
+      const publicKey = publicKeyContent
+        .replace(/.*\(\s*/g, '') // Remove opening parenthesis
+        .replace(/\s*\).*$/g, '') // Remove closing parenthesis and comment
+        .replace(/"\s*"/g, '') // Remove quote separators
+        .replace(/"/g, '') // Remove all quotes
+        .replace(/\t/g, '') // Remove tabs
+        .replace(/\n/g, '') // Remove newlines
+        .trim();
+
+      logger.info({ domain, selector, keyLength: publicKey.length }, 'Public key extracted');
+
+      if (!publicKey || !publicKey.includes('v=DKIM1')) {
+        throw new Error(`Failed to extract valid DKIM key (got: ${publicKey.substring(0, 50)}...)`);
+      }
+
+      return { publicKey, privateKeyPath };
     } catch (error) {
-      logger.error({ error, domain }, 'Failed to add domain to signing table');
-      throw error;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error({ error: errorMessage, domain, selector }, 'Failed to generate DKIM keys');
+      throw new Error(`DKIM key generation failed: ${errorMessage}`);
     }
   }
 
-  /**
-   * Add domain to OpenDKIM key table
-   */
-  async addToKeyTable(domain: string, selector: string, privateKeyPath: string): Promise<void> {
+  async addToSigningTable(domain: string): Promise<void> {
     try {
-      // Read current key table
-      let content = '';
-      try {
-        content = readFileSync(this.KEY_TABLE_PATH, 'utf-8');
-      } catch (error) {
-        // File may not exist, continue
-        logger.info('Key table does not exist, creating new');
-      }
+      const entry = `*@${domain} ${domain}`;
+      const checkCmd = `sudo grep -q "*@${domain}" ${SIGNING_TABLE} 2>/dev/null && echo exists || echo not_exists`;
+      const result = await this.executeRemoteCommand(checkCmd);
 
-      // Check if domain already exists
-      const domainKeyPattern = new RegExp(`^${domain.replace(/\./g, '\\.')}:${selector}\\s`, 'm');
-      if (domainKeyPattern.test(content)) {
-        logger.info({ domain }, 'Domain already in key table');
+      if (result.includes('exists')) {
+        logger.debug({ domain }, 'Domain already in signing table');
         return;
       }
 
-      // Append new entry
-      const entry = `${domain}:${selector}    ${domain}:${selector}:${privateKeyPath}\n`;
-      writeFileSync(this.KEY_TABLE_PATH, content + entry);
-
-      logger.info({ domain }, 'Added domain to key table');
+      await this.executeRemoteCommand(`echo '${entry}' | sudo tee -a ${SIGNING_TABLE}`);
+      logger.info({ domain }, 'Domain added to signing table');
     } catch (error) {
-      logger.error({ error, domain }, 'Failed to add domain to key table');
-      throw error;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error({ error: errorMessage, domain }, 'Failed to add to signing table');
+      throw new Error(`Could not add to signing table: ${errorMessage}`);
     }
   }
 
-  /**
-   * Remove domain from OpenDKIM signing and key tables
-   */
-  async removeFromDKIMTables(domain: string, selector: string = 'afrisinc'): Promise<void> {
+  async addToKeysTable(domain: string, selector: string = 'default'): Promise<void> {
     try {
-      // Remove from signing table
-      try {
-        let signingContent = readFileSync(this.SIGNING_TABLE_PATH, 'utf-8');
-        const domainPattern = new RegExp(`^\\*@${domain.replace(/\./g, '\\.')}.*\n?`, 'm');
-        signingContent = signingContent.replace(domainPattern, '');
-        writeFileSync(this.SIGNING_TABLE_PATH, signingContent);
-        logger.info({ domain }, 'Removed domain from signing table');
-      } catch (error) {
-        logger.warn({ error, domain }, 'Failed to remove from signing table');
+      const entry = `${domain} ${domain}:${selector}:/etc/opendkim/keys/${domain}/${selector}.private`;
+      const checkCmd = `sudo grep -q "${domain}" ${KEYS_TABLE} 2>/dev/null && echo exists || echo not_exists`;
+      const result = await this.executeRemoteCommand(checkCmd);
+
+      if (result.includes('exists')) {
+        logger.debug({ domain }, 'Domain already in keys table');
+        return;
       }
 
-      // Remove from key table
-      try {
-        let keyContent = readFileSync(this.KEY_TABLE_PATH, 'utf-8');
-        const keyPattern = new RegExp(`^${domain.replace(/\./g, '\\.')}:${selector}.*\n?`, 'm');
-        keyContent = keyContent.replace(keyPattern, '');
-        writeFileSync(this.KEY_TABLE_PATH, keyContent);
-        logger.info({ domain }, 'Removed domain from key table');
-      } catch (error) {
-        logger.warn({ error, domain }, 'Failed to remove from key table');
-      }
+      await this.executeRemoteCommand(`echo '${entry}' | sudo tee -a ${KEYS_TABLE}`);
+      logger.info({ domain }, 'Domain added to keys table');
     } catch (error) {
-      logger.error({ error, domain }, 'Failed to remove domain from DKIM tables');
-      throw error;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error({ error: errorMessage, domain }, 'Failed to add to keys table');
+      throw new Error(`Could not add to keys table: ${errorMessage}`);
     }
   }
 
-  /**
-   * Reload OpenDKIM service
-   */
   async reloadOpenDKIM(): Promise<void> {
     try {
-      execSync('systemctl reload opendkim', { stdio: 'pipe' });
+      await this.executeRemoteCommand('sudo systemctl reload opendkim');
       logger.info('OpenDKIM reloaded successfully');
     } catch (error) {
-      logger.error({ error }, 'Failed to reload OpenDKIM');
-      throw new Error('Failed to reload OpenDKIM service');
+      logger.warn({ error }, 'OpenDKIM reload failed');
     }
   }
 
-  /**
-   * Delete DKIM keys from server
-   */
+  async removeFromDKIMTables(domain: string): Promise<void> {
+    try {
+      await this.executeRemoteCommand(`sudo sed -i '/*@${domain}/d' ${SIGNING_TABLE} 2>/dev/null || true`);
+      await this.executeRemoteCommand(`sudo sed -i '/${domain}/d' ${KEYS_TABLE} 2>/dev/null || true`);
+      logger.info({ domain }, 'Domain removed from OpenDKIM tables');
+    } catch (error) {
+      logger.warn({ domain }, 'Failed to remove from OpenDKIM tables');
+    }
+  }
+
   async deleteKeys(domain: string): Promise<void> {
     try {
-      const domainKeyDir = join(this.OPENDKIM_KEYS_DIR, domain);
-      execSync(`rm -rf ${domainKeyDir}`);
+      const domainDir = path.posix.join(OPENDKIM_KEYS_DIR, domain);
+      await this.executeRemoteCommand(`sudo rm -rf ${domainDir}`);
       logger.info({ domain }, 'DKIM keys deleted');
     } catch (error) {
-      logger.error({ error, domain }, 'Failed to delete DKIM keys');
-      throw error;
+      logger.warn({ domain }, 'Failed to delete keys');
+    }
+  }
+
+  async getPublicKey(domain: string, selector: string = 'default'): Promise<string | null> {
+    try {
+      const publicKeyPath = path.posix.join(OPENDKIM_KEYS_DIR, domain, `${selector}.txt`);
+      return await this.executeRemoteCommand(`sudo cat ${publicKeyPath}`);
+    } catch {
+      return null;
+    }
+  }
+
+  async getPrivateKey(domain: string, selector: string = 'default'): Promise<{ key: string | null; error?: string }> {
+    try {
+      const privateKeyPath = path.posix.join(OPENDKIM_KEYS_DIR, domain, `${selector}.private`);
+      logger.debug({ domain, selector, path: privateKeyPath }, 'Fetching private key');
+      const key = await this.executeRemoteCommand(`sudo cat ${privateKeyPath}`);
+      logger.info({ domain, selector }, 'Private key fetched successfully');
+      return { key };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error({ domain, selector, error: errorMsg }, 'Failed to fetch private key');
+      return { key: null, error: errorMsg };
     }
   }
 }

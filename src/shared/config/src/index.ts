@@ -77,6 +77,39 @@ const EnvSchema = z.object({
   // Assets Service Configuration (for file uploads)
   ASSETS_API_URL: z.string().default('http://localhost:8080'),
   ASSETS_API_KEY: z.string().default('dev-api-key'),
+
+  // SMS Provider Configuration
+  // Africa's Talking
+  AFRICAS_TALKING_API_KEY: z.string().optional(),
+  AFRICAS_TALKING_USERNAME: z.string().optional(),
+  AFRICAS_TALKING_SENDER_ID: z.string().optional(),
+
+  // Twilio
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  TWILIO_PHONE_NUMBER: z.string().optional(),
+  TWILIO_MAX_PRICE: z.string().optional(),
+  TWILIO_VALIDITY_PERIOD: z.string().optional(),
+
+  // Vonage/Nexmo
+  VONAGE_API_KEY: z.string().optional(),
+  VONAGE_API_SECRET: z.string().optional(),
+  VONAGE_SENDER_ID: z.string().optional(),
+
+  // Database Encryption
+  DATABASE_ENCRYPTION_KEY: z.string().optional(),
+
+  // Google OAuth Configuration
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_REDIRECT_URI: z.string().optional(),
+
+  // Mail Server SSH Configuration (for DKIM key generation)
+  MAIL_SERVER_HOST: z.string().optional(),
+  MAIL_SERVER_PORT: z.coerce.number().optional().default(22),
+  MAIL_SERVER_USER: z.string().optional().default('root'),
+  MAIL_SERVER_SSH_KEY: z.string().optional(),
+  MAIL_SERVER_SSH_PASSWORD: z.string().optional(),
 });
 
 export type Environment = z.infer<typeof EnvSchema>;

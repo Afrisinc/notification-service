@@ -26,161 +26,153 @@ const accountService = new AccountService();
 
 export class AuthService {
   async register(data: SignupPayload) {
-    try {
-      const existing = await userRepo.findByEmail(data.email);
-      if (existing) {
-        throw new Error('Email already exists');
+    const existing = await userRepo.findByEmail(data.email);
+    if (existing) {
+      throw new Error('Email already exists');
+    }
+
+    // Validate company account requirements
+    if (data.account_type === 'company') {
+      if (!data.organizationName || !data.companyEmail) {
+        throw new Error('organizationName and companyEmail are required for company accounts');
       }
+    }
 
-      // Validate company account requirements
-      if (data.account_type === 'company') {
-        if (!data.organizationName || !data.companyEmail) {
-          throw new Error('organizationName and companyEmail are required for company accounts');
-        }
-      }
+    const hashed = await hashPassword(data.password);
 
-      const hashed = await hashPassword(data.password);
-
-      // Create user and account(s) based on account_type
-      const result = await prismaWrite.$transaction(async (tx) => {
-        const user = await tx.user.create({
-          data: {
-            email: data.email,
-            password_hash: hashed,
-            firstName: data.firstName,
-            lastName: data.lastName,
-            phone: data.phone,
-            location: data.location,
-            status: 'ACTIVE',
-          },
-        });
-
-        if (data.account_type === 'personal') {
-          // Create personal organization
-          const personalOrg = await tx.organization.create({
-            data: {
-              name: 'Personal',
-              slug: `personal-${user.id.slice(0, 8)}`,
-            },
-          });
-
-          // Create individual account linked to personal organization
-          const account = await tx.account.create({
-            data: {
-              type: 'INDIVIDUAL',
-              owner_user_id: user.id,
-              organization_id: personalOrg.id,
-            },
-          });
-
-          // Add user as OWNER member of the personal organization
-          await tx.organizationMember.create({
-            data: {
-              organization_id: personalOrg.id,
-              user_id: user.id,
-              role: 'OWNER',
-            },
-          });
-
-          return { user, account };
-        } else if (data.account_type === 'company') {
-          // Create organization for company accounts
-          const organization = await tx.organization.create({
-            data: {
-              name: data.organizationName,
-              org_email: data.companyEmail,
-              location: data.location,
-            },
-          });
-
-          // Create organization account linked to the organization
-          const account = await tx.account.create({
-            data: {
-              type: 'ORGANIZATION',
-              owner_user_id: user.id,
-              organization_id: organization.id,
-            },
-          });
-
-          // Add user as OWNER member of the organization
-          await tx.organizationMember.create({
-            data: {
-              organization_id: organization.id,
-              user_id: user.id,
-              role: 'OWNER',
-            },
-          });
-
-          return { user, account, organization };
-        }
-
-        throw new Error('Invalid account_type');
+    // Create user and account(s) based on account_type
+    const result = await prismaWrite.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email: data.email,
+          password_hash: hashed,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phone: data.phone,
+          location: data.location,
+          status: 'ACTIVE',
+        },
       });
 
-      // Create subscription with selected plan or default to FREE
-      if (result.account) {
-        const plan = data.plan || 'FREE';
-        await accountService.createSubscription(result.account.id, plan);
-      }
-
-      // Publish email verification message to notify service
-      try {
-        // Generate verification token and URL
-        console.log('User registered successfully:', { userId: result.user.id, email: result });
-
-        const verificationToken = generateResetToken(result.user.id, result.user.email);
-        const verificationUrl = `${env.WEBAPP_URL}/verify-email?token=${verificationToken}`;
-
-        // Publish verification email notification via queue
-        const queuePublisher = getQueuePublisher();
-        const notificationId = `verify-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-
-        await queuePublisher.publish({
-          notificationId,
-          tenantId: result.account.id,
-          channel: NOTIFICATION_CHANNELS.EMAIL as 'EMAIL',
-          recipient: result.user.email,
-          templateCode: NOTIFICATION_TEMPLATES.AUTH_VERIFY_EMAIL,
-          templateId: env.VERIFY_EMAIL_TEMPLATE_ID,
-          appId: env.SYSTEM_APP_ID,
-          payload: {
-            firstName: result.user.firstName,
-            verificationUrl,
-            companyName: env.COMPANY_NAME,
-            supportEmail: env.SUPPORT_EMAIL,
+      if (data.account_type === 'personal') {
+        // Create personal organization
+        const personalOrg = await tx.organization.create({
+          data: {
+            name: 'Personal',
+            slug: `personal-${user.id.slice(0, 8)}`,
           },
-          priority: 'HIGH',
-          timestamp: new Date(),
         });
 
-        logger.info({ userId: result.user.id, email: result.user.email }, 'Verification email published');
-      } catch (emailError) {
-        // Log but don't block registration - user can request verification email again
-        const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
-        logger.warn({ error: errorMessage, userId: result.user.id }, 'Failed to publish verification email');
+        // Create individual account linked to personal organization
+        const account = await tx.account.create({
+          data: {
+            type: 'INDIVIDUAL',
+            owner_user_id: user.id,
+            organization_id: personalOrg.id,
+          },
+        });
+
+        // Add user as OWNER member of the personal organization
+        await tx.organizationMember.create({
+          data: {
+            organization_id: personalOrg.id,
+            user_id: user.id,
+            role: 'OWNER',
+          },
+        });
+
+        return { user, account };
+      } else if (data.account_type === 'company') {
+        // Create organization for company accounts
+        const organization = await tx.organization.create({
+          data: {
+            name: data.organizationName,
+            org_email: data.companyEmail,
+            location: data.location,
+          },
+        });
+
+        // Create organization account linked to the organization
+        const account = await tx.account.create({
+          data: {
+            type: 'ORGANIZATION',
+            owner_user_id: user.id,
+            organization_id: organization.id,
+          },
+        });
+
+        // Add user as OWNER member of the organization
+        await tx.organizationMember.create({
+          data: {
+            organization_id: organization.id,
+            user_id: user.id,
+            role: 'OWNER',
+          },
+        });
+
+        return { user, account, organization };
       }
-      console.log('User registered successfully:', { userId: result.user.id, email: result });
-      const token = generateBaseToken(result.user.id, result.user.email, [result.account.id]);
 
-      const response: any = {
-        user_id: result.user.id,
-        account_id: result.account.id,
-        email: result.user.email,
-        firstName: result.user.firstName,
-        lastName: result.user.lastName,
-        token,
-      };
+      throw new Error('Invalid account_type');
+    });
 
-      if (result.organization) {
-        response.organization_id = result.organization.id;
-        response.organization_name = result.organization.name;
-      }
-
-      return response;
-    } catch (error) {
-      console.error('❌ Registration error:', error);
-      throw error;
+    // Create subscription with selected plan or default to FREE
+    if (result.account) {
+      const plan = data.plan || 'FREE';
+      await accountService.createSubscription(result.account.id, plan);
     }
+
+    // Publish email verification message to notify service
+    try {
+      // Generate verification token and URL
+      const verificationToken = generateResetToken(result.user.id, result.user.email);
+      const verificationUrl = `${env.WEBAPP_URL}/verify-email?token=${verificationToken}`;
+
+      // Publish verification email notification via queue
+      const queuePublisher = getQueuePublisher();
+      const notificationId = `verify-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+
+      await queuePublisher.publish({
+        notificationId,
+        tenantId: result.account.id,
+        channel: NOTIFICATION_CHANNELS.EMAIL as 'EMAIL',
+        recipient: result.user.email,
+        templateCode: NOTIFICATION_TEMPLATES.AUTH_VERIFY_EMAIL,
+        templateId: env.VERIFY_EMAIL_TEMPLATE_ID,
+        appId: env.SYSTEM_APP_ID,
+        payload: {
+          firstName: result.user.firstName,
+          verificationUrl,
+          companyName: env.COMPANY_NAME,
+          supportEmail: env.SUPPORT_EMAIL,
+        },
+        priority: 'HIGH',
+        timestamp: new Date(),
+      });
+
+      logger.info({ userId: result.user.id, email: result.user.email }, 'Verification email published');
+    } catch (emailError) {
+      // Log but don't block registration - user can request verification email again
+      const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
+      logger.warn({ error: errorMessage, userId: result.user.id }, 'Failed to publish verification email');
+    }
+    const token = generateBaseToken(result.user.id, result.user.email, [result.account.id]);
+
+    const response: any = {
+      user_id: result.user.id,
+      account_id: result.account.id,
+      email: result.user.email,
+      firstName: result.user.firstName,
+      lastName: result.user.lastName,
+      token,
+    };
+
+    if (result.organization) {
+      response.organization_id = result.organization.id;
+      response.organization_name = result.organization.name;
+    }
+
+    return response;
   }
 
   async login(data: LoginUserRequest, ipAddress?: string) {
@@ -364,10 +356,7 @@ export class AuthService {
       throw new Error('Invalid token payload');
     }
 
-    console.log('Decoded token data:', userData);
-
     const user = await userRepo.findById(userId, true);
-    console.log('Found user:', user);
 
     if (!user) {
       throw new Error('User not found');

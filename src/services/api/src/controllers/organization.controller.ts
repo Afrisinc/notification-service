@@ -331,10 +331,6 @@ export class OrganizationController {
       const userId = (request as any).user?.id;
       const body = request.body as any;
 
-      console.log('Update organization request body:', body);
-      console.log('User ID from request:', userId);
-      console.log('Organization ID from request:', orgId);
-
       if (!userId) {
         return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
       }

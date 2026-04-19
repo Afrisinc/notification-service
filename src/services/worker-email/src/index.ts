@@ -14,7 +14,7 @@ async function startEmailWorker() {
     const config = getConfig();
     const rabbitmqUrl = config.RABBITMQ_URL || 'amqp://admin:password@localhost:5672';
     const exchangeName = 'notifications';
-    const routingKey = 'send_message';
+    const routingKey = 'send_message.email';
     const queueName = 'notifications.email';
 
     // Connect to database

@@ -1,0 +1,43 @@
+model AppEmailProvider {
+  id                   String                   @id @default(uuid())
+  app_id               String                   @unique
+  provider             EmailProvider            @default(notify)
+  method               GmailAuthMethod?         // oauth2 or app_password (for Gmail only)
+  is_active            Boolean                  @default(true)
+
+  // Simple Sender Config
+  from_email           String?
+  from_name            String?
+  reply_to_email       String?
+  reply_to_name        String?
+
+  // Gmail OAuth2 & App Password
+  gmail_email          String?
+  gmail_auth_method    String?                  // 'oauth2' | 'app_password'
+  oauth_access_token   String?                  // encrypted
+  oauth_refresh_token  String?                  // encrypted
+  oauth_token_expiry   DateTime?
+  app_password         String?                  // encrypted (for app password method)
+
+  // Custom Domain (DKIM, SPF, DMARC)
+  domain               String?
+  domain_status        CustomerDomainStatus     @default(pending)
+  domain_verified_at   DateTime?
+  selector             String?                  @default("afrisinc")
+  public_key           String?
+  private_key_path     String?
+  spf_verified         Boolean                  @default(false)
+  dkim_verified        Boolean                  @default(false)
+  dmarc_verified       Boolean                  @default(false)
+
+  // Timestamps
+  created_at           DateTime                 @default(now())
+  updated_at           DateTime                 @updatedAt
+
+  // Relations
+  app                  App                      @relation(fields: [app_id], references: [id], onDelete: Cascade)
+
+  @@index([app_id])
+  @@index([method])
+  @@map("app_email_providers")
+}
