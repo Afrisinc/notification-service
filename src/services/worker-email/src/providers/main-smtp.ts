@@ -70,14 +70,11 @@ export class MainSMTPProvider implements EmailProvider {
             fromName = customDomain.from_name || undefined;
             replyTo = fromEmail;
 
-            this.logger.debug(
-              { appId: email.appId, domain, from: fromEmail },
-              'Using custom domain for email'
-            );
+            this.logger.debug({ appId: email.appId, domain, from: fromEmail }, 'Using custom domain for email');
 
             // Load and configure DKIM signing
             try {
-              const result = await dkimService.getPrivateKey(domain, selector);
+              const result = await dkimService.getPrivateKey(domain!, selector);
               const privateKey = result.key;
 
               if (privateKey) {
@@ -87,10 +84,7 @@ export class MainSMTPProvider implements EmailProvider {
                   privateKey,
                   cacheDir: false, // Disable caching to ensure fresh keys
                 };
-                this.logger.info(
-                  { domain, selector },
-                  'DKIM signing configured for custom domain'
-                );
+                this.logger.info({ domain, selector }, 'DKIM signing configured for custom domain');
               } else {
                 this.logger.warn(
                   { domain, selector, error: result.error },
@@ -99,10 +93,7 @@ export class MainSMTPProvider implements EmailProvider {
               }
             } catch (dkimError) {
               const errorMsg = dkimError instanceof Error ? dkimError.message : String(dkimError);
-              this.logger.error(
-                { domain, selector, error: errorMsg },
-                'Exception while configuring DKIM signing'
-              );
+              this.logger.error({ domain, selector, error: errorMsg }, 'Exception while configuring DKIM signing');
             }
           }
         } catch (customDomainError) {

@@ -140,16 +140,15 @@ export class AppEmailProviderService {
 
       // Encrypt tokens before storing
       const encryptedAccessToken = encrypt(tokens.access_token);
-      const encryptedRefreshToken = tokens.refresh_token ? encrypt(tokens.refresh_token) : undefined;
       const tokenExpiry = new Date(Date.now() + tokens.expires_in * 1000);
 
-      // Store configuration
-      const emailConfig = await AppEmailProviderRepository.upsert(appId, {
+      // Build update data - only include refresh_token if provided
+      // (Google only sends refresh_token on first auth, not on re-auth or token refresh)
+      const updateData: any = {
         provider: 'gmail',
         method: 'oauth2',
         gmail_email: userInfo.email,
         oauth_access_token: encryptedAccessToken,
-        oauth_refresh_token: encryptedRefreshToken,
         oauth_token_expiry: tokenExpiry,
         is_active: true,
         // Clear other fields
@@ -164,7 +163,18 @@ export class AppEmailProviderService {
         spf_verified: false,
         dkim_verified: false,
         dmarc_verified: false,
-      });
+      };
+
+      // Only update refresh_token if provided (Google doesn't send on re-auth)
+      if (tokens.refresh_token) {
+        updateData.oauth_refresh_token = encrypt(tokens.refresh_token);
+        logger.debug({ appId }, 'Storing new refresh token');
+      } else {
+        logger.debug({ appId }, 'No new refresh token in response, keeping existing one');
+      }
+
+      // Store configuration
+      const emailConfig = await AppEmailProviderRepository.upsert(appId, updateData);
 
       logger.info({ appId, gmailEmail: userInfo.email }, 'Gmail OAuth2 configured');
 
@@ -388,10 +398,7 @@ export class AppEmailProviderService {
       const dkimVerified = await dnsVerifyService.verifyDKIM(selector, domain);
       const dmarcVerified = await dnsVerifyService.verifyDMARC(domain);
 
-      logger.info(
-        { domain, spfVerified, dkimVerified, dmarcVerified },
-        'DNS verification completed'
-      );
+      logger.info({ domain, spfVerified, dkimVerified, dmarcVerified }, 'DNS verification completed');
 
       // Update database with verification results
       await prismaWrite.appEmailProvider.update({

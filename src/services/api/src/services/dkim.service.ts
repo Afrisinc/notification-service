@@ -1,6 +1,7 @@
 // @ts-expect-error ssh2 has no TypeScript definitions
 import { Client as SSHClient } from 'ssh2';
 import path from 'path';
+import fs from 'fs';
 import { logger } from '../config/logger';
 import { getConfig } from '@shared/config';
 
@@ -11,7 +12,8 @@ const KEYS_TABLE = '/etc/opendkim/keys.table';
 export class DKIMService {
   private async executeRemoteCommand(command: string): Promise<string> {
     const config = getConfig();
-    const { MAIL_SERVER_HOST, MAIL_SERVER_PORT, MAIL_SERVER_USER, MAIL_SERVER_SSH_KEY, MAIL_SERVER_SSH_PASSWORD } = config;
+    const { MAIL_SERVER_HOST, MAIL_SERVER_PORT, MAIL_SERVER_USER, MAIL_SERVER_SSH_KEY, MAIL_SERVER_SSH_PASSWORD } =
+      config;
 
     if (!MAIL_SERVER_HOST) {
       throw new Error('MAIL_SERVER_HOST not configured');
@@ -59,7 +61,6 @@ export class DKIMService {
       };
 
       if (MAIL_SERVER_SSH_KEY) {
-        const fs = require('fs');
         sshConfig.privateKey = fs.readFileSync(MAIL_SERVER_SSH_KEY);
       } else if (MAIL_SERVER_SSH_PASSWORD) {
         sshConfig.password = MAIL_SERVER_SSH_PASSWORD;
@@ -72,7 +73,10 @@ export class DKIMService {
     });
   }
 
-  async generateKeyPair(domain: string, selector: string = 'default'): Promise<{ publicKey: string; privateKeyPath: string }> {
+  async generateKeyPair(
+    domain: string,
+    selector: string = 'default'
+  ): Promise<{ publicKey: string; privateKeyPath: string }> {
     try {
       const domainDir = path.posix.join(OPENDKIM_KEYS_DIR, domain);
       const privateKeyPath = path.posix.join(domainDir, `${selector}.private`);
@@ -97,7 +101,7 @@ export class DKIMService {
       // Extract clean DKIM record: v=DKIM1; ... p=<key>
       // Zone file format: afrisinc._domainkey IN TXT ( "v=DKIM1..." "p=..." ) ; comment
       // Extract just the content between quotes, removing tabs and line breaks
-      let publicKey = publicKeyContent
+      const publicKey = publicKeyContent
         .replace(/.*\(\s*/g, '') // Remove opening parenthesis
         .replace(/\s*\).*$/g, '') // Remove closing parenthesis and comment
         .replace(/"\s*"/g, '') // Remove quote separators

@@ -14,7 +14,7 @@ async function startSMSWorker() {
     const config = getConfig();
     const rabbitmqUrl = config.RABBITMQ_URL || 'amqp://admin:password@localhost:5672';
     const exchangeName = 'notifications';
-    const routingKey = 'send_message';
+    const routingKey = 'send_message.sms';
     const queueName = 'notifications.sms';
 
     // Connect to database

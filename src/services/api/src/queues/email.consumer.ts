@@ -18,7 +18,7 @@ import { prismaWrite, prismaRead } from '@shared/database';
 const QUEUE_CONFIG = {
   QUEUE_NAME: 'notifications.email',
   EXCHANGE_NAME: 'notifications',
-  ROUTING_KEY: 'send_message',
+  ROUTING_KEY: 'send_message.email',
 };
 
 /**

@@ -15,6 +15,12 @@ export class SMSProcessor {
 
   async process(sms: any): Promise<void> {
     try {
+      // Filter out non-SMS messages (EMAIL, PUSH, etc.)
+      if (sms.channel && sms.channel !== 'SMS') {
+        this.logger.debug({ channel: sms.channel, notificationId: sms.notificationId }, 'Ignoring non-SMS message');
+        return;
+      }
+
       // Map incoming message format to SMS notification
       const smsId = sms.notificationId || sms.id;
       const smsTo = sms.to || sms.recipient;

@@ -9,4 +9,4 @@
  * - Uses multi-provider strategy for cost optimization
  */
 
-require('./index');
+import './index';

@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { EmailNotification, EmailProvider } from '@shared/common';
 import { prismaRead, prismaWrite } from '@shared/database';
 import { decrypt, encrypt } from '@shared/utils/encryption';
+import { getConfig } from '@shared/config';
 
 /**
  * Gmail Email Provider
@@ -35,12 +36,40 @@ export class GmailProvider implements EmailProvider {
 
       if (emailProvider.method === 'oauth2') {
         // OAuth2 authentication
+        const config = getConfig();
+
+        this.logger.debug(
+          {
+            appId: email.appId,
+            hasClientId: !!config.GOOGLE_CLIENT_ID,
+            hasClientSecret: !!config.GOOGLE_CLIENT_SECRET,
+          },
+          'Checking OAuth2 config'
+        );
+
+        if (!config.GOOGLE_CLIENT_ID || !config.GOOGLE_CLIENT_SECRET) {
+          throw new Error('Google OAuth2 credentials not configured on server (GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET)');
+        }
+
+        this.logger.debug(
+          {
+            appId: email.appId,
+            hasRefreshToken: !!emailProvider.oauth_refresh_token,
+            hasAccessToken: !!emailProvider.oauth_access_token,
+          },
+          'Checking stored tokens'
+        );
+
+        if (!emailProvider.oauth_refresh_token) {
+          throw new Error('Gmail OAuth2 refresh token is missing');
+        }
+
         let accessToken = emailProvider.oauth_access_token;
 
         // Check if token is expired and refresh if needed
         if (emailProvider.oauth_token_expiry && new Date() >= emailProvider.oauth_token_expiry) {
-          this.logger.debug({ appId: email.appId }, 'Gmail OAuth2 token expired, refreshing...');
-          const refreshedToken = await this.refreshOAuth2Token(email.appId, emailProvider.oauth_refresh_token || '');
+          this.logger.info({ appId: email.appId }, 'Gmail OAuth2 token expired, refreshing...');
+          const refreshedToken = await this.refreshOAuth2Token(email.appId, emailProvider.oauth_refresh_token);
           accessToken = refreshedToken;
         }
 
@@ -48,16 +77,44 @@ export class GmailProvider implements EmailProvider {
           throw new Error('Gmail OAuth2 access token is missing');
         }
 
-        const decryptedToken = decrypt(accessToken);
+        let decryptedAccessToken: string;
+        let decryptedRefreshToken: string;
+
+        try {
+          decryptedAccessToken = decrypt(accessToken);
+          decryptedRefreshToken = decrypt(emailProvider.oauth_refresh_token);
+
+          this.logger.debug(
+            {
+              appId: email.appId,
+              accessTokenLength: decryptedAccessToken.length,
+              refreshTokenLength: decryptedRefreshToken.length,
+              accessTokenStart: decryptedAccessToken.substring(0, 20),
+            },
+            'Tokens decrypted successfully'
+          );
+        } catch (decryptError) {
+          const msg = decryptError instanceof Error ? decryptError.message : String(decryptError);
+          this.logger.error({ appId: email.appId, error: msg }, 'Failed to decrypt OAuth2 tokens');
+          throw new Error(`Token decryption failed: ${msg}`);
+        }
 
         transporter = nodemailer.createTransport({
           service: 'gmail',
           auth: {
             type: 'OAuth2',
             user: emailProvider.gmail_email,
-            accessToken: decryptedToken,
+            clientId: config.GOOGLE_CLIENT_ID,
+            clientSecret: config.GOOGLE_CLIENT_SECRET,
+            refreshToken: decryptedRefreshToken,
+            accessToken: decryptedAccessToken,
           },
         } as any);
+
+        this.logger.info(
+          { appId: email.appId, gmailEmail: emailProvider.gmail_email, user: emailProvider.gmail_email },
+          'Gmail OAuth2 transport configured with tokens'
+        );
       } else if (emailProvider.method === 'app_password') {
         // App password authentication
         if (!emailProvider.app_password) {
