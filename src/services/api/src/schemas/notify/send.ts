@@ -17,8 +17,8 @@
 
 export const sendNotificationRequestBody = {
   type: 'object',
-  description: 'Request to send a single notification',
-  required: ['channel', 'recipient', 'app_id', 'payload'],
+  description: 'Request to send a single notification. app_id is required when using JWT auth; omit when using an API key (app is derived from the key).',
+  required: ['channel', 'recipient', 'payload'],
   properties: {
     channel: {
       type: 'string',
@@ -123,81 +123,3 @@ export const sendNotificationSchema = {
   },
 };
 
-/**
- * Schema for POST /notify/send-with-key endpoint
- * Send notification using API key instead of JWT token
- * App ID is automatically extracted from the API key
- */
-export const sendNotificationWithKeyRequestBody = {
-  type: 'object',
-  description: 'Request to send notification with API key',
-  required: ['channel', 'recipient', 'templateId', 'payload'],
-  properties: {
-    channel: {
-      type: 'string',
-      enum: ['EMAIL', 'SMS', 'IN_APP', 'PUSH', 'WHATSAPP'],
-      description: 'Notification channel',
-    },
-    recipient: {
-      type: 'string',
-      minLength: 1,
-      description: 'Recipient email, phone number, or user ID',
-    },
-    templateId: {
-      type: 'string',
-      format: 'uuid',
-      description: 'Template ID (UUID) - the specific template instance to use',
-    },
-    payload: {
-      type: 'object',
-      description: 'Dynamic variables for template interpolation',
-    },
-    priority: {
-      type: 'string',
-      enum: ['LOW', 'NORMAL', 'HIGH', 'URGENT'],
-      default: 'NORMAL',
-      description: 'Notification priority level',
-    },
-  },
-};
-
-export const sendNotificationWithKeySchema = {
-  description: 'Send notification using API key (app_id extracted from key)',
-  tags: ['Notifications'],
-  body: sendNotificationWithKeyRequestBody,
-  response: {
-    202: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean' },
-        resp_msg: { type: 'string' },
-        resp_code: { type: 'number' },
-        data: sendNotificationResponseBody,
-      },
-    },
-    400: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean' },
-        resp_msg: { type: 'string' },
-        resp_code: { type: 'number' },
-      },
-    },
-    401: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean' },
-        resp_msg: { type: 'string' },
-        resp_code: { type: 'number' },
-      },
-    },
-    404: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean' },
-        resp_msg: { type: 'string' },
-        resp_code: { type: 'number' },
-      },
-    },
-  },
-};

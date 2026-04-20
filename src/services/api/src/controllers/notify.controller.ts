@@ -7,24 +7,36 @@ import { ApiResponseHelper } from '../utils';
 export class NotifyController {
   async sendNotification(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const body = request.body as SendNotificationRequest;
+      const body = request.body as Omit<SendNotificationRequest, 'app_id'> & { app_id?: string };
       const accountId = request.headers['x-account-id'] as string;
+      const apiKeyId = request.headers['x-api-key-id'] as string | undefined;
 
       if (!accountId) {
         return ApiResponseHelper.unauthorized(reply, 'No account access');
       }
 
-      if (!body.app_id) {
-        return ApiResponseHelper.badRequest(reply, 'app_id is required in request body');
+      let app_id: string;
+
+      if (apiKeyId) {
+        const { apiKeyRepository } = await import('../repositories/api-key.repository');
+        const apiKey = await apiKeyRepository.findById(apiKeyId);
+        if (!apiKey) {
+          return ApiResponseHelper.unauthorized(reply, 'Invalid API key');
+        }
+        app_id = apiKey.app_id;
+      } else {
+        if (!body.app_id) {
+          return ApiResponseHelper.badRequest(reply, 'app_id is required in request body');
+        }
+        app_id = body.app_id;
       }
 
-      const notification = await notifyService.sendNotification(accountId, body.app_id, body);
+      const notification = await notifyService.sendNotification(accountId, app_id, { ...body, app_id });
 
-      logger.info({ notificationId: notification.id, correlationId: request.id }, 'Notification sent successfully');
+      logger.info({ notificationId: notification.id, appId: app_id, correlationId: request.id }, 'Notification sent successfully');
 
-      // Track usage
       const metric = `${body.channel.toLowerCase()}s_per_month`;
-      await UsageTrackingService.recordUsage(accountId, body.app_id, metric, 1);
+      await UsageTrackingService.recordUsage(accountId, app_id, metric, 1);
 
       ApiResponseHelper.accepted(reply, 'Notification queued for processing', {
         id: notification.id,
@@ -41,69 +53,6 @@ export class NotifyController {
       }
 
       if (errorMessage.includes('Missing') || errorMessage.includes('inactive')) {
-        return ApiResponseHelper.unauthorized(reply, errorMessage);
-      }
-
-      return ApiResponseHelper.badRequest(reply, errorMessage);
-    }
-  }
-
-  async sendNotificationWithKey(request: FastifyRequest, reply: FastifyReply) {
-    try {
-      const body = request.body as Omit<SendNotificationRequest, 'app_id'>;
-      const accountId = request.headers['x-account-id'] as string;
-
-      if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'Invalid API key');
-      }
-
-      // Extract app_id from request context (set by apiKeyRepository query)
-      // Need to fetch from API key data
-      const apiKeyId = request.headers['x-api-key-id'] as string;
-      if (!apiKeyId) {
-        return ApiResponseHelper.badRequest(reply, 'Could not determine app from API key');
-      }
-
-      // Get app_id from the API key by looking it up
-      const { apiKeyRepository } = await import('../repositories/api-key.repository');
-      const apiKey = await apiKeyRepository.findById(apiKeyId);
-
-      if (!apiKey) {
-        return ApiResponseHelper.unauthorized(reply, 'Invalid API key');
-      }
-
-      const app_id = apiKey.app_id;
-
-      // Send notification with extracted app_id
-      const notification = await notifyService.sendNotification(accountId, app_id, {
-        ...body,
-        app_id,
-      });
-
-      logger.info(
-        { notificationId: notification.id, appId: app_id, correlationId: request.id },
-        'Notification sent with API key'
-      );
-
-      // Track usage
-      const metric = `${body.channel.toLowerCase()}s_per_month`;
-      await UsageTrackingService.recordUsage(accountId, app_id, metric, 1);
-
-      ApiResponseHelper.accepted(reply, 'Notification queued for processing', {
-        id: notification.id,
-        status: notification.status,
-        channel: body.channel.toLowerCase(),
-        created_at: notification.createdAt,
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to send notification with API key');
-
-      if (errorMessage.includes('not found')) {
-        return ApiResponseHelper.notFound(reply, errorMessage);
-      }
-
-      if (errorMessage.includes('Invalid') || errorMessage.includes('inactive')) {
         return ApiResponseHelper.unauthorized(reply, errorMessage);
       }
 

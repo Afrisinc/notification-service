@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../config/logger';
 import { ApiResponseHelper } from '../utils';
 import { verifyToken, isTokenExpired, extractUserId, extractTenantId, validateProductToken } from '@shared/utils/jwt';
+import { apiKeyMiddleware } from './api-key.middleware';
 
 /**
  * Validate JWT token and extract account context
@@ -172,4 +173,29 @@ export async function validateBaseToken(request: FastifyRequest, reply: FastifyR
     },
     'Base token validated'
   );
+}
+
+/**
+ * Flexible auth middleware that accepts either a JWT token or an API key.
+ * Detects the token type by the `sk_` prefix and delegates accordingly.
+ * Both paths set `x-account-id` so downstream handlers are auth-agnostic.
+ */
+export async function flexAuthMiddleware(request: FastifyRequest, reply: FastifyReply) {
+  const authHeader = request.headers.authorization;
+
+  if (!authHeader) {
+    return ApiResponseHelper.unauthorized(reply, 'Missing authorization header');
+  }
+
+  const [scheme, token] = authHeader.split(' ');
+
+  if (scheme !== 'Bearer' || !token) {
+    return ApiResponseHelper.unauthorized(reply, 'Invalid authorization scheme');
+  }
+
+  if (token.startsWith('sk_')) {
+    return apiKeyMiddleware(request, reply);
+  }
+
+  return validateBaseToken(request, reply);
 }
