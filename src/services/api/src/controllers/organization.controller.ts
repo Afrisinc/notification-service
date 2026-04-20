@@ -177,9 +177,20 @@ export class OrganizationController {
         createdAt: invite.createdAt,
         expiresAt: invite.expiresAt,
       });
-    } catch (error) {
+    } catch (error: any) {
       logger.error({ error }, 'Failed to create invite');
-      return ApiResponseHelper.internalError(reply, 'Failed to create invite');
+      const message = error.message || 'Failed to create invite';
+
+      // Let's temporary return the actual internal error message to the frontend so we can see EXACTLY what's breaking
+      if (
+        message === 'Organization not found' ||
+        message.includes('already exists') ||
+        message.includes('already a member')
+      ) {
+        return ApiResponseHelper.badRequest(reply, message);
+      }
+
+      return ApiResponseHelper.internalError(reply, `Failed to create invite: ${message}`);
     }
   }
 
@@ -215,6 +226,61 @@ export class OrganizationController {
     } catch (error) {
       logger.error({ error }, 'Failed to get organization members');
       return ApiResponseHelper.internalError(reply, 'Failed to get organization members');
+    }
+  }
+
+  /**
+   * Get all invites of an organization
+   */
+  async getInvites(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { orgId } = request.params as { orgId: string };
+      const { page = 1, limit = 10 } = request.query as { page?: number; limit?: number };
+      const userId = (request as any).user?.id;
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
+      }
+
+      // Verify user is part of the organization
+      const isMember = await this.organizationService.isOrganizationMember(orgId, userId);
+      if (!isMember) {
+        return ApiResponseHelper.forbidden(reply, 'You do not have access to this organization');
+      }
+
+      const result = await this.organizationService.getInvites(orgId, Number(page), Number(limit));
+
+      return ApiResponseHelper.success(reply, 'Invites retrieved successfully', {
+        orgId,
+        invites: result.invites,
+        total: result.total,
+        page: Number(page),
+        limit: Number(limit),
+        pages: Math.ceil(result.total / limit),
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get organization invites');
+      return ApiResponseHelper.internalError(reply, 'Failed to get organization invites');
+    }
+  }
+
+  /**
+   * Get all pending invites for the authenticated user
+   */
+  async getUserInvites(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = (request as any).user?.id;
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
+      }
+
+      const invites = await this.organizationService.getUserInvites(userId);
+
+      return ApiResponseHelper.success(reply, 'User invites retrieved successfully', { invites });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get user invites');
+      return ApiResponseHelper.internalError(reply, 'Failed to get user invites');
     }
   }
 
@@ -264,10 +330,6 @@ export class OrganizationController {
       const { orgId } = request.params as { orgId: string };
       const userId = (request as any).user?.id;
       const body = request.body as any;
-
-      console.log('Update organization request body:', body);
-      console.log('User ID from request:', userId);
-      console.log('Organization ID from request:', orgId);
 
       if (!userId) {
         return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
@@ -384,6 +446,40 @@ export class OrganizationController {
 
       if (message.includes('already a member')) {
         return ApiResponseHelper.badRequest(reply, 'User is already a member of this organization');
+      }
+
+      return ApiResponseHelper.internalError(reply, message);
+    }
+  }
+
+  /**
+   * Decline an organization invitation (auth required)
+   */
+  async declineInvite(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { inviteId, token } = request.params as { inviteId: string; token: string };
+      const userId = (request as any).user?.id;
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User not authenticated');
+      }
+
+      const result = await this.organizationService.declineInvite(inviteId, token, userId);
+
+      if (!result) {
+        return ApiResponseHelper.badRequest(reply, 'Failed to decline invitation');
+      }
+
+      return ApiResponseHelper.success(reply, 'Invitation declined successfully', {
+        inviteId: result.inviteId,
+        status: result.status,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to decline invitation';
+      logger.error({ error }, message);
+
+      if (message.includes('expired')) {
+        return ApiResponseHelper.badRequest(reply, 'Invitation has expired');
       }
 
       return ApiResponseHelper.internalError(reply, message);

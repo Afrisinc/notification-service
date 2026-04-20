@@ -71,6 +71,20 @@ export async function registerOrganizationRoutes(fastify: FastifyInstance) {
     asyncWrapper(orgController.getMembers.bind(orgController))
   );
 
+  // Get organization invites
+  fastify.get(
+    '/organizations/:orgId/invites',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(orgController.getInvites.bind(orgController))
+  );
+
+  // Get user pending invites
+  fastify.get(
+    '/user/invites',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(orgController.getUserInvites.bind(orgController))
+  );
+
   // Remove organization member
   fastify.delete(
     '/organizations/:orgId/members/:memberId',
@@ -104,5 +118,12 @@ export async function registerOrganizationRoutes(fastify: FastifyInstance) {
     '/invites/:inviteId/:token/accept',
     { onRequest: [validateBaseToken], schema: AcceptInviteSchema },
     asyncWrapper(orgController.acceptInvite.bind(orgController))
+  );
+
+  // Decline invitation (auth required)
+  fastify.post(
+    '/invites/:inviteId/:token/decline',
+    { onRequest: [validateBaseToken], schema: AcceptInviteSchema },
+    asyncWrapper(orgController.declineInvite.bind(orgController))
   );
 }

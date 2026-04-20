@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../config/logger';
 import { templateService, CreateTemplateRequest, UpdateTemplateRequest } from '../services/template.service';
 import { UsageTrackingService } from '../services/usage-tracking.service';
+import { templateAssetsService } from '../services/template-assets.service';
 import { ApiResponseHelper } from '../utils';
 import { appTemplateRepository } from '../repositories/template-installation.repository';
 import { prismaRead, prismaWrite } from '@shared/database';
@@ -123,6 +124,15 @@ export class TemplateController {
         active: template.active,
         designJson: (template as any).design_json,
         editorType: (template as any).editor_type || 'visual',
+        // Marketplace fields
+        visibility: (template as any).visibility || 'private',
+        isPublic: (template as any).is_public,
+        thumbnail: (template as any).thumbnail,
+        previewImage: (template as any).previewUrl,
+        tags: (template as any).tags || [],
+        pricing: (template as any).pricing,
+        price: (template as any).price,
+        publishedAt: (template as any).publishedAt ? new Date((template as any).publishedAt).toISOString() : null,
         createdAt: template.createdAt.toISOString(),
         updatedAt: template.updatedAt.toISOString(),
       });
@@ -185,6 +195,15 @@ export class TemplateController {
         active: template.active,
         designJson: (template as any).design_json,
         editorType: (template as any).editor_type || 'visual',
+        // Marketplace fields
+        visibility: (template as any).visibility || 'private',
+        isPublic: (template as any).is_public,
+        thumbnail: (template as any).thumbnail,
+        previewImage: (template as any).previewUrl,
+        tags: (template as any).tags || [],
+        pricing: (template as any).pricing,
+        price: (template as any).price,
+        publishedAt: (template as any).publishedAt ? new Date((template as any).publishedAt).toISOString() : null,
         createdAt: template.createdAt.toISOString(),
         updatedAt: template.updatedAt.toISOString(),
       });
@@ -208,6 +227,7 @@ export class TemplateController {
 
       // Public endpoint - list all active templates with filtering
       const where: any = {
+        visibility: 'marketplace',
         active: true,
         deletedAt: null,
       };
@@ -270,6 +290,15 @@ export class TemplateController {
           language: t.language || 'en',
           version: t.version,
           active: t.active,
+          // Marketplace fields
+          visibility: (t as any).visibility || 'private',
+          isPublic: (t as any).is_public,
+          thumbnail: (t as any).thumbnail,
+          previewImage: (t as any).previewUrl,
+          tags: (t as any).tags || [],
+          pricing: (t as any).pricing,
+          price: (t as any).price,
+          publishedAt: (t as any).publishedAt ? new Date((t as any).publishedAt).toISOString() : null,
           createdAt: t.createdAt,
           updatedAt: t.updatedAt,
         })),
@@ -337,6 +366,15 @@ export class TemplateController {
         active: template.active,
         designJson: (template as any).design_json,
         editorType: (template as any).editor_type || 'visual',
+        // Marketplace fields
+        visibility: (template as any).visibility || 'private',
+        isPublic: (template as any).is_public,
+        thumbnail: (template as any).thumbnail,
+        previewImage: (template as any).previewUrl,
+        tags: (template as any).tags || [],
+        pricing: (template as any).pricing,
+        price: (template as any).price,
+        publishedAt: (template as any).publishedAt ? new Date((template as any).publishedAt).toISOString() : null,
         createdAt: template.createdAt.toISOString(),
         updatedAt: template.updatedAt.toISOString(),
       });
@@ -570,6 +608,15 @@ export class TemplateController {
           language: t.language || 'en',
           version: t.version,
           active: t.active,
+          // Marketplace fields
+          visibility: (t as any).visibility || 'private',
+          isPublic: (t as any).is_public,
+          thumbnail: (t as any).thumbnail,
+          previewImage: (t as any).previewUrl,
+          tags: (t as any).tags || [],
+          pricing: (t as any).pricing,
+          price: (t as any).price,
+          publishedAt: (t as any).publishedAt ? new Date((t as any).publishedAt).toISOString() : null,
           createdAt: t.createdAt,
           updatedAt: t.updatedAt,
         })),
@@ -646,6 +693,15 @@ export class TemplateController {
           author: 'Notify',
           isFree: true,
           variables: t.requiredVariables || [],
+          // Marketplace fields
+          visibility: (t as any).visibility || 'private',
+          isPublic: (t as any).is_public,
+          thumbnail: (t as any).thumbnail,
+          previewImage: (t as any).previewUrl,
+          tags: (t as any).tags || [],
+          pricing: (t as any).pricing,
+          price: (t as any).price,
+          publishedAt: (t as any).publishedAt ? new Date((t as any).publishedAt).toISOString() : null,
         })),
         { total }
       );
@@ -931,6 +987,12 @@ export class TemplateController {
           active: t.active,
           visibility: t.visibility || 'private',
           isPublic: t.is_public || false,
+          thumbnail: (t as any).thumbnail,
+          previewImage: (t as any).previewUrl,
+          tags: (t as any).tags || [],
+          pricing: (t as any).pricing,
+          price: (t as any).price,
+          publishedAt: (t as any).publishedAt ? new Date((t as any).publishedAt).toISOString() : null,
           rating: t.rating || 0,
           ratingCount: t.ratingCount || 0,
           installs: t.installs || 0,
@@ -952,11 +1014,6 @@ export class TemplateController {
       const accountId = request.headers['x-account-id'] as string;
       const userId = (request as any).user?.id;
       const { id: templateId } = request.params as { id: string };
-      const body = request.body as {
-        description?: string;
-        thumbnail?: string;
-        tags?: string[];
-      };
 
       if (!accountId) {
         return ApiResponseHelper.unauthorized(reply, 'No account access');
@@ -979,16 +1036,163 @@ export class TemplateController {
         return ApiResponseHelper.badRequest(reply, 'Cannot publish a deleted template');
       }
 
+      // Parse request body - handle both multipart (file uploads) and JSON
+      const isMultipart = request.isMultipart && request.isMultipart();
+      let body: any = {};
+      let thumbnailUrl: string | undefined;
+      let previewImageUrl: string | undefined;
+      let thumbnailBuffer: Buffer | undefined;
+      let previewImageBuffer: Buffer | undefined;
+
+      if (isMultipart) {
+        // Parse multipart form data
+        logger.debug({ templateId, templateCode: template.code }, 'Processing multipart form data');
+
+        try {
+          const parts = request.parts();
+
+          for await (const part of parts) {
+            if (part.type === 'file') {
+              // Handle file fields
+              if (part.fieldname === 'previewImage') {
+                logger.debug({ templateId }, 'Received previewImage file');
+                previewImageBuffer = await this.streamToBuffer(part.file);
+              } else if (part.fieldname === 'thumbnail') {
+                logger.debug({ templateId }, 'Received thumbnail file');
+                thumbnailBuffer = await this.streamToBuffer(part.file);
+              }
+            } else {
+              // Handle text fields
+              const value = part.value as string;
+              if (part.fieldname === 'tags') {
+                // Tags come as JSON string from FormData
+                try {
+                  body.tags = JSON.parse(value);
+                } catch {
+                  body.tags = [];
+                }
+              } else {
+                body[part.fieldname] = value;
+              }
+            }
+          }
+
+          // Upload assets if we have file buffers
+          if (thumbnailBuffer || previewImageBuffer) {
+            try {
+              const assetUrls = await templateAssetsService.uploadTemplateAssets({
+                thumbnail: thumbnailBuffer,
+                previewImage: previewImageBuffer,
+                accountId,
+                templateId,
+                templateCode: template.code,
+              });
+
+              // Debug: Check what service returned
+              logger.debug(
+                {
+                  templateId,
+                  returned: JSON.stringify(assetUrls),
+                  thumbnail: assetUrls.thumbnail ? 'HAS_URL' : 'MISSING',
+                  previewImage: assetUrls.previewImage ? 'HAS_URL' : 'MISSING',
+                },
+                'Asset URLs returned from service'
+              );
+
+              // Use uploaded URLs
+              if (assetUrls.thumbnail) {
+                thumbnailUrl = assetUrls.thumbnail;
+              }
+              if (assetUrls.previewImage) {
+                previewImageUrl = assetUrls.previewImage;
+              }
+
+              logger.info(
+                { templateId, hasThumbnail: !!thumbnailUrl, hasPreviewImage: !!previewImageUrl },
+                'Assets uploaded successfully'
+              );
+            } catch (uploadError) {
+              logger.warn(
+                { templateId, error: uploadError instanceof Error ? uploadError.message : uploadError },
+                'Asset upload failed, continuing without assets'
+              );
+            }
+          }
+        } catch (parseError) {
+          logger.error(
+            { templateId, error: parseError instanceof Error ? parseError.message : parseError },
+            'Failed to parse multipart form data'
+          );
+          return ApiResponseHelper.badRequest(reply, 'Failed to parse form data');
+        }
+      } else {
+        // Parse JSON body
+        body = request.body as any;
+        thumbnailUrl = body.thumbnail;
+        previewImageUrl = body.previewImage;
+      }
+
+      // Validate pricing: if "paid" is selected, price is required
+      if (body.pricing === 'paid' && (!body.price || body.price <= 0)) {
+        return ApiResponseHelper.badRequest(reply, 'Price is required for paid templates and must be greater than 0');
+      }
+
+      // Convert price from USD to cents (if provided)
+      const priceInCents = body.price ? Math.round(body.price * 100) : null;
+
+      // Build update data
+      const updateData: any = {
+        visibility: 'marketplace',
+        is_public: true,
+        description: body.description !== undefined ? body.description : template.description,
+        tags: body.tags && body.tags.length > 0 ? body.tags : template.tags,
+      };
+
+      // Include thumbnail URL (from assets or provided URL)
+      // Always save if we have a URL - prefer newly uploaded, fall back to provided
+      if (thumbnailUrl) {
+        updateData.thumbnail = thumbnailUrl;
+      }
+
+      // Include previewUrl (from assets or provided URL)
+      // Always save if we have a URL - prefer newly uploaded, fall back to provided
+      if (previewImageUrl) {
+        updateData.previewUrl = previewImageUrl;
+      }
+
+      // Update category if provided (normalize to uppercase)
+      if (body.category) {
+        const categoryUpper = body.category.toUpperCase();
+        const validCategories = ['AUTH', 'TRANSACTIONAL', 'MARKETING', 'NOTIFICATION'];
+        if (!validCategories.includes(categoryUpper)) {
+          return ApiResponseHelper.badRequest(reply, `Invalid category. Must be one of: ${validCategories.join(', ')}`);
+        }
+        updateData.category = categoryUpper;
+      }
+
+      // Update pricing information
+      if (body.pricing) {
+        updateData.price = body.pricing === 'paid' ? priceInCents : null;
+      }
+
+      // Log what we're saving
+      logger.debug(
+        {
+          templateId,
+          thumbnail: updateData.thumbnail ? '✓ set' : '✗ empty',
+          previewUrl: updateData.previewUrl ? '✓ set' : '✗ empty',
+          description: updateData.description ? '✓ set' : '✗ empty',
+          tags: updateData.tags.length > 0 ? `✓ ${updateData.tags.length} tags` : '✗ empty',
+          category: updateData.category || '✗ not updated',
+          pricing: body.pricing || 'free',
+        },
+        'Saving template data to database'
+      );
+
       // Publish template to marketplace
       const published = await prismaWrite.template.update({
         where: { id: templateId },
-        data: {
-          visibility: 'marketplace',
-          is_public: true,
-          description: body.description || template.description,
-          thumbnail: body.thumbnail,
-          tags: body.tags || template.tags,
-        },
+        data: updateData,
       });
 
       logger.info(
@@ -996,29 +1200,54 @@ export class TemplateController {
           templateId,
           userId,
           accountId,
+          visibility: published.visibility,
+          pricing: body.pricing || 'free',
+          thumbnail: published.thumbnail ? '✓ saved' : '✗ null',
+          previewUrl: published.previewUrl ? '✓ saved' : '✗ null',
           correlationId: request.id,
         },
         'Template published to marketplace'
       );
 
-      ApiResponseHelper.success(reply, 'Template published to marketplace', {
+      ApiResponseHelper.success(reply, 'Template published to marketplace successfully', {
         id: published.id,
         code: published.code,
+        title: body.title || published.code,
         channel: published.channel,
+        category: published.category,
+        description: published.description,
         visibility: published.visibility,
         isPublic: published.is_public,
+        pricing: body.pricing || 'free',
+        price: body.price || 0,
+        tags: published.tags,
+        thumbnail: published.thumbnail,
+        previewImage: published.previewUrl,
         publishedAt: new Date().toISOString(),
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to publish template');
 
-      if (errorMessage.includes('not found')) {
+      if (errorMessage.includes('not found') || errorMessage.includes('No record to update')) {
         ApiResponseHelper.notFound(reply, errorMessage);
       } else {
         ApiResponseHelper.badRequest(reply, errorMessage);
       }
     }
+  }
+
+  /**
+   * Convert readable stream to buffer
+   * @private
+   */
+  private async streamToBuffer(stream: any): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+      stream.on('error', reject);
+    });
   }
 
   async unpublishTemplate(request: FastifyRequest, reply: FastifyReply) {
@@ -1070,8 +1299,14 @@ export class TemplateController {
       ApiResponseHelper.success(reply, 'Template unpublished from marketplace', {
         id: unpublished.id,
         code: unpublished.code,
+        channel: unpublished.channel,
         visibility: unpublished.visibility,
         isPublic: unpublished.is_public,
+        thumbnail: (unpublished as any).thumbnail,
+        previewImage: (unpublished as any).previewUrl,
+        tags: (unpublished as any).tags,
+        pricing: (unpublished as any).pricing,
+        price: (unpublished as any).price,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

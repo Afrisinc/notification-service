@@ -1,45 +1,24 @@
 import { logger } from '../config/logger';
 import { prismaWrite, prismaRead } from '@shared/database';
 import { IQueuePublisher, QueueMessage, QueuePublisherFactory, QueuePublisherConfig } from './queue';
+import { Template } from '../types/template';
+import {
+  Notification,
+  SendNotificationRequest,
+  BulkSendRequest,
+  BulkSendResponse,
+  Channel,
+  NotificationStatus,
+} from '../types/notification';
 
-export type Channel = 'EMAIL' | 'SMS' | 'IN_APP' | 'PUSH' | 'WHATSAPP';
-export type NotificationStatus = 'PENDING' | 'QUEUED' | 'SENT' | 'FAILED';
-export type Priority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
-
-export interface SendNotificationRequest {
-  channel: Channel;
-  recipient: string;
-  templateId: string; // UUID of the template instance
-  app_id: string; // App/product ID - required for tracking notifications per app
-  payload: Record<string, any>;
-  priority?: Priority;
-}
-
-export interface Notification {
-  id: string;
-  account_id: string;
-  channel: Channel;
-  recipient: string;
-  templateId: string; // UUID for tracking which template version was used
-  templateCode: string; // Code for reference
-  status: NotificationStatus;
-  priority: Priority;
-  payload: Record<string, any>;
-  retryCount?: number;
-  scheduledAt?: Date | null;
-  sentAt?: Date | null;
-  createdAt: Date;
-}
-
-export interface BulkSendRequest {
-  notifications: SendNotificationRequest[];
-}
-
-export interface BulkSendResponse {
-  accepted: number;
-  rejected: number;
-  errors?: Array<{ index: number; error: string }>;
-}
+// Re-export types for backwards compatibility
+export type {
+  SendNotificationRequest,
+  BulkSendRequest,
+  BulkSendResponse,
+  Channel,
+  NotificationStatus,
+} from '../types/notification';
 
 // Mock notification repository
 const notifications: Map<string, Notification> = new Map();
@@ -49,45 +28,64 @@ let queuePublisher: IQueuePublisher;
 
 export class NotifyService {
   async sendNotification(accountId: string, appId: string, request: SendNotificationRequest): Promise<Notification> {
-    // Validate template exists by ID
-    const template = await prismaWrite.template.findUnique({
-      where: { id: request.templateId },
-    });
+    let template: Template | null = null;
+    let renderedContent = '';
+    let renderedSubject = '';
 
-    if (!template) {
-      const error = new Error(`Template not found: ${request.templateId}`);
-      logger.warn({ accountId, templateId: request.templateId }, 'Template not found');
-      throw error;
-    }
+    // TEMPLATE MODE: if templateId provided
+    if (request.templateId) {
+      template = await prismaWrite.template.findUnique({
+        where: { id: request.templateId },
+      });
 
-    // Verify template belongs to account
-    if (template.account_id !== accountId) {
-      const error = new Error('Unauthorized: Template does not belong to your account');
-      logger.warn(
-        { accountId, templateId: request.templateId, templateAccountId: template.account_id },
-        'Unauthorized template access'
-      );
-      throw error;
-    }
-
-    // Render template with payload variables
-    let renderedContent = template.content;
-    let renderedSubject = template.subject || template.code;
-
-    if (request.payload && Object.keys(request.payload).length > 0) {
-      try {
-        // Simple Handlebars-like variable replacement
-        renderedContent = this.renderTemplate(template.content, request.payload);
-        if (template.subject) {
-          renderedSubject = this.renderTemplate(template.subject, request.payload);
-        }
-      } catch (renderError) {
-        logger.warn(
-          { templateId: request.templateId, templateCode: template.code, error: renderError },
-          'Template rendering failed, using raw template'
-        );
-        // Continue with unrendered template
+      if (!template) {
+        const error = new Error(`Template not found: ${request.templateId}`);
+        logger.warn({ accountId, templateId: request.templateId }, 'Template not found');
+        throw error;
       }
+
+      // Verify template belongs to account
+      if (template.account_id !== accountId) {
+        const error = new Error('Unauthorized: Template does not belong to your account');
+        logger.warn(
+          { accountId, templateId: request.templateId, templateAccountId: template.account_id },
+          'Unauthorized template access'
+        );
+        throw error;
+      }
+
+      // Render template with payload variables
+      renderedContent = template.content;
+      renderedSubject = template.subject || '';
+
+      if (request.payload && Object.keys(request.payload).length > 0) {
+        try {
+          // Simple Handlebars-like variable replacement
+          renderedContent = this.renderTemplate(template.content, request.payload);
+          if (template.subject) {
+            renderedSubject = this.renderTemplate(template.subject, request.payload);
+          }
+        } catch (renderError) {
+          logger.warn(
+            { templateId: request.templateId, templateCode: template.code, error: renderError },
+            'Template rendering failed, using raw template'
+          );
+          // Continue with unrendered template
+        }
+      }
+    } else {
+      // DIRECT MESSAGE MODE: no template, use payload.message
+      if (!request.payload.message) {
+        const error = new Error('Either provide templateId or payload.message for direct message mode');
+        logger.warn({ accountId, app_id: appId }, 'Direct message mode: missing message in payload');
+        throw error;
+      }
+
+      renderedContent = request.payload.message;
+      logger.debug(
+        { accountId, app_id: appId, channel: request.channel },
+        'Sending notification in direct message mode'
+      );
     }
 
     // Create notification record in database
@@ -95,9 +93,10 @@ export class NotifyService {
       data: {
         account_id: accountId,
         app_id: appId, // Save app ID for tracking
-        channel: request.channel as any,
+        channel: request.channel,
         recipient: request.recipient,
-        templateCode: template.code, // Store code for reference
+        templateCode: template?.code || 'DIRECT_MESSAGE',
+        templateId: request.templateId,
         status: 'PENDING',
         priority: request.priority || 'NORMAL',
         payload: request.payload,
@@ -109,10 +108,10 @@ export class NotifyService {
     let fromEmail: string | undefined;
     let fromName: string | undefined;
     try {
-      const emailConfig = await prismaRead.appEmailConfig.findUnique({
+      const emailConfig = await prismaRead.appEmailProvider.findUnique({
         where: { app_id: appId },
       });
-      if (emailConfig) {
+      if (emailConfig && emailConfig.from_email) {
         fromEmail = emailConfig.from_email;
         fromName = emailConfig.from_name || undefined;
       }
@@ -128,8 +127,8 @@ export class NotifyService {
       appId: appId, // Include app ID for reference
       channel: request.channel,
       recipient: request.recipient,
-      templateCode: template.code,
-      templateId: request.templateId, // Include template ID for tracking
+      templateCode: template?.code || 'DIRECT_MESSAGE',
+      templateId: request.templateId,
       subject: renderedSubject,
       body: renderedContent,
       payload: request.payload,
@@ -152,15 +151,17 @@ export class NotifyService {
         templateId: request.templateId,
         accountId,
         channel: request.channel,
+        mode: request.templateId ? 'template' : 'direct',
       },
       'Notification enqueued'
     );
 
     return {
       ...notification,
-      templateId: request.templateId,
+      templateCode: notification.templateCode || 'DIRECT_MESSAGE',
+      templateId: request.templateId || 'direct-message',
       payload: (notification.payload || {}) as Record<string, any>,
-    };
+    } as Notification;
   }
 
   /**

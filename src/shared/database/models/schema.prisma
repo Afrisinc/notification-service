@@ -1,7 +1,3 @@
-////////////////////////////////////////////////////////////
-// GENERATOR & DATASOURCE
-////////////////////////////////////////////////////////////
-
 generator client {
   provider = "prisma-client-js"
   previewFeatures = ["prismaSchemaFolder"]
@@ -104,8 +100,37 @@ enum KeyType {
   production // Production API key
 }
 
-////////////////////////////////////////////////////////////
-// ==================== MODELS ====================
-////////////////////////////////////////////////////////////
-// Individual model files are in this directory
-// Prisma will automatically merge them with this schema
+// Supported Currencies
+enum Currency {
+  USD
+  RWF
+}
+
+enum TemplateVisibility {
+  private
+  account
+  marketplace
+}
+
+enum TemplatePricing {
+  free
+  paid
+}
+
+enum CustomerDomainStatus {
+  pending
+  verified
+  suspended
+}
+
+enum GmailAuthMethod {
+  oauth2
+  app_password
+}
+
+enum EmailProvider {
+  gmail         
+  sendgrid       
+  notify          // Your own SMTP server
+  custom_domain   // Custom domain with DKIM/SPF/DMARC
+}

@@ -13,7 +13,6 @@ export async function registerUser(req: FastifyRequest, reply: FastifyReply) {
     const result = await service.register(request);
     return ApiResponseHelper.created(reply, 'User registered successfully', result);
   } catch (err: unknown) {
-    console.log('Registration error:', getErrorMessage(err));
     return ApiResponseHelper.badRequest(reply, getErrorMessage(err));
   }
 }

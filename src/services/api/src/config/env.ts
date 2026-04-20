@@ -32,6 +32,9 @@ export const env = cleanEnv(process.env, {
   // System App ID (for organization invites and system notifications)
   SYSTEM_APP_ID: str({ default: 'system-org-app' }),
   RESET_PASSWORD_TEMPLATE_ID: str({ default: 'system-reset-password' }),
+  VERIFY_EMAIL_TEMPLATE_ID: str({ default: 'system-verify-email' }),
+  WELCOME_EMAIL_TEMPLATE_ID: str({ default: 'system-welcome-email' }),
+  INVITE_MEMBER_TEMPLATE_ID: str({ default: 'system-invite-member' }),
 
   // SMTP Configuration (optional)
   SMTP_HOST: str({ default: 'localhost' }),
@@ -48,4 +51,8 @@ export const env = cleanEnv(process.env, {
 
   // Logging
   LOG_LEVEL: str({ choices: ['debug', 'info', 'warn', 'error'], default: 'info' }),
+
+  // Assets Service (Marketplace file uploads)
+  ASSETS_API_URL: str({ default: 'http://localhost:8080' }),
+  ASSETS_API_KEY: str({ default: 'dev-api-key' }),
 });

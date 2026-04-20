@@ -35,16 +35,43 @@ export class SMTPProvider implements EmailProvider {
       const config = getConfig();
       let fromEmail = config.FROM_EMAIL || config.SMTP_FROM || 'noreply@notification.local';
       let fromName: string | undefined = undefined;
+      let replyTo: string | undefined = undefined;
 
-      // Try to get app-specific email config if appId is provided
+      // Try to get custom domain first if appId is provided
       if (email.appId) {
         try {
           const { prismaRead } = await import('@shared/database');
-          const emailConfig = await prismaRead.appEmailConfig.findUnique({
+          const customDomain = await prismaRead.appEmailProvider.findUnique({
             where: { app_id: email.appId },
           });
 
-          if (emailConfig) {
+          if (customDomain && customDomain.provider === 'custom_domain' && customDomain.domain_status === 'verified') {
+            fromEmail = customDomain.from_email || 'noreply@notification.local';
+            fromName = customDomain.from_name || undefined;
+            replyTo = customDomain.from_email || undefined;
+            this.logger.debug(
+              { appId: email.appId, domain: customDomain.domain, from: fromEmail },
+              'Using app custom domain for email'
+            );
+          }
+        } catch (customDomainError) {
+          this.logger.warn(
+            { error: customDomainError, appId: email.appId },
+            'Failed to load custom domain config, trying app config'
+          );
+          // Continue with app config or default
+        }
+      }
+
+      // Try to get app-specific email config if appId is provided (only if no custom domain)
+      if (!replyTo && email.appId) {
+        try {
+          const { prismaRead } = await import('@shared/database');
+          const emailConfig = await prismaRead.appEmailProvider.findUnique({
+            where: { app_id: email.appId },
+          });
+
+          if (emailConfig && emailConfig.from_email) {
             fromEmail = emailConfig.from_email;
             fromName = emailConfig.from_name || undefined;
             this.logger.debug({ appId: email.appId, from: fromEmail }, 'Using app-specific email configuration');
@@ -58,13 +85,18 @@ export class SMTPProvider implements EmailProvider {
         }
       }
 
-      const mailOptions = {
+      const mailOptions: any = {
         from: fromName ? `${fromName} <${fromEmail}>` : fromEmail,
         to: email.to,
         subject: email.subject,
         text: email.body,
         html: email.html || email.body,
       };
+
+      // Add replyTo if set (from custom domain)
+      if (replyTo) {
+        mailOptions.replyTo = replyTo;
+      }
 
       const result = await this.transporter.sendMail(mailOptions);
 

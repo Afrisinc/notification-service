@@ -22,8 +22,10 @@ export class RabbitMQPublisher implements IQueuePublisher {
   private maxReconnectAttempts = 10;
   private reconnectDelay = 5000; // 5 seconds
   private exchangeName = 'notifications';
-  private routingKey = 'send_message';
-  private queueName = 'notifications.email';
+  private emailQueue = 'notifications.email';
+  private emailRoutingKey = 'send_message.email';
+  private smsQueue = 'notifications.sms';
+  private smsRoutingKey = 'send_message.sms';
 
   constructor(private url: string) {}
 
@@ -45,20 +47,31 @@ export class RabbitMQPublisher implements IQueuePublisher {
         durable: true,
       });
 
-      // Assert queue
-      await this.channel.assertQueue(this.queueName, {
+      // Assert email queue and bind with email routing key
+      await this.channel.assertQueue(this.emailQueue, {
         durable: true,
       });
+      await this.channel.bindQueue(this.emailQueue, this.exchangeName, this.emailRoutingKey);
 
-      // Bind queue to exchange with routing key
-      await this.channel.bindQueue(this.queueName, this.exchangeName, this.routingKey);
+      // Assert SMS queue and bind with SMS routing key
+      await this.channel.assertQueue(this.smsQueue, {
+        durable: true,
+      });
+      await this.channel.bindQueue(this.smsQueue, this.exchangeName, this.smsRoutingKey);
 
       // Set prefetch to 1 to ensure fair distribution
       await this.channel.prefetch(1);
 
       logger.info(
-        { url: this.url, exchange: this.exchangeName, queue: this.queueName, routingKey: this.routingKey },
-        '✅ Connected to RabbitMQ'
+        {
+          url: this.url,
+          exchange: this.exchangeName,
+          queues: [
+            { name: this.emailQueue, routingKey: this.emailRoutingKey },
+            { name: this.smsQueue, routingKey: this.smsRoutingKey },
+          ],
+        },
+        '✅ Connected to RabbitMQ with multi-channel setup'
       );
 
       // Reset reconnect attempts on successful connection
@@ -108,9 +121,13 @@ export class RabbitMQPublisher implements IQueuePublisher {
     }
 
     try {
+      // Determine routing key based on message channel
+      const channel = message.channel?.toUpperCase() || 'EMAIL';
+      const routingKey = channel === 'SMS' ? this.smsRoutingKey : this.emailRoutingKey;
+
       const messageBuffer = Buffer.from(JSON.stringify({ msg: message, dateProduced: new Date() }));
 
-      const published = this.channel.publish(this.exchangeName, this.routingKey, messageBuffer, {
+      const published = this.channel.publish(this.exchangeName, routingKey, messageBuffer, {
         persistent: true,
         contentType: 'application/json',
         timestamp: Date.now(),
@@ -128,7 +145,7 @@ export class RabbitMQPublisher implements IQueuePublisher {
           channel: message.channel,
           recipient: message.recipient,
           exchange: this.exchangeName,
-          routingKey: this.routingKey,
+          routingKey: routingKey,
         },
         '📨 [RABBITMQ] Message published to exchange'
       );
@@ -144,7 +161,8 @@ export class RabbitMQPublisher implements IQueuePublisher {
         return false;
       }
 
-      await this.channel.checkQueue(this.queueName);
+      await this.channel.checkQueue(this.emailQueue);
+      await this.channel.checkQueue(this.smsQueue);
       return true;
     } catch (error) {
       logger.error(error, 'RabbitMQ health check failed');
@@ -175,22 +193,35 @@ export class RabbitMQPublisher implements IQueuePublisher {
   }
 
   /**
-   * Get queue statistics
+   * Get queue statistics for all channels
    */
-  async getQueueStats(): Promise<{
-    name: string;
-    messageCount: number;
-    consumerCount: number;
-  }> {
+  async getQueueStats(): Promise<
+    Array<{
+      name: string;
+      messageCount: number;
+      consumerCount: number;
+    }>
+  > {
     if (!this.channel) {
       throw new Error('RabbitMQ channel not initialized');
     }
 
-    const queueInfo = await this.channel.checkQueue(this.queueName);
-    return {
-      name: this.queueName,
-      messageCount: queueInfo.messageCount,
-      consumerCount: queueInfo.consumerCount,
-    };
+    const [emailQueueInfo, smsQueueInfo] = await Promise.all([
+      this.channel.checkQueue(this.emailQueue),
+      this.channel.checkQueue(this.smsQueue),
+    ]);
+
+    return [
+      {
+        name: this.emailQueue,
+        messageCount: emailQueueInfo.messageCount,
+        consumerCount: emailQueueInfo.consumerCount,
+      },
+      {
+        name: this.smsQueue,
+        messageCount: smsQueueInfo.messageCount,
+        consumerCount: smsQueueInfo.consumerCount,
+      },
+    ];
   }
 }

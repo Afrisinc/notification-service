@@ -190,6 +190,40 @@ export class OrganizationService {
         throw new Error('Organization not found');
       }
 
+      // check if invite exist for the email and organization and is still pending
+      const invit = await prismaRead.organizationInvite.findFirst({
+        where: {
+          organization_id: orgId,
+          email: email,
+          status: 'pending',
+          expiresAt: { gt: new Date() },
+        },
+      });
+      if (invit) {
+        logger.warn({ orgId, email }, 'Still pending invite for this email already exists for the organization');
+        throw new Error('Still pending invite for this email already exists for the organization');
+      }
+
+      // check if the user is already a member of the organization
+      const user = await prismaRead.user.findUnique({
+        where: { email },
+      });
+
+      if (user) {
+        // Check if the user is already a member of the organization
+        const isMember = await prismaRead.organizationMember.findFirst({
+          where: {
+            organization_id: orgId,
+            user_id: user.id,
+          },
+        });
+
+        if (isMember) {
+          logger.warn({ orgId, email }, 'User is already a member of the organization');
+          throw new Error('User is already a member of the organization');
+        }
+      }
+
       // Generate invite ID and token
       const inviteId = randomUUID();
       const inviteToken = randomUUID();
@@ -198,9 +232,21 @@ export class OrganizationService {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
-      // Store invite in database with plaintext token
-      const storedInvite = await prismaWrite.organizationInvite.create({
-        data: {
+      // Store invite in database with plaintext token (upsert to recycle old/expired invite records)
+      const storedInvite = await prismaWrite.organizationInvite.upsert({
+        where: {
+          organization_id_email: {
+            organization_id: orgId,
+            email: email,
+          },
+        },
+        update: {
+          role,
+          token: inviteToken,
+          status: 'pending',
+          expiresAt,
+        },
+        create: {
           id: inviteId,
           organization_id: orgId,
           email,
@@ -226,12 +272,15 @@ export class OrganizationService {
         await notifyService.sendNotification(env.ACCOUNT_ID, env.SYSTEM_APP_ID, {
           channel: 'EMAIL',
           recipient: email,
-          templateId: 'd7b6f03f-b261-4334-9adf-2c74485ea4bf', // Organization invite template
+          templateId: env.INVITE_MEMBER_TEMPLATE_ID, // Organization invite template
           app_id: env.SYSTEM_APP_ID,
           payload: {
             member_name: memberName,
             org_name: org.name,
+            role: role,
             invitation_link: invitationLink,
+            expiry_time: '7 Days',
+            platform_name: env.COMPANY_NAME,
           },
         });
 
@@ -297,6 +346,99 @@ export class OrganizationService {
       return { members: formattedMembers, total };
     } catch (error) {
       logger.error({ error, orgId }, 'Failed to get organization members');
+      throw error;
+    }
+  }
+
+  /**
+   * Get organization invites with pagination
+   */
+  async getInvites(orgId: string, page: number = 1, limit: number = 10) {
+    try {
+      const skip = (page - 1) * limit;
+
+      const [invites, total] = await Promise.all([
+        prismaRead.organizationInvite.findMany({
+          where: {
+            organization_id: orgId,
+            status: 'pending',
+            expiresAt: { gt: new Date() },
+          },
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+        }),
+        prismaRead.organizationInvite.count({
+          where: {
+            organization_id: orgId,
+            status: 'pending',
+            expiresAt: { gt: new Date() },
+          },
+        }),
+      ]);
+
+      const formattedInvites = invites.map((i: any) => ({
+        id: i.id,
+        email: i.email,
+        role: i.role,
+        status: i.status,
+        createdAt: i.createdAt,
+        expiresAt: i.expiresAt,
+        invitationLink: `${env.WEBAPP_URL}/invite/${i.id}/${i.token}`,
+      }));
+
+      return { invites: formattedInvites, total };
+    } catch (error) {
+      logger.error({ error, orgId }, 'Failed to get organization invites');
+      throw error;
+    }
+  }
+
+  /**
+   * Get pending invites for a specific user (by email)
+   */
+  async getUserInvites(userId: string) {
+    try {
+      // Get user email
+      const user = await prismaRead.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Find pending invites for this email
+      const invites = await prismaRead.organizationInvite.findMany({
+        where: {
+          email: user.email,
+          status: 'pending',
+          expiresAt: {
+            gt: new Date(), // Filter out expired invites
+          },
+        },
+        include: {
+          organization: {
+            select: { name: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return invites.map((i: any) => ({
+        id: i.id,
+        orgId: i.organization_id,
+        orgName: i.organization.name,
+        role: i.role,
+        status: i.status,
+        createdAt: i.createdAt,
+        expiresAt: i.expiresAt,
+        token: i.token,
+        invitationLink: `${env.WEBAPP_URL}/invite/${i.id}/${i.token}`,
+      }));
+    } catch (error) {
+      logger.error({ error, userId }, 'Failed to get user invites');
       throw error;
     }
   }
@@ -515,6 +657,61 @@ export class OrganizationService {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to accept invitation';
+      logger.error({ error, inviteId, userId }, message);
+      throw error;
+    }
+  }
+
+  /**
+   * Decline an organization invitation
+   * Sets status to "declined"
+   */
+  async declineInvite(inviteId: string, token: string, userId: string) {
+    try {
+      // Validate the invite
+      const invite = await this.validateInvite(inviteId, token);
+
+      if (!invite) {
+        throw new Error('Invalid or expired invitation');
+      }
+
+      // Get user details to verify email matches
+      const user = await prismaRead.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Verify user email matches invitation email
+      if (user.email !== invite.email) {
+        logger.warn(
+          { userId, inviteEmail: invite.email, userEmail: user.email },
+          'Email mismatch for invitation decline'
+        );
+        throw new Error('Your email does not match the invitation email. Please log in with the invited email.');
+      }
+
+      // Update invite status to declined
+      await prismaWrite.organizationInvite.update({
+        where: { id: inviteId },
+        data: {
+          status: 'declined',
+          acceptedBy_user_id: userId,
+          acceptedAt: new Date(), // using acceptedAt to track when it was actioned
+        },
+      });
+
+      logger.info({ inviteId, userId, orgId: invite.organization_id }, 'Organization invitation declined');
+
+      return {
+        inviteId,
+        status: 'declined',
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to decline invitation';
       logger.error({ error, inviteId, userId }, message);
       throw error;
     }

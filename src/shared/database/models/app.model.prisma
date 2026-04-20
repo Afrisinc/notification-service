@@ -1,8 +1,3 @@
-////////////////////////////////////////////////////////////
-// DOMAIN: BILLING & APPS
-// Application management and billing
-////////////////////////////////////////////////////////////
-
 model App {
   id                String       @id @default(uuid())
   account_id        String
@@ -15,8 +10,8 @@ model App {
   updatedAt         DateTime     @updatedAt
 
   // Relations
-  account           Account         @relation(fields: [account_id], references: [id], onDelete: Cascade)
-  organization      Organization?   @relation(fields: [organization_id], references: [id], onDelete: SetNull)
+  account           Account              @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  organization      Organization?        @relation(fields: [organization_id], references: [id], onDelete: SetNull)
   appTemplates      AppTemplate[]
   notifications     Notification[]
   usageRecords      UsageRecord[]
@@ -24,7 +19,7 @@ model App {
   contacts          Contact[]
   campaigns         Campaign[]
   settings          AppSettings?
-  emailConfig       AppEmailConfig?
+  emailProvider     AppEmailProvider?
 
   @@index([account_id])
   @@index([organization_id])
