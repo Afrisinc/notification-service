@@ -18,7 +18,6 @@ import { AccountService } from './account.service';
 import { NOTIFICATION_TEMPLATES, NOTIFICATION_CHANNELS } from '../config/constants';
 import { logger } from '../config/logger';
 import { getQueuePublisher, NotifyService } from './notify.service';
-import Notify from 'twilio/lib/rest/Notify';
 
 const userRepo = new UserRepository();
 const accountRepo = new AccountRepository();
