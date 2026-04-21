@@ -240,7 +240,12 @@ export async function resetEmailProvider(request: FastifyRequest, reply: Fastify
 export async function setCustomDomain(request: FastifyRequest, reply: FastifyReply) {
   try {
     const { appId } = request.params as { appId: string };
-    const { domain, selector } = request.body as { domain: string; selector?: string };
+    const { domain, selector, fromEmail, fromName } = request.body as {
+      domain: string;
+      selector?: string;
+      fromEmail?: string;
+      fromName?: string;
+    };
     const accountId = request.headers['x-account-id'] as string | undefined;
 
     if (!domain) {
@@ -253,7 +258,10 @@ export async function setCustomDomain(request: FastifyRequest, reply: FastifyRep
     }
 
     try {
-      const config = await appEmailProviderService.setCustomDomain(appId, domain, selector);
+      const config = await appEmailProviderService.setCustomDomain(appId, domain, selector, {
+        fromEmail,
+        fromName,
+      });
       logger.info({ appId, domain }, 'Custom domain configured');
 
       return ApiResponseHelper.success(reply, 'Custom domain configured', {
@@ -264,6 +272,8 @@ export async function setCustomDomain(request: FastifyRequest, reply: FastifyRep
         spfVerified: config.spf_verified,
         dkimVerified: config.dkim_verified,
         dmarcVerified: config.dmarc_verified,
+        fromEmail: config.from_email,
+        fromName: config.from_name,
       });
     } catch (error) {
       return ApiResponseHelper.badRequest(
@@ -299,10 +309,7 @@ export async function getCustomDomainRecords(request: FastifyRequest, reply: Fas
 
       return ApiResponseHelper.success(reply, 'DNS records retrieved', records);
     } catch (error) {
-      return ApiResponseHelper.badRequest(
-        reply,
-        error instanceof Error ? error.message : 'Failed to get DNS records'
-      );
+      return ApiResponseHelper.badRequest(reply, error instanceof Error ? error.message : 'Failed to get DNS records');
     }
   } catch (error) {
     logger.error({ error }, 'Failed to get custom domain records');
@@ -339,10 +346,7 @@ export async function verifyCustomDomain(request: FastifyRequest, reply: Fastify
         dmarcVerified: result.dmarcVerified,
       });
     } catch (error) {
-      return ApiResponseHelper.badRequest(
-        reply,
-        error instanceof Error ? error.message : 'Failed to verify domain'
-      );
+      return ApiResponseHelper.badRequest(reply, error instanceof Error ? error.message : 'Failed to verify domain');
     }
   } catch (error) {
     logger.error({ error }, 'Failed to verify custom domain');

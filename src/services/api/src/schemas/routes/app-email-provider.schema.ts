@@ -222,6 +222,8 @@ export const SetCustomDomainSchema: FastifySchema = {
     properties: {
       domain: { type: 'string', description: 'Custom domain (e.g., mail.example.com)' },
       selector: { type: 'string', description: 'DKIM selector (default: afrisinc)' },
+      fromEmail: { type: 'string', description: 'Sender email address' },
+      fromName: { type: 'string', description: 'Sender display name' },
     },
   },
   response: {
@@ -239,6 +241,8 @@ export const SetCustomDomainSchema: FastifySchema = {
             spfVerified: { type: 'boolean' },
             dkimVerified: { type: 'boolean' },
             dmarcVerified: { type: 'boolean' },
+            fromEmail: { type: 'string' },
+            fromName: { type: 'string' },
           },
         },
       },
