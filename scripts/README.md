@@ -393,3 +393,12 @@ Scripts can be scheduled via cron:
 - [Database Package Documentation](../packages/db/README.md)
 - [Configuration Documentation](../packages/config/README.md)
 - [Root README](../README.md)
+
+
+## RUN SEEDS AND SETUP
+<!-- docker exec -it notification-api-production sh -c "npx prisma@5 db push --schema=src/shared/database/models && npm run db:seed"
+
+docker exec -it notification-api-production sh -c "npx prisma@5 db push --schema=src/shared/database/models && pnpm db:setup"
+
+
+docker exec -it notification-api-production sh -c "npx tsx src/shared/database/seeds/users.seed.ts" -->

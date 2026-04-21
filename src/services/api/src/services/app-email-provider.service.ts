@@ -276,7 +276,12 @@ export class AppEmailProviderService {
   /**
    * Configure custom email domain with DKIM key generation
    */
-  async setCustomDomain(appId: string, domain: string, selector?: string) {
+  async setCustomDomain(
+    appId: string,
+    domain: string,
+    selector?: string,
+    options?: { fromEmail?: string; fromName?: string }
+  ) {
     try {
       const sel = selector || 'afrisinc';
 
@@ -307,6 +312,8 @@ export class AppEmailProviderService {
           spf_verified: false,
           dkim_verified: false,
           dmarc_verified: false,
+          from_email: options?.fromEmail || null,
+          from_name: options?.fromName || null,
         },
         update: {
           provider: 'custom_domain',
@@ -320,8 +327,8 @@ export class AppEmailProviderService {
           spf_verified: false,
           dkim_verified: false,
           dmarc_verified: false,
-          from_email: null,
-          from_name: null,
+          from_email: options?.fromEmail || null,
+          from_name: options?.fromName || null,
           gmail_email: null,
           oauth_access_token: null,
           oauth_refresh_token: null,
