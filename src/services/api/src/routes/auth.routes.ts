@@ -10,6 +10,7 @@ import {
   resetPassword,
   verifyAuth,
   verifyEmail,
+  resendVerificationEmail,
 } from '../controllers/auth.controller';
 import { validateBaseToken } from '../middlewares/auth.middleware';
 import {
@@ -26,6 +27,25 @@ import {
 } from '../schemas';
 
 export async function authRoutes(app: FastifyInstance) {
+  app.post(
+    '/auth/resend-verification',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          properties: {
+            email: { type: 'string', format: 'email' },
+          },
+          required: ['email'],
+        },
+        tags: ['Authentication'],
+        summary: 'Resend verification email',
+        description: 'Send a new verification email to the user if they are not verified yet',
+      },
+    },
+    resendVerificationEmail
+  );
+
   app.post(
     '/auth/register',
     {

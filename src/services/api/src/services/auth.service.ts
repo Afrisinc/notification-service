@@ -17,7 +17,8 @@ import type { LoginUserRequest, SignupPayload } from '../../../../types/auth';
 import { AccountService } from './account.service';
 import { NOTIFICATION_TEMPLATES, NOTIFICATION_CHANNELS } from '../config/constants';
 import { logger } from '../config/logger';
-import { getQueuePublisher } from './notify.service';
+import { getQueuePublisher, NotifyService } from './notify.service';
+import Notify from 'twilio/lib/rest/Notify';
 
 const userRepo = new UserRepository();
 const accountRepo = new AccountRepository();
@@ -134,7 +135,7 @@ export class AuthService {
 
       await queuePublisher.publish({
         notificationId,
-        tenantId: result.account.id,
+        tenantId: env.ACCOUNT_ID, // Use system account ID for transactional emails
         channel: NOTIFICATION_CHANNELS.EMAIL as 'EMAIL',
         recipient: result.user.email,
         templateCode: NOTIFICATION_TEMPLATES.AUTH_VERIFY_EMAIL,
@@ -190,6 +191,10 @@ export class AuthService {
       throw new Error('Invalid credentials');
     }
 
+    // Check email verification status
+    if (!user.email_verified) {
+      throw new Error('Email not verified');
+    }
     // Get all accounts owned by user
     const accounts = await accountRepo.findByUserId(user.id);
     const accountIds = accounts.map((a) => a.id);
@@ -370,6 +375,49 @@ export class AuthService {
       user_id: user.id,
       email: user.email,
     };
+  }
+
+  async resendVerificationEmail(email: string) {
+    if (!email) {
+      throw new Error('Email is required');
+    }
+
+    const user = await userRepo.findByEmail(email);
+    if (!user) {
+      // Don't reveal if user exists or not for security reasons
+      return { message: 'Verification email sent if account exists' };
+    }
+
+    if (user.email_verified) {
+      throw new Error('Email is already verified');
+    }
+
+    try {
+      const notifyService = new NotifyService();
+      const verificationToken = generateResetToken(user.id, user.email);
+      const verificationUrl = `${env.WEBAPP_URL}/verify-email?token=${verificationToken}`;
+      const userName = user.email.split('@')[0];
+      await notifyService.sendNotification(env.ACCOUNT_ID, env.SYSTEM_APP_ID, {
+        channel: 'EMAIL',
+        recipient: user.email,
+        templateId: env.VERIFY_EMAIL_TEMPLATE_ID,
+        app_id: env.SYSTEM_APP_ID,
+        payload: {
+          firstName: userName,
+          verificationUrl,
+          companyName: env.COMPANY_NAME,
+          supportEmail: env.SUPPORT_EMAIL,
+        },
+        priority: 'HIGH',
+      });
+      logger.info({ userId: user.id, email: user.email }, 'Resent verification email');
+    } catch (emailError) {
+      const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
+      logger.warn({ error: errorMessage, userId: user.id }, 'Failed to resend verification email');
+      throw new Error('Failed to send verification email');
+    }
+
+    return { message: 'Verification email sent' };
   }
 
   async getProfile(userId: string) {

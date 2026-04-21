@@ -78,6 +78,19 @@ export async function verifyEmail(req: FastifyRequest, reply: FastifyReply) {
   }
 }
 
+export async function resendVerificationEmail(req: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { email } = req.body as { email: string };
+    if (!email) {
+      return ApiResponseHelper.badRequest(reply, 'Email is required');
+    }
+    const result = await service.resendVerificationEmail(email);
+    return ApiResponseHelper.success(reply, 'Verification email sent if account exists', result);
+  } catch (err: unknown) {
+    return ApiResponseHelper.badRequest(reply, getErrorMessage(err));
+  }
+}
+
 export async function verifyAuth(req: FastifyRequest, reply: FastifyReply) {
   try {
     const authHeader = req.headers.authorization;
