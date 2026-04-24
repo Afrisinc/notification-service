@@ -104,4 +104,31 @@ export class OrganizationRepository {
       },
     });
   }
+
+  async getUserMemberOrganizations(userId: string) {
+    return prismaRead.organizationMember.findMany({
+      where: { user_id: userId },
+      include: {
+        organization: {
+          include: {
+            accounts: {
+              include: {
+                apps: true,
+                subscription: {
+                  include: {
+                    plan: {
+                      select: {
+                        id: true,
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
 }
