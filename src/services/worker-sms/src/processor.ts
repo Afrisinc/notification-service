@@ -113,40 +113,65 @@ export class SMSProcessor {
         '✅ [SMS PROCESSOR] SMS sent successfully'
       );
 
-      // Record success log to database
+      // Update notification record and record success log
       try {
-        const sentAt = new Date();
-        await prismaWrite.notificationLog.create({
-          data: {
-            notificationId: smsId,
-            provider: result.provider || 'multi-provider-strategy',
-            channel: 'SMS',
-            status: 'SENT',
-            response: {
-              messageId: result.messageId || 'unknown',
-              sentAt: sentAt.toISOString(),
-              to: sms.to,
-              type: 'SMS',
-            },
-          },
+        const notificationExists = await prismaRead.notification.findUnique({
+          where: { id: smsId },
         });
 
-        this.logger.info(
-          {
-            smsId,
-            messageId: result.messageId,
-            provider: result.provider,
-            sentAt: sentAt.toISOString(),
-          },
-          '💾 [SMS PROCESSOR] Notification log recorded in database'
-        );
+        if (notificationExists) {
+          const now = new Date();
+          const existingPayload = (notificationExists.payload as Record<string, any>) ?? {};
+
+          // Update main notification record with sentAt and provider info
+          await prismaWrite.notification.update({
+            where: { id: smsId },
+            data: {
+              sentAt: now,
+              payload: {
+                ...existingPayload,
+                provider: result.provider || 'multi-provider-strategy',
+                providerMessageId: result.messageId || 'unknown',
+                deliveryStatus: 'sent',
+              },
+            },
+          });
+
+          // Record log for audit trail
+          await prismaWrite.notificationLog.create({
+            data: {
+              notificationId: smsId,
+              provider: result.provider || 'multi-provider-strategy',
+              channel: 'SMS',
+              status: 'SENT',
+              response: {
+                messageId: result.messageId || 'unknown',
+                sentAt: now.toISOString(),
+                to: sms.to,
+                type: 'SMS',
+              },
+            },
+          });
+
+          this.logger.info(
+            {
+              smsId,
+              messageId: result.messageId,
+              provider: result.provider,
+              sentAt: now.toISOString(),
+            },
+            '💾 [SMS PROCESSOR] Notification sent and logged'
+          );
+        } else {
+          this.logger.debug({ smsId }, 'Ad-hoc SMS - no parent notification');
+        }
       } catch (logError) {
         this.logger.warn(
           {
             smsId,
             error: logError instanceof Error ? logError.message : logError,
           },
-          '⚠️ [SMS PROCESSOR] Failed to record SMS notification log (non-blocking)'
+          '⚠️ [SMS PROCESSOR] Failed to update notification or log'
         );
       }
     } catch (error) {
@@ -164,35 +189,60 @@ export class SMSProcessor {
         '❌ [SMS PROCESSOR] Failed to process SMS notification'
       );
 
-      // Record failure log to database
+      // Update notification record and record failure log
       try {
-        const failedAt = new Date();
-        await prismaWrite.notificationLog.create({
-          data: {
-            notificationId: smsId,
-            provider: 'multi-provider-strategy',
-            channel: 'SMS',
-            status: 'FAILED',
-            response: {
-              error: error instanceof Error ? error.message : String(error),
-              failedAt: failedAt.toISOString(),
-              to: smsTo,
-              type: 'SMS',
-            },
-          },
+        const notificationExists = await prismaRead.notification.findUnique({
+          where: { id: smsId },
         });
 
-        this.logger.warn(
-          { smsId, to: smsTo, failedAt: failedAt.toISOString() },
-          '💾 [SMS PROCESSOR] Failure log recorded in database'
-        );
+        if (notificationExists) {
+          const now = new Date();
+          const existingPayload = (notificationExists.payload as Record<string, any>) ?? {};
+
+          // Update main notification record as FAILED
+          await prismaWrite.notification.update({
+            where: { id: smsId },
+            data: {
+              status: 'FAILED',
+              retryCount: (notificationExists.retryCount || 0) + 1,
+              payload: {
+                ...existingPayload,
+                errorMessage: errorMessage,
+                deliveryStatus: 'failed',
+              },
+            },
+          });
+
+          // Record failure log for audit trail
+          await prismaWrite.notificationLog.create({
+            data: {
+              notificationId: smsId,
+              provider: 'multi-provider-strategy',
+              channel: 'SMS',
+              status: 'FAILED',
+              response: {
+                error: errorMessage,
+                failedAt: now.toISOString(),
+                to: smsTo,
+                type: 'SMS',
+              },
+            },
+          });
+
+          this.logger.warn(
+            { smsId, to: smsTo, failedAt: now.toISOString() },
+            '💾 [SMS PROCESSOR] Notification failed and logged'
+          );
+        } else {
+          this.logger.debug({ smsId }, 'Ad-hoc SMS - no parent notification');
+        }
       } catch (logError) {
         this.logger.error(
           {
             smsId,
             logError: logError instanceof Error ? logError.message : logError,
           },
-          '⚠️ [SMS PROCESSOR] Failed to record SMS failure log'
+          '⚠️ [SMS PROCESSOR] Failed to update notification or log'
         );
       }
 
