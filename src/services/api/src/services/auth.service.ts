@@ -1,14 +1,13 @@
 import { UserRepository } from '../repositories/identity-repositories/user.repository';
 import { AccountRepository } from '../repositories/identity-repositories/account.repository';
+import { OrganizationRepository } from '../repositories/identity-repositories/organization.repository';
 import { AuthorizationCodeRepository } from '../repositories/identity-repositories/authorization-code.repository';
 import {
   comparePassword,
   generateBaseToken,
   generateResetToken,
   hashPassword,
-  verifyToken,
-  generateAuthorizationCode,
-  getAuthCodeExpiresAt,
+  verifyToken
 } from '../utils/auth-utils';
 import { env } from '../config/env';
 import { prismaWrite } from '@shared/database';
@@ -21,6 +20,7 @@ import { getQueuePublisher, NotifyService } from './notify.service';
 
 const userRepo = new UserRepository();
 const accountRepo = new AccountRepository();
+const organizationRepo = new OrganizationRepository();
 const authCodeRepo = new AuthorizationCodeRepository();
 const accountService = new AccountService();
 
@@ -456,11 +456,16 @@ export class AuthService {
       throw new Error('User ID is required');
     }
 
-    // Get user's accounts with their apps and organization info
+    // Get user's owned organizations (accounts where user is owner)
     const accounts = await accountRepo.getUserAccountsWithAppsAndOrganization(userId);
+
+    // Get organizations where user is a member
+    const memberOrganizations = await organizationRepo.getUserMemberOrganizations(userId);
 
     // Group by organization
     const organizationsMap = new Map();
+
+    // Process owned organizations
     accounts.forEach((account) => {
       const orgId = account.organization_id || 'personal';
       if (!organizationsMap.has(orgId)) {
@@ -470,6 +475,7 @@ export class AuthService {
           slug: account.organization?.slug || 'personal',
           plan: account.subscription?.plan?.name?.toLowerCase() || 'free',
           createdAt: account.organization?.createdAt || account.createdAt,
+          userRole: 'OWNER',
           apps: [],
         });
       }
@@ -484,6 +490,35 @@ export class AuthService {
           createdAt: app.createdAt,
         }))
       );
+    });
+
+    // Process member organizations
+    memberOrganizations.forEach((member) => {
+      const orgId = member.organization_id;
+      // Skip if already added as owner
+      if (organizationsMap.has(orgId)) {
+        return;
+      }
+
+      // Get first account to extract subscription and app info
+      const firstAccount = member.organization.accounts[0];
+
+      organizationsMap.set(orgId, {
+        id: orgId,
+        name: member.organization.name,
+        slug: member.organization.slug,
+        plan: firstAccount?.subscription?.plan?.name?.toLowerCase() || 'free',
+        createdAt: member.organization.createdAt,
+        userRole: member.role,
+        apps: firstAccount?.apps?.map((app) => ({
+          id: app.id,
+          name: app.name,
+          environment: app.environment,
+          api_key: app.api_key,
+          status: app.status,
+          createdAt: app.createdAt,
+        })) || [],
+      });
     });
 
     return {

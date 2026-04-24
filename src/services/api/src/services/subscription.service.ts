@@ -28,7 +28,10 @@ export class SubscriptionService {
           limit: limit.limit_value === -1 ? -1 : limit.limit_value,
           used: usage[limit.metric] || 0,
           remaining: limit.limit_value === -1 ? -1 : Math.max(0, limit.limit_value - (usage[limit.metric] || 0)),
-          percentage: limit.limit_value === -1 ? 0 : ((usage[limit.metric] || 0) / limit.limit_value) * 100,
+          percentage:
+            limit.limit_value === -1 || limit.limit_value === 0
+              ? 0
+              : ((usage[limit.metric] || 0) / limit.limit_value) * 100,
           period: limit.period,
         })),
       };

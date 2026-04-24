@@ -204,6 +204,7 @@ export const OrganizationsResponseSchema = {
               name: { type: 'string', description: 'Organization name' },
               slug: { type: 'string', description: 'Organization slug for URLs' },
               plan: { type: 'string', description: 'Organization subscription plan (e.g., free, pro, enterprise)' },
+              userRole: { type: 'string', enum: ['OWNER', 'ADMIN', 'MEMBER'], description: 'User role in the organization (OWNER, ADMIN, or MEMBER)' },
               legal_name: { type: ['string', 'null'], description: 'Legal business name' },
               createdAt: { type: 'string', format: 'date-time', description: 'Organization creation date' },
               apps: {
@@ -227,7 +228,7 @@ export const OrganizationsResponseSchema = {
                 description: 'List of apps in the organization',
               },
             },
-            required: ['id', 'name', 'slug', 'plan', 'createdAt', 'apps'],
+            required: ['id', 'name', 'slug', 'plan', 'userRole', 'createdAt', 'apps'],
           },
           description: 'List of organizations and their apps',
         },
