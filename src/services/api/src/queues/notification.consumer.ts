@@ -1,5 +1,4 @@
 import { logger } from '../config/logger';
-import { SendNotificationRequest } from '../services/notify.service';
 import { prismaWrite } from '@shared/database';
 import { Channel } from '@prisma/client';
 
@@ -32,17 +31,27 @@ export class NotificationConsumer {
 
       // Save notification to database
       const templateCode = (payload as any).templateCode || 'queued-notification';
+
+      // Prepare payload with provider and source information
+      const enrichedPayload = {
+        ...(payload.payload || {}),
+        source: payload.source || payload.notificationSource || 'api',
+        provider: payload.provider || 'internal', // Will be updated when actually sent
+      };
+
       const notification = await prismaWrite.notification.create({
         data: {
           account_id: accountId,
-          app_id: appId || (payload as any).app_id, // Use provided appId or fallback to payload
+          app_id: appId ?? payload.app_id, // Use provided appId or fallback to payload
           channel: payload.channel as Channel,
           recipient: payload.recipient,
+          templateId: payload.templateId,
           templateCode,
-          payload: payload.payload || {},
-          status: 'QUEUED',
+          payload: enrichedPayload,
+          status: 'PENDING', // Start as PENDING, not QUEUED
           priority: payload.priority || 'NORMAL',
-          sentAt: new Date(), // Set timestamp for log filtering
+          retryCount: 0,
+          scheduledAt: payload.scheduledAt || null,
         },
       });
 

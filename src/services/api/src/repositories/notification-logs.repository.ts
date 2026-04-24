@@ -46,6 +46,7 @@ export class NotificationLogsRepository {
         skip,
         take: filters.limit,
         orderBy: { sentAt: 'desc' },
+        include: { logs: true },
       }),
       prismaRead.notification.count({ where }),
     ]);
@@ -93,6 +94,7 @@ export class NotificationLogsRepository {
         skip,
         take: filters.limit,
         orderBy: { sentAt: 'desc' },
+        include: { logs: true },
       }),
       prismaRead.notification.count({ where }),
     ]);
@@ -112,6 +114,7 @@ export class NotificationLogsRepository {
 
     return prismaRead.notification.findFirst({
       where,
+      include: { logs: true },
     });
   }
 
@@ -133,15 +136,27 @@ export class NotificationLogsRepository {
   }
 
   /**
-   * Get notification counts by status
+   * Get notification counts by status with filters
    */
-  async getStatusCounts(appId: string, dateFrom?: Date, dateTo?: Date) {
+  async getStatusCounts(appId: string, filters: NotificationLogFilters) {
     const where: any = { app_id: appId };
 
-    if (dateFrom || dateTo) {
+    if (filters.status) {
+      where.status = { in: filters.status.split(',').map((s) => s.trim().toUpperCase()) };
+    }
+
+    if (filters.channel) {
+      where.channel = { in: filters.channel.split(',').map((c) => c.trim().toUpperCase()) };
+    }
+
+    if (filters.search) {
+      where.OR = [{ recipient: { contains: filters.search, mode: 'insensitive' } }];
+    }
+
+    if (filters.dateFrom || filters.dateTo) {
       where.sentAt = {};
-      if (dateFrom) where.sentAt.gte = dateFrom;
-      if (dateTo) where.sentAt.lte = dateTo;
+      if (filters.dateFrom) where.sentAt.gte = filters.dateFrom;
+      if (filters.dateTo) where.sentAt.lte = filters.dateTo;
     }
 
     const counts = await prismaRead.notification.groupBy({
@@ -156,10 +171,13 @@ export class NotificationLogsRepository {
       PENDING: 0,
       BOUNCED: 0,
       QUEUED: 0,
+      SENT: 0,
     };
 
     counts.forEach((c: any) => {
-      if (c.status in result) {
+      if (c.status === 'QUEUED' || c.status === 'PENDING') {
+        result['PENDING'] += c._count;
+      } else if (c.status in result) {
         result[c.status] = c._count;
       }
     });
@@ -191,6 +209,7 @@ export class NotificationLogsRepository {
       where,
       orderBy: { sentAt: 'desc' },
       take: 100000,
+      include: { logs: true },
     });
   }
 }
