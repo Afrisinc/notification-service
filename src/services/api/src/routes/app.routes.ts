@@ -7,6 +7,7 @@ import {
   deleteApp,
   rotateApiKey,
   getAppsByOrganization,
+  getAppsByOrganizationDetails,
   getAppTemplates,
   getAppTemplateById,
   createAppTemplate,
@@ -15,6 +16,7 @@ import {
   getAppOverview,
 } from '../controllers/app.controller';
 import { validateBaseToken } from '../middlewares/auth.middleware';
+import { asyncWrapper } from '../middlewares/async_wrapper.middleware';
 import {
   CreateAppRouteSchema,
   ListAppsRouteSchema,
@@ -24,7 +26,7 @@ import {
   RotateApiKeyRouteSchema,
   GetAppsByOrgRouteSchema,
 } from '../schemas';
-import { CreateAppTemplateRouteSchema } from '../schemas/routes/app.schema';
+import { CreateAppTemplateRouteSchema, GetAppsByOrganizationDetailsSchema } from '../schemas/routes/app.schema';
 import { GetAppOverviewSchema } from '../schemas/routes/app-overview.schema';
 
 export async function registerAppRoutes(app: FastifyInstance) {
@@ -57,7 +59,6 @@ export async function registerAppRoutes(app: FastifyInstance) {
     },
     listApps
   );
-
   // Get App
   app.get(
     '/apps/:appId',
@@ -118,7 +119,19 @@ export async function registerAppRoutes(app: FastifyInstance) {
     rotateApiKey
   );
 
-  // Get Apps by Organization
+  // Get Apps by Organization (details only, no metrics) - MUST come before generic /organizations/:orgId/apps
+  app.get(
+    '/organizations/:orgId/apps/details',
+    {
+      onRequest: [validateBaseToken],
+      schema: {
+        ...GetAppsByOrganizationDetailsSchema,
+      },
+    },
+    asyncWrapper(getAppsByOrganizationDetails)
+  );
+
+  // Get Apps by Organization (with metrics)
   app.get(
     '/organizations/:orgId/apps',
     {

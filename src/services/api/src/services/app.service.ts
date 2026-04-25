@@ -253,6 +253,38 @@ export class AppService {
     return enrichedApps.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
+  async getAppsByOrganizationDetails(organizationId: string, search?: string) {
+    // Get apps directly from organization with template counts
+    let apps = await appRepo.findByOrganizationId(organizationId);
+
+    // Filter by search term (case-insensitive) if provided
+    if (search) {
+      const searchLower = search.toLowerCase();
+      apps = apps.filter((app) => app.name.toLowerCase().includes(searchLower));
+    }
+
+    const enrichedApps = [];
+
+    for (const app of apps) {
+      const [templateCount, templatesSentCount] = await prismaRead.$transaction([
+        prismaRead.appTemplate.count({ where: { app_id: app.id } }),
+        prismaRead.notification.count({ where: { app_id: app.id, templateId: { not: null } } }),
+      ]);
+
+      enrichedApps.push({
+        id: app.id,
+        name: app.name,
+        environment: app.environment,
+        status: app.status,
+        createdAt: app.createdAt,
+        templateCount,
+        templatesSent: templatesSentCount,
+      });
+    }
+
+    return enrichedApps.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
   async createAppTemplate(appId: string, accountId: string, userId: string, data: any) {
     // Verify app exists and account has access
     const app = await appRepo.findById(appId);

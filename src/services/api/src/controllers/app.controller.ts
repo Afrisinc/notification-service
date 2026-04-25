@@ -188,6 +188,32 @@ export async function getAppsByOrganization(req: FastifyRequest, reply: FastifyR
   }
 }
 
+export async function getAppsByOrganizationDetails(req: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { orgId } = req.params as { orgId: string };
+    const { search } = req.query as { search?: string };
+
+    const apps = await appService.getAppsByOrganizationDetails(orgId, search);
+
+    logger.info({ orgId, appCount: apps.length, search }, 'Organization apps (details only) retrieved successfully');
+
+    return ApiResponseHelper.success(reply, 'Organization apps retrieved successfully', {
+      organization_id: orgId,
+      apps,
+      total: apps.length,
+    });
+  } catch (err: unknown) {
+    const errorMessage = getErrorMessage(err);
+    if (errorMessage.includes('not found')) {
+      return ApiResponseHelper.notFound(reply, errorMessage);
+    }
+    if (errorMessage.includes('Unauthorized')) {
+      return ApiResponseHelper.forbidden(reply, errorMessage);
+    }
+    return ApiResponseHelper.badRequest(reply, errorMessage);
+  }
+}
+
 export async function createAppTemplate(req: FastifyRequest, reply: FastifyReply) {
   try {
     const accountId = req.headers['x-account-id'] as string;

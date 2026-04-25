@@ -224,3 +224,56 @@ export const CreateAppTemplateRouteSchema = {
     },
   },
 };
+
+export const GetAppsByOrganizationDetailsSchema = {
+  description: 'Get applications by organization with details only (no metrics)',
+  params: {
+    type: 'object',
+    properties: {
+      orgId: { type: 'string', description: 'Organization ID' },
+    },
+    required: ['orgId'],
+  },
+  querystring: {
+    type: 'object',
+    properties: {
+      search: { type: 'string', description: 'Search apps by name (case-insensitive)' },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'integer' },
+        data: {
+          type: 'object',
+          properties: {
+            organization_id: { type: 'string', description: 'Organization ID' },
+            apps: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string', description: 'App ID' },
+                  name: { type: 'string', description: 'App name' },
+                  environment: { type: 'string', enum: ['production', 'staging', 'development'], description: 'Environment' },
+                  status: { type: 'string', description: 'App status' },
+                  createdAt: { type: 'string', format: 'date-time', description: 'Creation date' },
+                  templateCount: { type: 'integer', description: 'Number of templates for this app' },
+                  templatesSent: { type: 'integer', description: 'Number of templates sent via this app' },
+                },
+                required: ['id', 'name', 'environment', 'status', 'createdAt', 'templateCount', 'templatesSent'],
+              },
+              description: 'List of apps in the organization',
+            },
+            total: { type: 'integer', description: 'Total number of apps' },
+          },
+        },
+      },
+    },
+  },
+  tags: ['Applications', 'Organizations'],
+  summary: 'Get organization apps (details only)',
+};
