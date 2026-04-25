@@ -471,6 +471,7 @@ export class AuthService {
       if (!organizationsMap.has(orgId)) {
         organizationsMap.set(orgId, {
           id: orgId,
+          account_id: account.id,
           name: account.organization?.name || 'Personal',
           slug: account.organization?.slug || 'personal',
           plan: account.subscription?.plan?.name?.toLowerCase() || 'free',
@@ -505,6 +506,7 @@ export class AuthService {
 
       organizationsMap.set(orgId, {
         id: orgId,
+        account_id: firstAccount?.id,
         name: member.organization.name,
         slug: member.organization.slug,
         plan: firstAccount?.subscription?.plan?.name?.toLowerCase() || 'free',

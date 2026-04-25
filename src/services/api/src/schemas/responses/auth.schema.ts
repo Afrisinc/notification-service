@@ -201,6 +201,7 @@ export const OrganizationsResponseSchema = {
             type: 'object',
             properties: {
               id: { type: 'string', description: 'Organization ID or "personal" for personal account' },
+              account_id: { type: 'string', description: 'Account ID associated with the organization' },
               name: { type: 'string', description: 'Organization name' },
               slug: { type: 'string', description: 'Organization slug for URLs' },
               plan: { type: 'string', description: 'Organization subscription plan (e.g., free, pro, enterprise)' },
@@ -212,7 +213,7 @@ export const OrganizationsResponseSchema = {
               legal_name: { type: ['string', 'null'], description: 'Legal business name' },
               createdAt: { type: 'string', format: 'date-time', description: 'Organization creation date' },
             },
-            required: ['id', 'name', 'slug', 'plan', 'userRole', 'createdAt', 'apps'],
+            required: ['id', 'account_id', 'name', 'slug', 'plan', 'userRole', 'createdAt', 'apps'],
           },
           description: 'List of organizations and their apps',
         },
