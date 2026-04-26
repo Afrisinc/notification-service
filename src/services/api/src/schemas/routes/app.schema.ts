@@ -3,18 +3,31 @@
  * Validation schemas for application CRUD operations and template management
  */
 
+export const GetAppByOrganizationParamsSchema = {
+  type: 'object',
+  properties: {
+    orgId: { type: 'string', description: 'Organization ID' },
+    appId: { type: 'string', description: 'Application ID' },
+  },
+  required: ['orgId', 'appId'],
+};
+
 export const CreateAppTemplateRouteSchema = {
   description: 'Create new template or install existing template on app',
   tags: ['Applications', 'Templates'],
   params: {
     type: 'object',
     properties: {
+      orgId: {
+        type: 'string',
+        description: 'Organization ID',
+      },
       appId: {
         type: 'string',
         description: 'Application ID',
       },
     },
-    required: ['appId'],
+    required: ['orgId', 'appId'],
   },
   body: {
     type: 'object',
@@ -225,6 +238,63 @@ export const CreateAppTemplateRouteSchema = {
   },
 };
 
+export const GetAppTemplatesParamsSchema = {
+  type: 'object',
+  properties: {
+    orgId: { type: 'string', description: 'Organization ID' },
+    appId: { type: 'string', description: 'App ID' },
+  },
+  required: ['orgId', 'appId'],
+};
+
+export const GetAppTemplateByIdParamsSchema = {
+  type: 'object',
+  properties: {
+    orgId: { type: 'string', description: 'Organization ID' },
+    appId: { type: 'string', description: 'App ID' },
+    templateId: { type: 'string', description: 'Template ID' },
+  },
+  required: ['orgId', 'appId', 'templateId'],
+};
+
+export const UpdateAppTemplateParamsSchema = {
+  type: 'object',
+  properties: {
+    orgId: { type: 'string', description: 'Organization ID' },
+    appId: { type: 'string', description: 'App ID' },
+    templateId: { type: 'string', description: 'Template ID' },
+  },
+  required: ['orgId', 'appId', 'templateId'],
+};
+
+export const DeleteAppTemplateParamsSchema = {
+  type: 'object',
+  properties: {
+    orgId: { type: 'string', description: 'Organization ID' },
+    appId: { type: 'string', description: 'App ID' },
+    templateId: { type: 'string', description: 'Template ID' },
+  },
+  required: ['orgId', 'appId', 'templateId'],
+};
+
+export const UpdateAppTemplateBodySchema = {
+  type: 'object',
+  properties: {
+    subject: { type: 'string', description: 'Email subject' },
+    content: { type: 'string', description: 'Template content (HTML)' },
+    description: { type: 'string', description: 'Template description' },
+    design_json: { type: 'object', description: 'Design configuration' },
+    editor_type: {
+      type: 'string',
+      enum: ['visual', 'code'],
+      description: 'Editor type',
+    },
+    code: { type: 'string', description: 'Template code' },
+    channel: { type: 'string', description: 'Notification channel' },
+    language: { type: 'string', description: 'Language code' },
+  },
+};
+
 export const GetAppsByOrganizationDetailsSchema = {
   description: 'Get applications by organization with details only (no metrics)',
   params: {
@@ -258,7 +328,11 @@ export const GetAppsByOrganizationDetailsSchema = {
                 properties: {
                   id: { type: 'string', description: 'App ID' },
                   name: { type: 'string', description: 'App name' },
-                  environment: { type: 'string', enum: ['production', 'staging', 'development'], description: 'Environment' },
+                  environment: {
+                    type: 'string',
+                    enum: ['production', 'staging', 'development'],
+                    description: 'Environment',
+                  },
                   status: { type: 'string', description: 'App status' },
                   createdAt: { type: 'string', format: 'date-time', description: 'Creation date' },
                   templateCount: { type: 'integer', description: 'Number of templates for this app' },

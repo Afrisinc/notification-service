@@ -26,42 +26,50 @@ import {
   RotateApiKeyRouteSchema,
   GetAppsByOrgRouteSchema,
 } from '../schemas';
-import { CreateAppTemplateRouteSchema, GetAppsByOrganizationDetailsSchema } from '../schemas/routes/app.schema';
+import {
+  CreateAppTemplateRouteSchema,
+  GetAppsByOrganizationDetailsSchema,
+  GetAppTemplatesParamsSchema,
+  GetAppTemplateByIdParamsSchema,
+  UpdateAppTemplateParamsSchema,
+  DeleteAppTemplateParamsSchema,
+  UpdateAppTemplateBodySchema,
+} from '../schemas/routes/app.schema';
 import { GetAppOverviewSchema } from '../schemas/routes/app-overview.schema';
 
 export async function registerAppRoutes(app: FastifyInstance) {
   // Create App
   app.post(
-    '/apps',
+    '/organizations/:orgId/apps',
     {
       onRequest: [validateBaseToken],
       schema: {
         ...CreateAppRouteSchema,
         tags: ['Applications'],
         summary: 'Create a new application',
-        description: 'Create a new application within your account',
+        description: 'Create a new application within your organization',
       },
     },
-    createApp
+    asyncWrapper(createApp)
   );
 
-  // List Apps
+  // List Apps (organization-based, replaces old /apps endpoint)
   app.get(
-    '/apps',
+    '/organizations/:orgId/apps-list',
     {
       onRequest: [validateBaseToken],
       schema: {
         ...ListAppsRouteSchema,
         tags: ['Applications'],
-        summary: 'List all applications',
-        description: 'Retrieve all applications for the current account',
+        summary: 'List all applications in organization',
+        description: 'Retrieve all applications for the organization',
       },
     },
-    listApps
+    asyncWrapper(listApps)
   );
   // Get App
   app.get(
-    '/apps/:appId',
+    '/organizations/:orgId/apps/:appId',
     {
       onRequest: [validateBaseToken],
       schema: {
@@ -71,12 +79,12 @@ export async function registerAppRoutes(app: FastifyInstance) {
         description: 'Retrieve details of a specific application',
       },
     },
-    getApp
+    asyncWrapper(getApp)
   );
 
   // Update App
   app.patch(
-    '/apps/:appId',
+    '/organizations/:orgId/apps/:appId',
     {
       onRequest: [validateBaseToken],
       schema: {
@@ -86,12 +94,12 @@ export async function registerAppRoutes(app: FastifyInstance) {
         description: 'Update application details (name, environment, status)',
       },
     },
-    updateApp
+    asyncWrapper(updateApp)
   );
 
   // Delete App
   app.delete(
-    '/apps/:appId',
+    '/organizations/:orgId/apps/:appId',
     {
       onRequest: [validateBaseToken],
       schema: {
@@ -101,12 +109,12 @@ export async function registerAppRoutes(app: FastifyInstance) {
         description: 'Delete an application and all its associated data',
       },
     },
-    deleteApp
+    asyncWrapper(deleteApp)
   );
 
   // Rotate API Key
   app.post(
-    '/apps/:appId/rotate-key',
+    '/organizations/:orgId/apps/:appId/rotate-key',
     {
       onRequest: [validateBaseToken],
       schema: {
@@ -116,7 +124,7 @@ export async function registerAppRoutes(app: FastifyInstance) {
         description: 'Generate a new API key for the application',
       },
     },
-    rotateApiKey
+    asyncWrapper(rotateApiKey)
   );
 
   // Get Apps by Organization (details only, no metrics) - MUST come before generic /organizations/:orgId/apps
@@ -148,114 +156,78 @@ export async function registerAppRoutes(app: FastifyInstance) {
 
   // Create/Install App Template
   app.post(
-    '/apps/:appId/templates',
+    '/organizations/:orgId/apps/:appId/templates',
     {
       onRequest: [validateBaseToken],
       schema: CreateAppTemplateRouteSchema,
     },
-    createAppTemplate
+    asyncWrapper(createAppTemplate)
   );
 
   // Get App Templates
   app.get(
-    '/apps/:appId/templates',
+    '/organizations/:orgId/apps/:appId/templates',
     {
       onRequest: [validateBaseToken],
       schema: {
+        params: GetAppTemplatesParamsSchema,
         tags: ['Applications', 'Templates'],
         summary: 'Get app templates',
         description: 'Retrieve all templates installed on a specific app',
       },
     },
-    getAppTemplates
+    asyncWrapper(getAppTemplates)
   );
 
   // Get App Template by ID
   app.get(
-    '/apps/:appId/templates/:templateId',
+    '/organizations/:orgId/apps/:appId/templates/:templateId',
     {
       onRequest: [validateBaseToken],
       schema: {
-        params: {
-          type: 'object',
-          properties: {
-            appId: { type: 'string', description: 'App ID' },
-            templateId: { type: 'string', description: 'Template ID' },
-          },
-          required: ['appId', 'templateId'],
-        },
+        params: GetAppTemplateByIdParamsSchema,
         tags: ['Applications', 'Templates'],
         summary: 'Get app template details',
         description: 'Retrieve details of a specific template installed on an app',
       },
     },
-    getAppTemplateById
+    asyncWrapper(getAppTemplateById)
   );
 
   // Update App Template
   app.put(
-    '/apps/:appId/templates/:templateId',
+    '/organizations/:orgId/apps/:appId/templates/:templateId',
     {
       onRequest: [validateBaseToken],
       schema: {
-        params: {
-          type: 'object',
-          properties: {
-            appId: { type: 'string', description: 'App ID' },
-            templateId: { type: 'string', description: 'Template ID' },
-          },
-          required: ['appId', 'templateId'],
-        },
-        body: {
-          type: 'object',
-          properties: {
-            subject: { type: 'string', description: 'Email subject' },
-            content: { type: 'string', description: 'Template content (HTML)' },
-            description: { type: 'string', description: 'Template description' },
-            design_json: { type: 'object', description: 'Design configuration' },
-            editor_type: {
-              type: 'string',
-              enum: ['visual', 'code'],
-              description: 'Editor type',
-            },
-            code: { type: 'string', description: 'Template code' },
-            channel: { type: 'string', description: 'Notification channel' },
-            language: { type: 'string', description: 'Language code' },
-          },
-        },
+        params: UpdateAppTemplateParamsSchema,
+        body: UpdateAppTemplateBodySchema,
         tags: ['Applications', 'Templates'],
         summary: 'Update app template',
         description: 'Update an existing template on an app',
       },
     },
-    updateAppTemplate
+    asyncWrapper(updateAppTemplate)
   );
 
   // Delete App Template
   app.delete(
-    '/apps/:appId/templates/:templateId',
+    '/organizations/:orgId/apps/:appId/templates/:templateId',
     {
       onRequest: [validateBaseToken],
       schema: {
-        params: {
-          type: 'object',
-          properties: {
-            appId: { type: 'string', description: 'App ID' },
-            templateId: { type: 'string', description: 'Template ID' },
-          },
-          required: ['appId', 'templateId'],
-        },
+        params: DeleteAppTemplateParamsSchema,
         tags: ['Applications', 'Templates'],
         summary: 'Delete app template',
         description: 'Delete a template from an app (only template owner can delete)',
       },
     },
-    deleteAppTemplate
+    asyncWrapper(deleteAppTemplate)
   );
 
   // Get App Overview
   app.get(
-    '/apps/:appId/overview',
+    '/organizations/:orgId/apps/:appId/overview',
     {
       onRequest: [validateBaseToken],
       schema: {
@@ -265,6 +237,6 @@ export async function registerAppRoutes(app: FastifyInstance) {
         description: 'Retrieve app overview including stats, chart data, and recent activity',
       },
     },
-    getAppOverview
+    asyncWrapper(getAppOverview)
   );
 }

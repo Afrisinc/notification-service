@@ -2,13 +2,7 @@ import { UserRepository } from '../repositories/identity-repositories/user.repos
 import { AccountRepository } from '../repositories/identity-repositories/account.repository';
 import { OrganizationRepository } from '../repositories/identity-repositories/organization.repository';
 import { AuthorizationCodeRepository } from '../repositories/identity-repositories/authorization-code.repository';
-import {
-  comparePassword,
-  generateBaseToken,
-  generateResetToken,
-  hashPassword,
-  verifyToken
-} from '../utils/auth-utils';
+import { comparePassword, generateBaseToken, generateResetToken, hashPassword, verifyToken } from '../utils/auth-utils';
 import { env } from '../config/env';
 import { prismaWrite } from '@shared/database';
 import { recordLoginFailure } from '../utils/securityRecorder';
@@ -512,14 +506,15 @@ export class AuthService {
         plan: firstAccount?.subscription?.plan?.name?.toLowerCase() || 'free',
         createdAt: member.organization.createdAt,
         userRole: member.role,
-        apps: firstAccount?.apps?.map((app) => ({
-          id: app.id,
-          name: app.name,
-          environment: app.environment,
-          api_key: app.api_key,
-          status: app.status,
-          createdAt: app.createdAt,
-        })) || [],
+        apps:
+          firstAccount?.apps?.map((app) => ({
+            id: app.id,
+            name: app.name,
+            environment: app.environment,
+            api_key: app.api_key,
+            status: app.status,
+            createdAt: app.createdAt,
+          })) || [],
       });
     });
 

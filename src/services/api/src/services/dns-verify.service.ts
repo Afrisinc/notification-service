@@ -27,7 +27,10 @@ export class DNSVerifyService {
       return !!dkimRecord;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      logger.warn({ domain, selector, dkimDomain: `${selector}._domainkey.${domain}`, error: msg }, 'DKIM lookup failed');
+      logger.warn(
+        { domain, selector, dkimDomain: `${selector}._domainkey.${domain}`, error: msg },
+        'DKIM lookup failed'
+      );
       return false;
     }
   }

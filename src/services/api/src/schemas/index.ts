@@ -56,32 +56,43 @@ import {
   RotateApiKeyResponseSchema,
   GetAppsByOrganizationResponseSchema,
 } from './responses/app.schema';
+import { GetAppByOrganizationParamsSchema } from './routes/app.schema';
 
 // App Route Schemas (combining request + response)
 export const CreateAppRouteSchema = {
+  params: {
+    type: 'object',
+    properties: {
+      orgId: { type: 'string', description: 'Organization ID' },
+    },
+    required: ['orgId'],
+  },
   body: { ...CreateAppRequestSchema },
   response: {
     201: CreateAppResponseSchema,
     400: errorResponse,
     401: errorResponse,
+    403: errorResponse,
   },
 } as const;
 
 export const ListAppsRouteSchema = {
+  params: {
+    type: 'object',
+    properties: {
+      orgId: { type: 'string', description: 'Organization ID' },
+    },
+    required: ['orgId'],
+  },
   response: {
     200: ListAppsResponseSchema,
     401: errorResponse,
+    403: errorResponse,
   },
 } as const;
 
 export const GetAppRouteSchema = {
-  params: {
-    type: 'object',
-    properties: {
-      appId: { type: 'string', description: 'Application ID' },
-    },
-    required: ['appId'],
-  },
+  params: GetAppByOrganizationParamsSchema,
   response: {
     200: GetAppResponseSchema,
     401: errorResponse,
@@ -94,9 +105,10 @@ export const UpdateAppRouteSchema = {
   params: {
     type: 'object',
     properties: {
+      orgId: { type: 'string', description: 'Organization ID' },
       appId: { type: 'string', description: 'Application ID' },
     },
-    required: ['appId'],
+    required: ['orgId', 'appId'],
   },
   body: { ...UpdateAppRequestSchema },
   response: {
@@ -112,9 +124,10 @@ export const DeleteAppRouteSchema = {
   params: {
     type: 'object',
     properties: {
+      orgId: { type: 'string', description: 'Organization ID' },
       appId: { type: 'string', description: 'Application ID' },
     },
-    required: ['appId'],
+    required: ['orgId', 'appId'],
   },
   response: {
     200: DeleteAppResponseSchema,
@@ -128,9 +141,10 @@ export const RotateApiKeyRouteSchema = {
   params: {
     type: 'object',
     properties: {
+      orgId: { type: 'string', description: 'Organization ID' },
       appId: { type: 'string', description: 'Application ID' },
     },
-    required: ['appId'],
+    required: ['orgId', 'appId'],
   },
   response: {
     200: RotateApiKeyResponseSchema,

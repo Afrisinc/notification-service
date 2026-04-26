@@ -9,7 +9,7 @@ export class AppOverviewService {
    */
   async getAppOverview(
     appId: string,
-    accountId: string,
+    organizationId: string,
     filters?: {
       startDate?: Date;
       endDate?: Date;
@@ -21,7 +21,7 @@ export class AppOverviewService {
       const app = await prismaRead.app.findFirst({
         where: {
           id: appId,
-          account_id: accountId,
+          organization_id: organizationId,
         },
       });
 
@@ -52,7 +52,7 @@ export class AppOverviewService {
         recentActivity: activityData,
       };
     } catch (error) {
-      logger.error({ error, appId, accountId }, 'Failed to get app overview');
+      logger.error({ error, appId, organizationId }, 'Failed to get app overview');
       throw error;
     }
   }

@@ -40,15 +40,20 @@ export interface AppResponse {
 }
 
 export class AppService {
-  async createApp(data: CreateAppRequest): Promise<AppResponse> {
+  async createApp(data: CreateAppRequest, organizationId: string): Promise<AppResponse> {
     if (!data.name || !data.environment || !data.account_id) {
       throw new Error('Name, environment, and account_id are required');
     }
 
-    // Fetch the account to get its organization
+    // Fetch the account to verify it exists and belongs to the organization
     const account = await appRepo.findAccountById(data.account_id);
     if (!account) {
       throw new Error('Account not found');
+    }
+
+    // Verify account belongs to the specified organization
+    if (account.organization_id !== organizationId) {
+      throw new Error('Unauthorized: Account does not belong to this organization');
     }
 
     // Generate unique API key
@@ -57,7 +62,7 @@ export class AppService {
     try {
       const app = await appRepo.create({
         account_id: data.account_id,
-        organization_id: account.organization_id, // Attach the account's organization
+        organization_id: organizationId,
         name: data.name,
         environment: data.environment as any,
         api_key: apiKey,
@@ -70,7 +75,7 @@ export class AppService {
           name: app.name,
           environment: app.environment,
           accountId: data.account_id,
-          organizationId: account.organization_id,
+          organizationId: organizationId,
         },
         'App created successfully'
       );
@@ -78,6 +83,7 @@ export class AppService {
       return {
         id: app.id,
         account_id: app.account_id,
+        organization_id: organizationId,
         name: app.name,
         environment: app.environment,
         api_key: apiKey,
@@ -86,7 +92,7 @@ export class AppService {
         updatedAt: app.updatedAt,
       };
     } catch (error) {
-      logger.error({ error, data }, 'Failed to create app');
+      logger.error({ error, data, organizationId }, 'Failed to create app');
       throw new Error('Failed to create application');
     }
   }
@@ -106,6 +112,49 @@ export class AppService {
 
     if (app.organization_id !== account.organization_id) {
       throw new Error('Unauthorized access to this app');
+    }
+
+    const [templateCount, notificationCount, apiKeyCount] = await prismaRead.$transaction([
+      prismaRead.appTemplate.count({ where: { app_id: appId } }),
+      prismaRead.notification.count({ where: { app_id: appId } }),
+      prismaRead.apiKey.count({ where: { app_id: appId } }),
+    ]);
+
+    return {
+      id: app.id,
+      account_id: app.account_id,
+      organization_id: app.organization_id || undefined,
+      name: app.name,
+      environment: app.environment,
+      api_key: app.api_key,
+      status: app.status,
+      createdAt: app.createdAt,
+      updatedAt: app.updatedAt,
+      templateCount,
+      notificationsSent: notificationCount,
+      apiKeyCount,
+    };
+  }
+
+  async getAppByOrganization(appId: string, organizationId: string): Promise<AppResponse> {
+    const app = await appRepo.findById(appId);
+
+    if (!app) {
+      throw new Error('App not found');
+    }
+
+    // Verify app belongs to the specified organization
+    // Handle legacy apps where organization_id might be null by checking account's organization
+    if (app.organization_id && app.organization_id !== organizationId) {
+      throw new Error('Unauthorized: App does not belong to this organization');
+    }
+
+    if (!app.organization_id) {
+      // Legacy app - verify account belongs to the organization
+      const account = await appRepo.findAccountById(app.account_id);
+      if (account?.organization_id !== organizationId) {
+        throw new Error('Unauthorized: App does not belong to this organization');
+      }
     }
 
     const [templateCount, notificationCount, apiKeyCount] = await prismaRead.$transaction([
@@ -163,22 +212,36 @@ export class AppService {
 
   async updateApp(
     appId: string,
-    accountId: string,
+    organizationId: string,
     data: Partial<{ name: string; environment: string; status: string }>
   ): Promise<AppResponse> {
-    const isOwner = await appRepo.validateOwnership(appId, accountId);
+    const app = await appRepo.findById(appId);
 
-    if (!isOwner) {
-      throw new Error('Unauthorized access to this app');
+    if (!app) {
+      throw new Error('App not found');
+    }
+
+    // Verify app belongs to the specified organization
+    if (app.organization_id && app.organization_id !== organizationId) {
+      throw new Error('Unauthorized: App does not belong to this organization');
+    }
+
+    if (!app.organization_id) {
+      // Legacy app - verify account belongs to the organization
+      const account = await appRepo.findAccountById(app.account_id);
+      if (account?.organization_id !== organizationId) {
+        throw new Error('Unauthorized: App does not belong to this organization');
+      }
     }
 
     const updated = await appRepo.update(appId, data);
 
-    logger.info({ appId, changes: data }, 'App updated');
+    logger.info({ organizationId, appId, changes: data }, 'App updated');
 
     return {
       id: updated.id,
       account_id: updated.account_id,
+      organization_id: updated.organization_id || undefined,
       name: updated.name,
       environment: updated.environment,
       api_key: updated.api_key,
@@ -188,35 +251,56 @@ export class AppService {
     };
   }
 
-  async deleteApp(appId: string, accountId: string): Promise<void> {
-    const isOwner = await appRepo.validateOwnership(appId, accountId);
+  async deleteApp(appId: string, organizationId: string): Promise<void> {
+    const app = await appRepo.findById(appId);
 
-    if (!isOwner) {
-      throw new Error('Unauthorized access to this app');
+    if (!app) {
+      throw new Error('App not found');
+    }
+
+    // Verify app belongs to the specified organization
+    if (app.organization_id && app.organization_id !== organizationId) {
+      throw new Error('Unauthorized: App does not belong to this organization');
+    }
+
+    if (!app.organization_id) {
+      // Legacy app - verify account belongs to the organization
+      const account = await appRepo.findAccountById(app.account_id);
+      if (account?.organization_id !== organizationId) {
+        throw new Error('Unauthorized: App does not belong to this organization');
+      }
     }
 
     await appRepo.delete(appId);
 
-    logger.info({ appId }, 'App deleted');
+    logger.info({ organizationId, appId }, 'App deleted');
   }
 
-  async rotateApiKey(appId: string, accountId: string): Promise<string> {
-    const isOwner = await appRepo.validateOwnership(appId, accountId);
-
-    if (!isOwner) {
-      throw new Error('Unauthorized access to this app');
-    }
-
+  async rotateApiKey(appId: string, organizationId: string): Promise<string> {
     const app = await appRepo.findById(appId);
+
     if (!app) {
       throw new Error('App not found');
+    }
+
+    // Verify app belongs to the specified organization
+    if (app.organization_id && app.organization_id !== organizationId) {
+      throw new Error('Unauthorized: App does not belong to this organization');
+    }
+
+    if (!app.organization_id) {
+      // Legacy app - verify account belongs to the organization
+      const account = await appRepo.findAccountById(app.account_id);
+      if (account?.organization_id !== organizationId) {
+        throw new Error('Unauthorized: App does not belong to this organization');
+      }
     }
 
     const newApiKey = `sk_${app.environment}_${uuidv4().replace(/-/g, '').slice(0, 24)}`;
 
     await appRepo.update(appId, { api_key: newApiKey });
 
-    logger.info({ appId }, 'API key rotated');
+    logger.info({ organizationId, appId }, 'API key rotated');
 
     return newApiKey;
   }
@@ -285,20 +369,22 @@ export class AppService {
     return enrichedApps.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  async createAppTemplate(appId: string, accountId: string, userId: string, data: any) {
-    // Verify app exists and account has access
+  async createAppTemplate(appId: string, organizationId: string, userId: string, data: any) {
+    // Verify app exists and belongs to organization
     const app = await appRepo.findById(appId);
     if (!app) {
       throw new Error('App not found');
     }
 
-    const account = await appRepo.findAccountById(accountId);
-    if (!account) {
-      throw new Error('Account not found');
+    // Verify app belongs to the specified organization
+    if (app.organization_id !== organizationId) {
+      throw new Error('Unauthorized access to this app');
     }
 
-    if (app.organization_id !== account.organization_id) {
-      throw new Error('Unauthorized access to this app');
+    // Get account from app for template creation
+    const account = await appRepo.findAccountById(app.account_id);
+    if (!account) {
+      throw new Error('Account not found');
     }
 
     // Handle two cases: install existing template OR create new template
@@ -344,7 +430,8 @@ export class AppService {
             appId,
             templateId,
             templateCode: data.code,
-            accountId,
+            accountId: account.id,
+            organizationId,
           },
           'New template created for account'
         );
@@ -434,19 +521,14 @@ export class AppService {
     };
   }
 
-  async getAppTemplateById(appId: string, templateId: string, accountId: string) {
-    // Verify app exists and account has access
+  async getAppTemplateById(appId: string, templateId: string, organizationId: string) {
+    // Verify app exists and belongs to organization
     const app = await appRepo.findById(appId);
     if (!app) {
       throw new Error('App not found');
     }
 
-    const account = await appRepo.findAccountById(accountId);
-    if (!account) {
-      throw new Error('Account not found');
-    }
-
-    if (app.organization_id !== account.organization_id) {
+    if (app.organization_id !== organizationId) {
       throw new Error('Unauthorized access to this app');
     }
 
@@ -506,19 +588,14 @@ export class AppService {
     };
   }
 
-  async getAppTemplates(appId: string, accountId: string) {
-    // Verify app exists and account has access
+  async getAppTemplates(appId: string, organizationId: string) {
+    // Verify app exists and belongs to organization
     const app = await appRepo.findById(appId);
     if (!app) {
       throw new Error('App not found');
     }
 
-    const account = await appRepo.findAccountById(accountId);
-    if (!account) {
-      throw new Error('Account not found');
-    }
-
-    if (app.organization_id !== account.organization_id) {
+    if (app.organization_id !== organizationId) {
       throw new Error('Unauthorized access to this app');
     }
 
@@ -660,19 +737,14 @@ export class AppService {
     };
   }
 
-  async updateAppTemplate(appId: string, templateId: string, accountId: string, data: any) {
-    // Verify app exists and account has access
+  async updateAppTemplate(appId: string, templateId: string, organizationId: string, data: any) {
+    // Verify app exists and belongs to organization
     const app = await appRepo.findById(appId);
     if (!app) {
       throw new Error('App not found');
     }
 
-    const account = await appRepo.findAccountById(accountId);
-    if (!account) {
-      throw new Error('Account not found');
-    }
-
-    if (app.organization_id !== account.organization_id) {
+    if (app.organization_id !== organizationId) {
       throw new Error('Unauthorized access to this app');
     }
 
@@ -759,19 +831,14 @@ export class AppService {
     };
   }
 
-  async deleteAppTemplate(appId: string, templateId: string, accountId: string, userId: string) {
-    // Verify app exists and account has access
+  async deleteAppTemplate(appId: string, templateId: string, organizationId: string, userId: string) {
+    // Verify app exists and belongs to organization
     const app = await appRepo.findById(appId);
     if (!app) {
       throw new Error('App not found');
     }
 
-    const account = await appRepo.findAccountById(accountId);
-    if (!account) {
-      throw new Error('Account not found');
-    }
-
-    if (app.organization_id !== account.organization_id) {
+    if (app.organization_id !== organizationId) {
       throw new Error('Unauthorized access to this app');
     }
 
