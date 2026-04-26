@@ -6,9 +6,10 @@ export const GetAppOverviewSchema = {
   params: {
     type: 'object',
     properties: {
+      orgId: { type: 'string', description: 'Organization ID' },
       appId: { type: 'string', format: 'uuid', description: 'Application ID' },
     },
-    required: ['appId'],
+    required: ['orgId', 'appId'],
   },
   querystring: {
     type: 'object',
@@ -17,13 +18,6 @@ export const GetAppOverviewSchema = {
       endDate: { type: 'string', format: 'date-time', description: 'Filter end date (ISO 8601)' },
       channels: { type: 'string', description: 'Comma-separated channels to filter (EMAIL,SMS,PUSH,IN_APP,WHATSAPP)' },
     },
-  },
-  headers: {
-    type: 'object',
-    properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
-    },
-    required: ['x-account-id'],
   },
   response: {
     200: {

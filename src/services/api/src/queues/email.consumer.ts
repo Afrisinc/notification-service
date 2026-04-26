@@ -11,6 +11,7 @@ import { logger } from '../config/logger';
 import { RabbitMQExchange } from '../utils/rabbitmq';
 import { notificationConsumer } from './notification.consumer';
 import { prismaWrite, prismaRead } from '@shared/database';
+import { accountRepository } from '../repositories/account.repository';
 
 /**
  * RabbitMQ Configuration for Email Notifications
@@ -233,15 +234,13 @@ const resolveTenant = async (): Promise<string> => {
         select: { id: true },
       });
 
-      account = await prismaWrite.account.create({
-        data: {
-          id: 'afrisinc-auth-account',
-          type: 'ORGANIZATION',
-          owner_user_id: systemUser.id,
-          organization_id: org.id,
-        },
-        select: { id: true },
+      const createdAccount = await accountRepository.create({
+        id: 'afrisinc-auth-account',
+        type: 'ORGANIZATION',
+        owner_user_id: systemUser.id,
+        organization_id: org.id,
       });
+      account = { id: createdAccount.id };
     }
 
     return account.id;

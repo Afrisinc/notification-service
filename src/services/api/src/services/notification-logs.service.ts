@@ -7,8 +7,9 @@ export class NotificationLogsService {
   /**
    * List app notification logs with filtering
    */
-  async listAppLogs(appId: string, filters: NotificationLogFilters) {
+  async listAppLogs(appId: string, organizationId: string, filters: NotificationLogFilters) {
     try {
+      // Verify app belongs to organization (will be done by repository/caller)
       const page = Math.max(1, filters.page || 1);
       const limit = Math.min(100, Math.max(1, filters.limit || 50));
 
@@ -59,7 +60,7 @@ export class NotificationLogsService {
         },
       };
     } catch (error) {
-      logger.error({ error, appId }, 'Failed to list app logs');
+      logger.error({ error, appId, organizationId }, 'Failed to list app logs');
       throw error;
     }
   }
@@ -109,7 +110,7 @@ export class NotificationLogsService {
   /**
    * Get single notification log
    */
-  async getNotificationLog(appId: string, notificationId: string) {
+  async getNotificationLog(appId: string, organizationId: string, notificationId: string) {
     try {
       const notification = await notificationLogsRepository.findById(notificationId, appId);
 
@@ -119,7 +120,7 @@ export class NotificationLogsService {
 
       return this.formatDetailedNotificationResponse(notification);
     } catch (error) {
-      logger.error({ error, appId, notificationId }, 'Failed to get notification log');
+      logger.error({ error, appId, organizationId, notificationId }, 'Failed to get notification log');
       throw error;
     }
   }
@@ -155,7 +156,11 @@ export class NotificationLogsService {
   /**
    * Get logs for export
    */
-  async getLogsForExport(appId: string, filters: Omit<NotificationLogFilters, 'page' | 'limit'>) {
+  async getLogsForExport(
+    appId: string,
+    organizationId: string,
+    filters: Omit<NotificationLogFilters, 'page' | 'limit'>
+  ) {
     try {
       const dateFrom = filters.dateFrom || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const dateTo = filters.dateTo || new Date();
@@ -168,7 +173,7 @@ export class NotificationLogsService {
 
       return notifications.map((n: any) => this.formatNotificationResponse(n));
     } catch (error) {
-      logger.error({ error, appId }, 'Failed to get logs for export');
+      logger.error({ error, appId, organizationId }, 'Failed to get logs for export');
       throw error;
     }
   }

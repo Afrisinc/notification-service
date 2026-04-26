@@ -4,6 +4,7 @@ import { prismaRead, prismaWrite } from '@shared/database';
 import { NotifyService } from './notify.service';
 import { env } from '../config/env';
 import { template } from 'handlebars';
+import { accountRepository } from '../repositories/account.repository';
 
 const logger = pino();
 
@@ -634,6 +635,15 @@ export class OrganizationService {
           user_id: userId,
           role: invite.role as any, // role is OWNER, ADMIN, or MEMBER
         },
+      });
+
+      // Create account for the user in this organization
+      // This allows the user to create templates and perform operations
+      await accountRepository.create({
+        id: randomUUID(),
+        owner_user_id: userId,
+        organization_id: invite.organization_id,
+        type: 'ORGANIZATION',
       });
 
       // Update invite status to accepted
