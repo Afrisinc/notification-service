@@ -180,7 +180,19 @@ export class AppService {
   }
 
   async listAppsByAccount(accountId: string): Promise<AppResponse[]> {
-    const apps = await appRepo.findByAccountId(accountId);
+    // Get account to find its organization
+    const account = await appRepo.findAccountById(accountId);
+
+    if (!account) {
+      throw new Error('Account not found');
+    }
+
+    if (!account.organization_id) {
+      throw new Error('Account is not associated with an organization');
+    }
+
+    // Fetch all apps for the organization to ensure all members see all org apps
+    const apps = await appRepo.findByOrganizationId(account.organization_id);
 
     const enrichedApps: AppResponse[] = [];
 
