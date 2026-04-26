@@ -393,10 +393,11 @@ export class AppService {
       throw new Error('Unauthorized access to this app');
     }
 
-    // Get account from app for template creation
-    const account = await appRepo.findAccountById(app.account_id);
+    // Get user's account in the organization for template creation
+    // This allows any organization member to create templates under their own account
+    const account = await appRepo.findAccountByUserAndOrganization(userId, organizationId);
     if (!account) {
-      throw new Error('Account not found');
+      throw new Error('User account not found in this organization. Please contact your organization administrator.');
     }
 
     // Handle two cases: install existing template OR create new template

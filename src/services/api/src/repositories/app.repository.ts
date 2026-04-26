@@ -101,4 +101,17 @@ export class AppRepository {
       },
     });
   }
+
+  async findAccountByUserAndOrganization(userId: string, organizationId: string) {
+    return prismaRead.account.findFirst({
+      where: {
+        owner_user_id: userId,
+        organization_id: organizationId,
+      },
+      select: {
+        id: true,
+        organization_id: true,
+      },
+    });
+  }
 }

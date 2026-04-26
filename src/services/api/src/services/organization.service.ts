@@ -636,6 +636,17 @@ export class OrganizationService {
         },
       });
 
+      // Create account for the user in this organization
+      // This allows the user to create templates and perform operations
+      await prismaWrite.account.create({
+        data: {
+          id: randomUUID(),
+          owner_user_id: userId,
+          organization_id: invite.organization_id,
+          type: 'ORGANIZATION',
+        },
+      });
+
       // Update invite status to accepted
       await prismaWrite.organizationInvite.update({
         where: { id: inviteId },
