@@ -33,7 +33,10 @@ export class NotifyController {
 
       const notification = await notifyService.sendNotification(accountId, app_id, { ...body, app_id });
 
-      logger.info({ notificationId: notification.id, appId: app_id, correlationId: request.id }, 'Notification sent successfully');
+      logger.info(
+        { notificationId: notification.id, appId: app_id, correlationId: request.id },
+        'Notification sent successfully'
+      );
 
       const metric = `${body.channel.toLowerCase()}s_per_month`;
       await UsageTrackingService.recordUsage(accountId, app_id, metric, 1);

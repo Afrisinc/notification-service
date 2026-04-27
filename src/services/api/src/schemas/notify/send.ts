@@ -17,7 +17,8 @@
 
 export const sendNotificationRequestBody = {
   type: 'object',
-  description: 'Request to send a single notification. app_id is required when using JWT auth; omit when using an API key (app is derived from the key).',
+  description:
+    'Request to send a single notification. app_id is required when using JWT auth; omit when using an API key (app is derived from the key).',
   required: ['channel', 'recipient', 'payload'],
   properties: {
     channel: {
@@ -122,4 +123,3 @@ export const sendNotificationSchema = {
     },
   },
 };
-

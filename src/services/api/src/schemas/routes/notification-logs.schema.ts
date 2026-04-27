@@ -2,26 +2,81 @@ import { standardErrorResponses } from '../common/error-responses';
 
 const notificationLogObject = {
   type: 'object',
+  description: 'Notification log object - optional fields only present when values exist',
   properties: {
-    id: { type: 'string', format: 'uuid' },
-    appId: { type: 'string', format: 'uuid' },
-    recipient: { type: 'string' },
-    templateId: { type: 'string', format: 'uuid' },
-    templateName: { type: 'string' },
-    channel: { type: 'string', enum: ['EMAIL', 'SMS', 'PUSH', 'IN_APP', 'WHATSAPP'] },
-    status: { type: 'string', enum: ['DELIVERED', 'FAILED', 'PENDING', 'BOUNCED', 'QUEUED'] },
-    provider: { type: 'string' },
-    providerMessageId: { type: ['string', 'null'] },
-    sentAt: { type: ['string', 'null'], format: 'date-time' },
-    deliveredAt: { type: ['string', 'null'], format: 'date-time' },
-    openedAt: { type: ['string', 'null'], format: 'date-time' },
-    clickedAt: { type: ['string', 'null'], format: 'date-time' },
-    bounceType: { type: ['string', 'null'] },
-    errorMessage: { type: ['string', 'null'] },
-    errorCode: { type: ['string', 'null'] },
-    campaignId: { type: ['string', 'null'], format: 'uuid' },
-    metadata: { type: 'object' },
+    id: { type: 'string', format: 'uuid', description: 'Notification ID' },
+    appId: { type: 'string', format: 'uuid', description: 'App ID' },
+    accountId: { type: 'string', format: 'uuid', description: 'Account ID that owns the notification' },
+    recipient: { type: 'string', description: 'Recipient email, phone number, or user ID' },
+    channel: {
+      type: 'string',
+      enum: ['EMAIL', 'SMS', 'PUSH', 'IN_APP', 'WHATSAPP'],
+      description: 'Notification delivery channel',
+    },
+    status: {
+      type: 'string',
+      enum: ['PENDING', 'DELIVERED', 'FAILED', 'BOUNCED', 'SENT'],
+      description: 'Notification status (normalized, QUEUED → PENDING)',
+    },
+    deliveryState: {
+      type: 'string',
+      enum: ['PENDING_QUEUE', 'SENT', 'DELIVERED', 'FAILED', 'BOUNCED'],
+      description:
+        'Delivery state for queue management: PENDING_QUEUE (awaiting send), SENT (sent to provider), or terminal state',
+    },
+    source: { type: 'string', description: 'How notification was triggered (api, ui, automation, webhook, etc.)' },
+    provider: { type: 'string', description: 'Delivery provider (internal, sendgrid, twilio, etc.)' },
+    createdAt: { type: 'string', format: 'date-time', description: 'When notification was created (ISO 8601)' },
+    sentAt: {
+      type: 'string',
+      format: 'date-time',
+      description: 'When notification was sent to provider (ISO 8601). Null if not yet sent.',
+    },
+    retryCount: { type: 'integer', description: 'Number of delivery retry attempts made' },
+    templateId: { type: 'string', format: 'uuid', description: '(Optional) Template ID if from a template' },
+    templateCode: { type: 'string', description: '(Optional) Template code/identifier if from a template' },
+    subject: { type: 'string', description: '(Optional) Email subject or message title' },
+    providerMessageId: {
+      type: 'string',
+      description: '(Optional) Provider message ID for tracking with external service',
+    },
+    deliveredAt: {
+      type: 'string',
+      format: 'date-time',
+      description: '(Optional) When recipient received the notification',
+    },
+    openedAt: {
+      type: 'string',
+      format: 'date-time',
+      description: '(Optional) When recipient opened the notification (email/SMS)',
+    },
+    clickedAt: {
+      type: 'string',
+      format: 'date-time',
+      description: '(Optional) When recipient clicked a link in the notification',
+    },
+    bounceType: {
+      type: 'string',
+      enum: ['hard', 'soft'],
+      description: '(Optional) Type of bounce: hard (permanent) or soft (temporary)',
+    },
+    errorMessage: { type: 'string', description: '(Optional) Error message if delivery failed' },
+    errorCode: { type: 'string', description: '(Optional) Error code if delivery failed' },
   },
+  required: [
+    'id',
+    'appId',
+    'accountId',
+    'recipient',
+    'channel',
+    'status',
+    'deliveryState',
+    'source',
+    'provider',
+    'createdAt',
+    'sentAt',
+    'retryCount',
+  ],
 };
 
 export const ListAppNotificationLogsSchema = {
@@ -30,9 +85,10 @@ export const ListAppNotificationLogsSchema = {
   params: {
     type: 'object',
     properties: {
+      orgId: { type: 'string', description: 'Organization ID' },
       appId: { type: 'string', format: 'uuid', description: 'Application ID' },
     },
-    required: ['appId'],
+    required: ['orgId', 'appId'],
   },
   querystring: {
     type: 'object',
@@ -48,13 +104,6 @@ export const ListAppNotificationLogsSchema = {
       templateId: { type: 'string', format: 'uuid', description: 'Filter by template ID' },
       provider: { type: 'string', description: 'Filter by provider' },
     },
-  },
-  headers: {
-    type: 'object',
-    properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
-    },
-    required: ['x-account-id'],
   },
   response: {
     200: {
@@ -74,14 +123,15 @@ export const ListAppNotificationLogsSchema = {
             totalPages: { type: 'integer' },
             summary: {
               type: 'object',
+              description: 'Statistics based on the filtered results (respects all active filters)',
               properties: {
-                totalCount: { type: 'integer' },
-                deliveredCount: { type: 'integer' },
-                failedCount: { type: 'integer' },
-                pendingCount: { type: 'integer' },
-                bouncedCount: { type: 'integer' },
-                deliveryRate: { type: 'integer' },
-                failureRate: { type: 'integer' },
+                totalCount: { type: 'integer', description: 'Total notifications matching filters' },
+                deliveredCount: { type: 'integer', description: 'Count of delivered notifications' },
+                failedCount: { type: 'integer', description: 'Count of failed notifications' },
+                pendingCount: { type: 'integer', description: 'Count of pending (not yet sent) notifications' },
+                bouncedCount: { type: 'integer', description: 'Count of bounced notifications' },
+                deliveryRate: { type: 'integer', description: 'Percentage of delivered notifications (0-100)' },
+                failureRate: { type: 'integer', description: 'Percentage of failed notifications (0-100)' },
               },
             },
           },
@@ -99,17 +149,11 @@ export const GetAppNotificationLogSchema = {
   params: {
     type: 'object',
     properties: {
+      orgId: { type: 'string', description: 'Organization ID' },
       appId: { type: 'string', format: 'uuid', description: 'Application ID' },
       notificationId: { type: 'string', format: 'uuid', description: 'Notification ID' },
     },
-    required: ['appId', 'notificationId'],
-  },
-  headers: {
-    type: 'object',
-    properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
-    },
-    required: ['x-account-id'],
+    required: ['orgId', 'appId', 'notificationId'],
   },
   response: {
     200: {
@@ -152,9 +196,10 @@ export const ExportNotificationLogsSchema = {
   params: {
     type: 'object',
     properties: {
+      orgId: { type: 'string', description: 'Organization ID' },
       appId: { type: 'string', format: 'uuid', description: 'Application ID' },
     },
-    required: ['appId'],
+    required: ['orgId', 'appId'],
   },
   querystring: {
     type: 'object',
@@ -166,13 +211,6 @@ export const ExportNotificationLogsSchema = {
       dateTo: { type: 'string', format: 'date-time' },
       fields: { type: 'string', description: 'Comma-separated fields to include' },
     },
-  },
-  headers: {
-    type: 'object',
-    properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
-    },
-    required: ['x-account-id'],
   },
   response: {
     200: {
@@ -187,6 +225,13 @@ export const ExportNotificationLogsSchema = {
 export const ListAllNotificationLogsSchema = {
   description: 'List notification logs across all apps (org-level access)',
   tags: ['Notifications', 'Logs'],
+  params: {
+    type: 'object',
+    properties: {
+      orgId: { type: 'string', description: 'Organization ID' },
+    },
+    required: ['orgId'],
+  },
   querystring: {
     type: 'object',
     properties: {
@@ -198,13 +243,6 @@ export const ListAllNotificationLogsSchema = {
       dateTo: { type: 'string', format: 'date-time' },
       appId: { type: 'string', format: 'uuid', description: 'Filter by app' },
     },
-  },
-  headers: {
-    type: 'object',
-    properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
-    },
-    required: ['x-account-id'],
   },
   response: {
     200: {
@@ -250,16 +288,20 @@ export const GetNotificationStatusSchema = {
         data: {
           type: 'object',
           properties: {
-            id: { type: 'string', format: 'uuid' },
-            status: { type: 'string' },
-            recipient: { type: 'string' },
-            channel: { type: 'string' },
-            sentAt: { type: ['string', 'null'], format: 'date-time' },
-            deliveredAt: { type: ['string', 'null'], format: 'date-time' },
-            openedAt: { type: ['string', 'null'], format: 'date-time' },
-            clickedAt: { type: ['string', 'null'], format: 'date-time' },
-            errorMessage: { type: ['string', 'null'] },
-            provider: { type: 'string' },
+            id: { type: 'string', format: 'uuid', description: 'Notification ID' },
+            status: {
+              type: 'string',
+              enum: ['PENDING', 'DELIVERED', 'FAILED', 'BOUNCED', 'SENT'],
+              description: 'Current notification status',
+            },
+            recipient: { type: 'string', description: 'Recipient email, phone, or user ID' },
+            channel: {
+              type: 'string',
+              enum: ['EMAIL', 'SMS', 'PUSH', 'IN_APP', 'WHATSAPP'],
+              description: 'Notification channel',
+            },
+            sentAt: { type: ['string', 'null'], format: 'date-time', description: 'When notification was sent' },
+            createdAt: { type: ['string', 'null'], format: 'date-time', description: 'When notification was created' },
           },
         },
       },
