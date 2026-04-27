@@ -20,8 +20,7 @@ export async function createApp(req: FastifyRequest, reply: FastifyReply) {
 
     const body = req.body as CreateAppRequest;
 
-    // Pass organization ID to service for creation
-    const app = await appService.createApp(body, orgId);
+    const app = await appService.createApp(body, orgId, userId);
 
     logger.info({ userId, orgId, appId: app.id, appName: app.name }, 'App created successfully');
 

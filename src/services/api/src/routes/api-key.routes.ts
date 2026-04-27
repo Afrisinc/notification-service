@@ -13,7 +13,7 @@ const controller = new ApiKeyController();
 export async function apiKeyRoutes(app: FastifyInstance) {
   // Create API key for app
   app.post(
-    '/apps/:appId/api-keys',
+    '/organizations/:orgId/apps/:appId/api-keys',
     {
       schema: CreateApiKeySchema,
       onRequest: [validateBaseToken],
@@ -23,7 +23,7 @@ export async function apiKeyRoutes(app: FastifyInstance) {
 
   // List API keys for app
   app.get(
-    '/apps/:appId/api-keys',
+    '/organizations/:orgId/apps/:appId/api-keys',
     {
       schema: ListApiKeysSchema,
       onRequest: [validateBaseToken],
@@ -33,7 +33,7 @@ export async function apiKeyRoutes(app: FastifyInstance) {
 
   // Get API key details
   app.get(
-    '/apps/:appId/api-keys/:keyId',
+    '/organizations/:orgId/apps/:appId/api-keys/:keyId',
     {
       schema: GetApiKeySchema,
       onRequest: [validateBaseToken],
@@ -43,7 +43,7 @@ export async function apiKeyRoutes(app: FastifyInstance) {
 
   // Revoke API key
   app.delete(
-    '/apps/:appId/api-keys/:keyId',
+    '/organizations/:orgId/apps/:appId/api-keys/:keyId',
     {
       schema: RevokeApiKeySchema,
       onRequest: [validateBaseToken],

@@ -19,8 +19,6 @@ export interface CreateAppRequest {
   name: string;
   environment: 'production' | 'staging' | 'development';
   description?: string;
-  account_id: string;
-  organization_id?: string;
 }
 
 export interface AppResponse {
@@ -40,20 +38,15 @@ export interface AppResponse {
 }
 
 export class AppService {
-  async createApp(data: CreateAppRequest, organizationId: string): Promise<AppResponse> {
-    if (!data.name || !data.environment || !data.account_id) {
-      throw new Error('Name, environment, and account_id are required');
+  async createApp(data: CreateAppRequest, organizationId: string, userId: string): Promise<AppResponse> {
+    if (!data.name || !data.environment) {
+      throw new Error('Name and environment are required');
     }
 
-    // Fetch the account to verify it exists and belongs to the organization
-    const account = await appRepo.findAccountById(data.account_id);
+    // Get user's account in the organization
+    const account = await appRepo.findAccountByUserAndOrganization(userId, organizationId);
     if (!account) {
-      throw new Error('Account not found');
-    }
-
-    // Verify account belongs to the specified organization
-    if (account.organization_id !== organizationId) {
-      throw new Error('Unauthorized: Account does not belong to this organization');
+      throw new Error('User account not found in this organization. Please contact your organization administrator.');
     }
 
     // Generate unique API key
@@ -61,7 +54,7 @@ export class AppService {
 
     try {
       const app = await appRepo.create({
-        account_id: data.account_id,
+        account_id: account.id,
         organization_id: organizationId,
         name: data.name,
         environment: data.environment as any,
@@ -74,8 +67,9 @@ export class AppService {
           appId: app.id,
           name: app.name,
           environment: app.environment,
-          accountId: data.account_id,
+          accountId: account.id,
           organizationId: organizationId,
+          userId,
         },
         'App created successfully'
       );
@@ -388,8 +382,20 @@ export class AppService {
       throw new Error('App not found');
     }
 
+    console.log('App details:', app, organizationId);
+
     // Verify app belongs to the specified organization
-    if (app.organization_id !== organizationId) {
+    let appBelongsToOrg = false;
+
+    if (app.organization_id) {
+      appBelongsToOrg = app.organization_id === organizationId;
+    } else {
+      const appAccount = await appRepo.findAccountById(app.account_id);
+      console.log('App account details:', appAccount);
+      appBelongsToOrg = appAccount?.organization_id === organizationId;
+    }
+
+    if (!appBelongsToOrg) {
       throw new Error('Unauthorized access to this app');
     }
 

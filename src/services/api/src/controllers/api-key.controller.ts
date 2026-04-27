@@ -14,7 +14,7 @@ export class ApiKeyController {
    */
   async createApiKey(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const { appId } = request.params as { appId: string };
+      const { orgId, appId } = request.params as { orgId: string; appId: string };
       const { name, type = 'test' } = request.body as { name: string; type?: 'test' | 'production' };
 
       // Get account from token
@@ -25,7 +25,7 @@ export class ApiKeyController {
 
       const result = await apiKeyService.createApiKey(account_id, appId, name, type);
 
-      logger.info({ keyId: result.id, appId, userId: (request as any).userId }, 'API key created');
+      logger.info({ keyId: result.id, appId, orgId, userId: (request as any).userId }, 'API key created');
 
       // Track usage
       await UsageTrackingService.recordUsage(account_id, appId, 'api_keys', 1);
@@ -42,7 +42,7 @@ export class ApiKeyController {
    */
   async listApiKeys(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const { appId } = request.params as { appId: string };
+      const { orgId, appId } = request.params as { orgId: string; appId: string };
       const { includeRevoked = false } = request.query as {
         includeRevoked?: boolean;
       };
@@ -71,7 +71,9 @@ export class ApiKeyController {
    */
   async getApiKey(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const { keyId } = request.params as {
+      const { orgId, appId, keyId } = request.params as {
+        orgId: string;
+        appId: string;
         keyId: string;
       };
 
@@ -98,7 +100,9 @@ export class ApiKeyController {
    */
   async revokeApiKey(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const { keyId } = request.params as {
+      const { orgId, appId, keyId } = request.params as {
+        orgId: string;
+        appId: string;
         keyId: string;
       };
 
@@ -110,7 +114,7 @@ export class ApiKeyController {
 
       const result = await apiKeyService.revokeApiKey(keyId, account_id);
 
-      logger.info({ keyId, userId: (request as any).userId }, 'API key revoked');
+      logger.info({ keyId, orgId, appId, userId: (request as any).userId }, 'API key revoked');
 
       return ApiResponseHelper.success(reply, 'API key revoked successfully', result);
     } catch (error) {
