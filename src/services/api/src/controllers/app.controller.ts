@@ -19,7 +19,7 @@ export async function createApp(req: FastifyRequest, reply: FastifyReply) {
     }
 
     const body = req.body as CreateAppRequest;
-    
+
     const app = await appService.createApp(body, orgId, userId);
 
     logger.info({ userId, orgId, appId: app.id, appName: app.name }, 'App created successfully');

@@ -391,7 +391,7 @@ export class AppService {
       appBelongsToOrg = app.organization_id === organizationId;
     } else {
       const appAccount = await appRepo.findAccountById(app.account_id);
-      console.log('App account details:', appAccount);  
+      console.log('App account details:', appAccount);
       appBelongsToOrg = appAccount?.organization_id === organizationId;
     }
 
