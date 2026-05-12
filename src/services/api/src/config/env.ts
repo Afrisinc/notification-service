@@ -24,12 +24,12 @@ export const env = cleanEnv(process.env, {
   APP_URL: url({ default: 'http://localhost:3000' }),
 
   // Tenant & Company Info
-  ACCOUNT_ID: str({ default: 'afrisinc-notify-account' }),
   COMPANY_NAME: str({ default: 'Afrisinc' }),
   SUPPORT_EMAIL: str({ default: 'support@afrisinc.com' }),
   FROM_EMAIL: str({ default: 'noreply@afrisinc.com' }),
 
   // System App ID (for organization invites and system notifications)
+  SYSTEM_ACCOUNT_ID: str({ default: 'afrisinc-notify-account' }),
   SYSTEM_APP_ID: str({ default: 'system-org-app' }),
   RESET_PASSWORD_TEMPLATE_ID: str({ default: 'system-reset-password' }),
   VERIFY_EMAIL_TEMPLATE_ID: str({ default: 'system-verify-email' }),

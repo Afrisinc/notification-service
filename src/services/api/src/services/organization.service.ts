@@ -270,7 +270,7 @@ export class OrganizationService {
         // Extract member name from email (part before @)
         const memberName = email.split('@')[0];
 
-        await notifyService.sendNotification(env.ACCOUNT_ID, env.SYSTEM_APP_ID, {
+        await notifyService.sendNotification(env.SYSTEM_ACCOUNT_ID, env.SYSTEM_APP_ID, {
           channel: 'EMAIL',
           recipient: email,
           templateId: env.INVITE_MEMBER_TEMPLATE_ID, // Organization invite template
