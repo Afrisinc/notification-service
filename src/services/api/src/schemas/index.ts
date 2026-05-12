@@ -1,18 +1,3 @@
-/**
- * Central export point for all API schemas
- *
- * Schema organization:
- * - common/: Shared schemas (errors, pagination, headers)
- * - notify/: Notification endpoint schemas
- * - template/: Template endpoint schemas
- * - requests/: Request schemas
- * - responses/: Response schemas
- *
- * Usage:
- * import { sendNotificationSchema } from '@/schemas';
- * import { createTemplateSchema } from '@/schemas';
- */
-
 // Import common schemas first to resolve dependencies
 import { errorResponse } from './common/error-responses';
 

@@ -1,11 +1,10 @@
 import { logger } from '../config/logger';
 import { prismaWrite, prismaRead } from '@shared/database';
-import { IQueuePublisher, QueueMessage, QueuePublisherFactory, QueuePublisherConfig } from './queue';
+import { IQueuePublisher, QueuePublisherFactory, QueuePublisherConfig } from './queue';
 import { Template } from '../types/template';
 import {
   Notification,
   SendNotificationRequest,
-  BulkSendRequest,
   BulkSendResponse,
   Channel,
   NotificationStatus,
@@ -34,7 +33,7 @@ export class NotifyService {
 
     // TEMPLATE MODE: if templateId provided
     if (request.templateId) {
-      template = await prismaWrite.template.findUnique({
+      template = await prismaRead.template.findUnique({
         where: { id: request.templateId },
       });
 

@@ -123,17 +123,12 @@ export class AuthService {
       const verificationUrl = `${env.WEBAPP_URL}/verify-email?token=${verificationToken}`;
 
       // Publish verification email notification via queue
-      const queuePublisher = getQueuePublisher();
-      const notificationId = `verify-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-
-      await queuePublisher.publish({
-        notificationId,
-        tenantId: env.ACCOUNT_ID, // Use system account ID for transactional emails
+      const notifyService = new NotifyService();
+      await notifyService.sendNotification(env.SYSTEM_ACCOUNT_ID, env.SYSTEM_APP_ID, {
         channel: NOTIFICATION_CHANNELS.EMAIL as 'EMAIL',
         recipient: result.user.email,
-        templateCode: NOTIFICATION_TEMPLATES.AUTH_VERIFY_EMAIL,
         templateId: env.VERIFY_EMAIL_TEMPLATE_ID,
-        appId: env.SYSTEM_APP_ID,
+        app_id: env.SYSTEM_APP_ID,
         payload: {
           firstName: result.user.firstName,
           verificationUrl,
@@ -141,7 +136,6 @@ export class AuthService {
           supportEmail: env.SUPPORT_EMAIL,
         },
         priority: 'HIGH',
-        timestamp: new Date(),
       });
 
       logger.info({ userId: result.user.id, email: result.user.email }, 'Verification email published');
@@ -262,7 +256,7 @@ export class AuthService {
 
       await queuePublisher.publish({
         notificationId,
-        tenantId: env.ACCOUNT_ID, // Use system account ID for transactional emails
+        tenantId: env.SYSTEM_ACCOUNT_ID, // Use system account ID for transactional emails
         channel: 'EMAIL',
         recipient: user.email,
         templateCode: NOTIFICATION_TEMPLATES.AUTH_PASSWORD_RESET,
@@ -390,7 +384,7 @@ export class AuthService {
       const verificationToken = generateResetToken(user.id, user.email);
       const verificationUrl = `${env.WEBAPP_URL}/verify-email?token=${verificationToken}`;
       const userName = user.email.split('@')[0];
-      await notifyService.sendNotification(env.ACCOUNT_ID, env.SYSTEM_APP_ID, {
+      await notifyService.sendNotification(env.SYSTEM_ACCOUNT_ID, env.SYSTEM_APP_ID, {
         channel: 'EMAIL',
         recipient: user.email,
         templateId: env.VERIFY_EMAIL_TEMPLATE_ID,
