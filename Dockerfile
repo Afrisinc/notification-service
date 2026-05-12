@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install pnpm
-RUN npm install -g pnpm@latest
+RUN corepack enable && corepack prepare pnpm@10 --activate
 
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
