@@ -119,6 +119,8 @@ export class NotifyService {
       // Continue without custom config - will use platform default in worker
     }
 
+    
+
     // Publish to queue with rendered content
     await queuePublisher.publish({
       notificationId: notification.id,
@@ -126,14 +128,12 @@ export class NotifyService {
       appId: appId, // Include app ID for reference
       channel: request.channel,
       recipient: request.recipient,
-      templateCode: template?.code || 'DIRECT_MESSAGE',
       templateId: request.templateId,
       subject: renderedSubject,
       body: renderedContent,
       payload: request.payload,
       priority: request.priority || 'NORMAL',
       timestamp: new Date(),
-      // Email sender information (resolved at publish time)
       fromEmail: fromEmail,
       fromName: fromName,
     });

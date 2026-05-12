@@ -251,17 +251,13 @@ export class AuthService {
 
     // Send reset password email
     try {
-      const queuePublisher = getQueuePublisher();
-      const notificationId = `reset-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-
-      await queuePublisher.publish({
-        notificationId,
-        tenantId: env.SYSTEM_ACCOUNT_ID, // Use system account ID for transactional emails
-        channel: 'EMAIL',
+      
+      const notifyService = new NotifyService();
+      await notifyService.sendNotification(env.SYSTEM_ACCOUNT_ID, env.SYSTEM_APP_ID, {
+        channel: NOTIFICATION_CHANNELS.EMAIL as 'EMAIL',
         recipient: user.email,
-        templateCode: NOTIFICATION_TEMPLATES.AUTH_PASSWORD_RESET,
         templateId: env.RESET_PASSWORD_TEMPLATE_ID,
-        appId: env.SYSTEM_APP_ID,
+        app_id: env.SYSTEM_APP_ID,
         payload: {
           firstName: user.firstName,
           resetLink,
@@ -270,8 +266,8 @@ export class AuthService {
           supportEmail: env.SUPPORT_EMAIL,
         },
         priority: 'HIGH',
-        timestamp: new Date(),
       });
+
 
       logger.info({ userId: user.id, email: user.email }, 'Reset password email published');
     } catch (emailError) {
