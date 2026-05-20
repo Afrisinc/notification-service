@@ -20,15 +20,15 @@ const DANGEROUS_PATTERNS = [
 ];
 
 const SQL_INJECTION_PATTERNS = [
-  /(\%27)|(\')|(\-\-)|(\%23)|(#)/gi,
-  /((\%3D)|(=))[^\n]*((\%27)|(\')|(\-\-)|(\%3B)|(;))/gi,
-  /\w*((\%27)|(\'))((\%6F)|o|(\%4F))((\%72)|r|(\%52))/gi,
-  /((\%27)|(\'))union/gi,
+  /(%27)|(')|(--)|(%23)|(#)/gi,
+  /((%3D)|(=))[^\n]*((%27)|(')|(--)|(%3B)|(;))/gi,
+  /\w*((%27)|('))((%6F)|o|(%4F))((%72)|r|(%52))/gi,
+  /((%27)|('))union/gi,
 ];
 
 export function escapeHtml(str: string): string {
   if (typeof str !== 'string') return str;
-  return str.replace(/[&<>"'`=\/]/g, (char) => HTML_ENTITIES[char] || char);
+  return str.replace(/[&<>"'`=/]/g, (char) => HTML_ENTITIES[char] || char);
 }
 
 export function stripHtmlTags(str: string): string {
