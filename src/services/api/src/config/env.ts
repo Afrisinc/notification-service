@@ -36,6 +36,13 @@ export const env = cleanEnv(process.env, {
   WELCOME_EMAIL_TEMPLATE_ID: str({ default: 'system-welcome-email' }),
   INVITE_MEMBER_TEMPLATE_ID: str({ default: 'system-invite-member' }),
 
+  // Admin Alerts & System Notifications
+  ADMIN_EMAILS: str({ default: '' }),
+  SYSTEM_ALERT_TEMPLATE_ID: str({ default: '' }),
+  USAGE_APPROACHING_LIMIT_TEMPLATE_ID: str({ default: '' }),
+  USAGE_LIMIT_EXCEEDED_TEMPLATE_ID: str({ default: '' }),
+  ALERT_WEBHOOK_URL: str({ default: '' }),
+
   // SMTP Configuration (optional)
   SMTP_HOST: str({ default: 'localhost' }),
   SMTP_PORT: port({ default: 587 }),

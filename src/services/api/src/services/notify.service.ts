@@ -119,8 +119,6 @@ export class NotifyService {
       // Continue without custom config - will use platform default in worker
     }
 
-    
-
     // Publish to queue with rendered content
     await queuePublisher.publish({
       notificationId: notification.id,
