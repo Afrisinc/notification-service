@@ -155,8 +155,19 @@ export class PlanEnforcementMiddleware {
         where: { account_id: accountId },
         include: { plan: true },
       });
-      return subscription?.plan.name === 'PAYG';
-    } catch {
+      const isPayg = subscription?.plan.name === 'PAYG';
+      logger.debug(
+        {
+          accountId,
+          hasSubscription: !!subscription,
+          planName: subscription?.plan?.name,
+          isPayg,
+        },
+        '[PAYG] isPaygAccount check'
+      );
+      return isPayg;
+    } catch (error) {
+      logger.error({ error, accountId }, '[PAYG] isPaygAccount check failed');
       return false;
     }
   }

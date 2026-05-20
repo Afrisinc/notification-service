@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { TemplateController } from '../controllers/template.controller';
 import { asyncWrapper } from '../middlewares/async_wrapper.middleware';
 import { validateBaseToken } from '../middlewares/auth.middleware';
+import { planGuards } from '../guards/plan-guard';
 import {
   CreateTemplateRouteSchema,
   ListTemplatesRouteSchema,
@@ -44,7 +45,11 @@ export async function registerTemplateRoutes(fastify: FastifyInstance) {
   // Create new template
   fastify.post(
     '/templates',
-    { onRequest: [validateBaseToken], schema: CreateTemplateRouteSchema },
+    {
+      onRequest: [validateBaseToken],
+      preHandler: [planGuards.checkEntityLimit('templates')],
+      schema: CreateTemplateRouteSchema,
+    },
     asyncWrapper(controller.createTemplate.bind(controller))
   );
 
@@ -105,10 +110,14 @@ export async function registerTemplateRoutes(fastify: FastifyInstance) {
     asyncWrapper(controller.getInstallationStatus.bind(controller))
   );
 
-  // Get template analytics (specific path BEFORE generic :id) - PROTECTED
+  // Get template analytics (specific path BEFORE generic :id) - PROTECTED, requires advanced_analytics
   fastify.get(
     '/templates/:id/analytics',
-    { onRequest: [validateBaseToken], schema: GetTemplateRouteSchema },
+    {
+      onRequest: [validateBaseToken],
+      preHandler: [planGuards.requireFeature('advanced_analytics')],
+      schema: GetTemplateRouteSchema,
+    },
     asyncWrapper(controller.getTemplateAnalytics.bind(controller))
   );
 

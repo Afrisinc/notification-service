@@ -36,9 +36,12 @@ export class NotifyController {
 
       // ── PAYG: check balance before sending ────────────────────────────────
       const isPayg = await PlanEnforcementMiddleware.isPaygAccount(accountId);
+      logger.debug({ accountId, isPayg, correlationId: request.id }, '[PAYG] Account plan check');
+
       if (isPayg) {
         const channel = body.channel as PaygChannel;
         const balanceCheck = await PaygService.checkSufficientBalance(accountId, channel, 1);
+        logger.debug({ accountId, channel, balanceCheck, correlationId: request.id }, '[PAYG] Pre-send balance check');
         if (!balanceCheck.sufficient) {
           return ApiResponseHelper.error(
             reply,
@@ -58,12 +61,30 @@ export class NotifyController {
 
       if (isPayg) {
         // ── PAYG: deduct credits & fire low-balance alert ──────────────────
-        await PaygService.deductCredits({
+        const deductResult = await PaygService.deductCredits({
           accountId,
           channel: body.channel as PaygChannel,
           quantity: 1,
           notificationId: notification.id,
         });
+        logger.info(
+          {
+            accountId,
+            notificationId: notification.id,
+            channel: body.channel,
+            deducted: deductResult.amountDeducted,
+            newBalance: deductResult.newBalance,
+            success: deductResult.success,
+            correlationId: request.id,
+          },
+          '[PAYG] Credit deduction result'
+        );
+        if (!deductResult.success) {
+          logger.error(
+            { accountId, notificationId: notification.id, deductResult },
+            '[PAYG] Credit deduction failed after notification was queued'
+          );
+        }
         PaygService.checkAndAlertLowBalance(accountId).catch(() => {});
       } else {
         // ── Subscription: record usage against monthly quota ───────────────
@@ -114,9 +135,15 @@ export class NotifyController {
 
       // ── PAYG: pre-flight balance check for the full batch ─────────────────
       const isPayg = await PlanEnforcementMiddleware.isPaygAccount(accountId);
+      logger.debug({ accountId, isPayg, correlationId: request.id }, '[PAYG] Bulk send plan check');
+
       if (isPayg) {
         const quantity = body.notifications.length;
         const balanceCheck = await PaygService.checkSufficientBalance(accountId, channel, quantity);
+        logger.debug(
+          { accountId, channel, quantity, balanceCheck, correlationId: request.id },
+          '[PAYG] Bulk pre-send balance check'
+        );
         if (!balanceCheck.sufficient) {
           return ApiResponseHelper.error(
             reply,
@@ -137,11 +164,29 @@ export class NotifyController {
       if (isPayg) {
         // ── PAYG: deduct credits for each accepted message ─────────────────
         if (response.accepted > 0) {
-          await PaygService.deductCredits({
+          const deductResult = await PaygService.deductCredits({
             accountId,
             channel,
             quantity: response.accepted,
           });
+          logger.info(
+            {
+              accountId,
+              channel,
+              quantity: response.accepted,
+              deducted: deductResult.amountDeducted,
+              newBalance: deductResult.newBalance,
+              success: deductResult.success,
+              correlationId: request.id,
+            },
+            '[PAYG] Bulk credit deduction result'
+          );
+          if (!deductResult.success) {
+            logger.error(
+              { accountId, deductResult },
+              '[PAYG] Bulk credit deduction failed after notifications were queued'
+            );
+          }
           PaygService.checkAndAlertLowBalance(accountId).catch(() => {});
         }
       } else {

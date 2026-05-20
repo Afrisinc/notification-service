@@ -1,24 +1,10 @@
 import pino from 'pino';
+import { AlertType, AlertSeverity } from '@prisma/client';
 import { getConfig } from '@shared/config';
 import { NotifyService } from './notify.service';
+import { systemAlertRepository } from '../repositories/system-alert.repository';
 
-export enum AlertSeverity {
-  INFO = 'info',
-  WARNING = 'warning',
-  ERROR = 'error',
-  CRITICAL = 'critical',
-}
-
-export enum AlertType {
-  CIRCUIT_BREAKER_OPEN = 'circuit_breaker_open',
-  CIRCUIT_BREAKER_RECOVERED = 'circuit_breaker_recovered',
-  DLQ_THRESHOLD_EXCEEDED = 'dlq_threshold_exceeded',
-  RATE_LIMIT_ABUSE = 'rate_limit_abuse',
-  PROVIDER_FAILURE = 'provider_failure',
-  EMAIL_PROVIDER_UNHEALTHY = 'email_provider_unhealthy',
-  HIGH_ERROR_RATE = 'high_error_rate',
-  USAGE_LIMIT_CRITICAL = 'usage_limit_critical',
-}
+export { AlertType, AlertSeverity };
 
 export interface AlertPayload {
   type: AlertType;
@@ -105,7 +91,20 @@ class AdminAlertsService {
       return;
     }
 
-    // Always log the alert
+    // Store alert in database
+    try {
+      await systemAlertRepository.create({
+        type: alert.type,
+        severity: alert.severity,
+        title: alert.title,
+        message: alert.message,
+        metadata: alert.metadata,
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to store alert in database');
+    }
+
+    // Log the alert
     logger.warn(
       {
         alertType: alert.type,
@@ -143,7 +142,7 @@ class AdminAlertsService {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        text: `[${alert.severity.toUpperCase()}] ${alert.title}`,
+        text: `[${alert.severity}] ${alert.title}`,
         attachments: [
           {
             color: colors[alert.severity],
@@ -182,7 +181,7 @@ class AdminAlertsService {
             timestamp,
             ...alert.metadata,
           },
-          priority: priority,
+          priority,
         });
       } catch (error) {
         logger.error({ email, error }, 'Failed to send admin alert email');
@@ -192,13 +191,12 @@ class AdminAlertsService {
     logger.info({ count: this.adminEmails.length }, 'Admin alert emails sent');
   }
 
-  // Convenience methods for common alerts
   async circuitBreakerOpen(provider: string, failures: number): Promise<void> {
     await this.sendAlert({
       type: AlertType.CIRCUIT_BREAKER_OPEN,
       severity: AlertSeverity.ERROR,
       title: `Circuit Breaker OPEN: ${provider}`,
-      message: `Provider ${provider} circuit breaker opened after ${failures} consecutive failures. Traffic will fail over to backup providers.`,
+      message: `Provider ${provider} circuit breaker opened after ${failures} consecutive failures.`,
       metadata: { provider, failures },
     });
   }
@@ -218,7 +216,7 @@ class AdminAlertsService {
       type: AlertType.DLQ_THRESHOLD_EXCEEDED,
       severity: AlertSeverity.WARNING,
       title: `DLQ Alert: ${queue}`,
-      message: `Dead letter queue ${queue} has ${count} messages (threshold: ${threshold}). Manual review required.`,
+      message: `Dead letter queue ${queue} has ${count} messages (threshold: ${threshold}).`,
       metadata: { queue, count, threshold },
     });
   }

@@ -10,6 +10,7 @@ import {
   exportContacts,
 } from '../controllers/contact.controller';
 import { validateBaseToken } from '../middlewares/auth.middleware';
+import { planGuards } from '../guards/plan-guard';
 import {
   ListContactsSchema,
   CreateContactSchema,
@@ -68,6 +69,7 @@ export async function registerContactRoutes(app: FastifyInstance) {
     '/apps/:appId/contacts/import',
     {
       onRequest: [validateBaseToken],
+      preHandler: [planGuards.checkEntityLimit('contacts')],
       schema: BulkImportContactsSchema,
     },
     bulkImportContacts

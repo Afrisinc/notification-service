@@ -17,6 +17,7 @@ import {
 } from '../controllers/app.controller';
 import { validateBaseToken } from '../middlewares/auth.middleware';
 import { asyncWrapper } from '../middlewares/async_wrapper.middleware';
+import { planGuards } from '../guards/plan-guard';
 import {
   CreateAppRouteSchema,
   ListAppsRouteSchema,
@@ -43,6 +44,7 @@ export async function registerAppRoutes(app: FastifyInstance) {
     '/organizations/:orgId/apps',
     {
       onRequest: [validateBaseToken],
+      preHandler: [planGuards.checkEntityLimit('apps')],
       schema: {
         ...CreateAppRouteSchema,
         tags: ['Applications'],
@@ -159,6 +161,7 @@ export async function registerAppRoutes(app: FastifyInstance) {
     '/organizations/:orgId/apps/:appId/templates',
     {
       onRequest: [validateBaseToken],
+      preHandler: [planGuards.checkEntityLimit('templates')],
       schema: CreateAppTemplateRouteSchema,
     },
     asyncWrapper(createAppTemplate)

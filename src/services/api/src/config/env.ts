@@ -62,4 +62,7 @@ export const env = cleanEnv(process.env, {
   // Assets Service (Marketplace file uploads)
   ASSETS_API_URL: str({ default: 'http://localhost:8080' }),
   ASSETS_API_KEY: str({ default: 'dev-api-key' }),
+
+  // DLQ Alert Threshold
+  DLQ_ALERT_THRESHOLD: str({ default: '100' }),
 });
