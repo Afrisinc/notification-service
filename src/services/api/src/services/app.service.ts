@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../config/logger';
 import { AppRepository } from '../repositories/app.repository';
+import { accountRepository } from '../repositories/account.repository';
 import { appTemplateRepository } from '../repositories/template-installation.repository';
 import { TemplateRepository } from '../repositories/template.repository';
 import {
@@ -382,8 +383,6 @@ export class AppService {
       throw new Error('App not found');
     }
 
-    console.log('App details:', app, organizationId);
-
     // Verify app belongs to the specified organization
     let appBelongsToOrg = false;
 
@@ -391,7 +390,6 @@ export class AppService {
       appBelongsToOrg = app.organization_id === organizationId;
     } else {
       const appAccount = await appRepo.findAccountById(app.account_id);
-      console.log('App account details:', appAccount);
       appBelongsToOrg = appAccount?.organization_id === organizationId;
     }
 
@@ -399,11 +397,10 @@ export class AppService {
       throw new Error('Unauthorized access to this app');
     }
 
-    // Get user's account in the organization for template creation
-    // This allows any organization member to create templates under their own account
-    const account = await appRepo.findAccountByUserAndOrganization(userId, organizationId);
+    // Get organization's account for template creation (1 org = 1 account)
+    const account = await accountRepository.findAccountByOrganizationId(organizationId);
     if (!account) {
-      throw new Error('User account not found in this organization. Please contact your organization administrator.');
+      throw new Error('Organization account not found. Please contact support.');
     }
 
     // Handle two cases: install existing template OR create new template

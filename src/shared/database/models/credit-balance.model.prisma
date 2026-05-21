@@ -1,0 +1,20 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: BILLING & PAYG
+// Credit balance for pay-as-you-go accounts
+////////////////////////////////////////////////////////////
+
+model CreditBalance {
+  id          String   @id @default(uuid())
+  account_id  String   @unique
+  balance     Float    @default(0) // USD balance (e.g. 25.00)
+  currency    Currency   @default(USD)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  // Relations
+  account      Account              @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  transactions CreditTransaction[]
+
+  @@index([account_id])
+  @@map("credit_balances")
+}

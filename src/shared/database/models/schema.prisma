@@ -129,8 +129,28 @@ enum GmailAuthMethod {
 }
 
 enum EmailProvider {
-  gmail         
-  sendgrid       
+  gmail
+  sendgrid
   notify          // Your own SMTP server
   custom_domain   // Custom domain with DKIM/SPF/DMARC
+}
+
+// Alert Severity Levels (for admin/system alerts)
+enum AlertSeverity {
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}
+
+// Alert Types (system monitoring alerts)
+enum AlertType {
+  CIRCUIT_BREAKER_OPEN
+  CIRCUIT_BREAKER_RECOVERED
+  DLQ_THRESHOLD_EXCEEDED
+  RATE_LIMIT_ABUSE
+  PROVIDER_FAILURE
+  EMAIL_PROVIDER_UNHEALTHY
+  HIGH_ERROR_RATE
+  USAGE_LIMIT_CRITICAL
 }

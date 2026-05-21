@@ -11,6 +11,7 @@ import {
   getWebhookLogs,
 } from '../controllers/app-settings.controller';
 import { validateBaseToken } from '../middlewares/auth.middleware';
+import { planGuards } from '../guards/plan-guard';
 import {
   GetAppSettingsSchema,
   UpdateAppSettingsSchema,
@@ -49,6 +50,7 @@ export async function registerAppSettingsRoutes(app: FastifyInstance) {
     '/apps/:appId/settings/domains',
     {
       onRequest: [validateBaseToken],
+      preHandler: [planGuards.checkCustomDomainLimit()],
       schema: UpdateAllowedDomainsSchema,
     },
     updateAllowedDomains
@@ -69,6 +71,7 @@ export async function registerAppSettingsRoutes(app: FastifyInstance) {
     '/apps/:appId/webhooks',
     {
       onRequest: [validateBaseToken],
+      preHandler: [planGuards.checkWebhookLimit()],
       schema: CreateWebhookSchema,
     },
     createWebhook

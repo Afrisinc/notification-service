@@ -7,16 +7,18 @@ import {
   RevokeApiKeySchema,
 } from '../schemas/routes/api-key.schema';
 import { validateBaseToken } from '../middlewares/auth.middleware';
+import { planGuards } from '../guards/plan-guard';
 
 const controller = new ApiKeyController();
 
 export async function apiKeyRoutes(app: FastifyInstance) {
-  // Create API key for app
+  // Create API key for app (requires api_access feature and api_keys entity limit)
   app.post(
     '/organizations/:orgId/apps/:appId/api-keys',
     {
       schema: CreateApiKeySchema,
       onRequest: [validateBaseToken],
+      preHandler: [planGuards.requireFeature('api_access'), planGuards.checkEntityLimit('api_keys')],
     },
     controller.createApiKey.bind(controller)
   );

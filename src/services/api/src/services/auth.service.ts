@@ -251,7 +251,6 @@ export class AuthService {
 
     // Send reset password email
     try {
-      
       const notifyService = new NotifyService();
       await notifyService.sendNotification(env.SYSTEM_ACCOUNT_ID, env.SYSTEM_APP_ID, {
         channel: NOTIFICATION_CHANNELS.EMAIL as 'EMAIL',
@@ -267,7 +266,6 @@ export class AuthService {
         },
         priority: 'HIGH',
       });
-
 
       logger.info({ userId: user.id, email: user.email }, 'Reset password email published');
     } catch (emailError) {

@@ -1,0 +1,23 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: SYSTEM MONITORING
+// Audit trail for system alerts sent to admins
+////////////////////////////////////////////////////////////
+
+model SystemAlert {
+  id          String        @id @default(uuid())
+  type        AlertType
+  severity    AlertSeverity
+  title       String
+  message     String        @db.Text
+  metadata    Json?
+  resolved    Boolean       @default(false)
+  resolved_at DateTime?
+  resolved_by String?
+  created_at  DateTime      @default(now())
+
+  @@index([type])
+  @@index([severity])
+  @@index([created_at])
+  @@index([resolved])
+  @@map("system_alerts")
+}

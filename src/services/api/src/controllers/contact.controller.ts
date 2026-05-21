@@ -2,6 +2,8 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { contactService } from '../services/contact.service';
 import { UsageTrackingService } from '../services/usage-tracking.service';
 import { NotifyService } from '../services/notify.service';
+import { PaygService } from '../services/payg.service';
+import { PlanEnforcementMiddleware } from '../middleware/plan-enforcement.middleware';
 import { ApiResponseHelper } from '../utils';
 import { prismaRead } from '@shared/database';
 import pino from 'pino';
@@ -84,6 +86,17 @@ export async function createContact(req: FastifyRequest, reply: FastifyReply) {
       accountId = app.account_id;
     }
 
+    // Check contact limit before creation
+    const limitCheck = await PlanEnforcementMiddleware.checkEntityLimit(accountId, 'contacts');
+    if (!limitCheck.allowed) {
+      return ApiResponseHelper.error(
+        reply,
+        `Cannot create more contacts. Plan limit reached: ${limitCheck.limit}. Please upgrade your plan.`,
+        4020,
+        403
+      );
+    }
+
     // Add contact_form tag if source is contact_form
     const tags = body.tags || [];
     if (body.source === 'contact_form' && !tags.includes('contact_form')) {
@@ -131,23 +144,62 @@ export async function createContact(req: FastifyRequest, reply: FastifyReply) {
         });
 
         if (template) {
-          // Send auto-reply notification asynchronously (non-blocking)
-          notifyService
-            .sendNotification(accountId, appId, {
-              channel: 'EMAIL',
-              recipient: body.email,
-              templateId: template.id,
-              app_id: appId,
-              payload: {
-                firstName: body.firstName || 'Valued Customer',
-                companyName: 'Our Team',
-              },
-            })
-            .catch((err) => {
-              logger.error({ error: err, contactId: contact.id }, 'Failed to send contact form auto-reply');
-            });
+          // Check PAYG balance before sending
+          const isPayg = await PlanEnforcementMiddleware.isPaygAccount(accountId);
+          if (isPayg) {
+            const balanceCheck = await PaygService.checkSufficientBalance(accountId, 'EMAIL', 1);
+            if (!balanceCheck.sufficient) {
+              logger.warn(
+                { accountId, contactId: contact.id, balance: balanceCheck.available },
+                'Skipping contact form auto-reply: insufficient PAYG balance'
+              );
+            } else {
+              // Send auto-reply and deduct credits
+              notifyService
+                .sendNotification(accountId, appId, {
+                  channel: 'EMAIL',
+                  recipient: body.email,
+                  templateId: template.id,
+                  app_id: appId,
+                  payload: {
+                    firstName: body.firstName || 'Valued Customer',
+                    companyName: 'Our Team',
+                  },
+                })
+                .then(async (notification) => {
+                  await PaygService.deductCredits({
+                    accountId,
+                    channel: 'EMAIL',
+                    quantity: 1,
+                    notificationId: notification.id,
+                  });
+                  logger.info({ accountId, notificationId: notification.id }, 'PAYG auto-reply sent and credited');
+                })
+                .catch((err) => {
+                  logger.error({ error: err, contactId: contact.id }, 'Failed to send contact form auto-reply');
+                });
+            }
+          } else {
+            // Non-PAYG: send auto-reply and record usage
+            notifyService
+              .sendNotification(accountId, appId, {
+                channel: 'EMAIL',
+                recipient: body.email,
+                templateId: template.id,
+                app_id: appId,
+                payload: {
+                  firstName: body.firstName || 'Valued Customer',
+                  companyName: 'Our Team',
+                },
+              })
+              .then(async () => {
+                await UsageTrackingService.recordUsage(accountId, appId, 'emails_per_month', 1);
+              })
+              .catch((err) => {
+                logger.error({ error: err, contactId: contact.id }, 'Failed to send contact form auto-reply');
+              });
+          }
         } else {
-          // Send simple text-based auto-reply if template doesn't exist
           logger.info({ contactId: contact.id }, 'Contact form template not found, skipping auto-reply');
         }
       } catch (err) {
