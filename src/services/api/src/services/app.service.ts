@@ -16,6 +16,30 @@ import { prismaRead, prismaWrite } from '@shared/database';
 const appRepo = new AppRepository();
 const templateRepo = new TemplateRepository();
 
+/**
+ * Verify app belongs to the organization
+ * Handles legacy apps where organization_id might be null by checking account's organization
+ */
+async function verifyAppBelongsToOrganization(app: any, organizationId: string): Promise<boolean> {
+  // Direct match
+  if (app.organization_id === organizationId) {
+    return true;
+  }
+
+  // If app has a different organization_id set, it doesn't belong
+  if (app.organization_id && app.organization_id !== organizationId) {
+    return false;
+  }
+
+  // Legacy app - check if account belongs to the organization
+  if (!app.organization_id) {
+    const account = await appRepo.findAccountById(app.account_id);
+    return account?.organization_id === organizationId;
+  }
+
+  return false;
+}
+
 export interface CreateAppRequest {
   name: string;
   environment: 'production' | 'staging' | 'development';
@@ -544,7 +568,10 @@ export class AppService {
       throw new Error('App not found');
     }
 
-    if (app.organization_id !== organizationId) {
+    // Handle legacy apps where organization_id might be null
+    const hasAccess = await verifyAppBelongsToOrganization(app, organizationId);
+
+    if (!hasAccess) {
       throw new Error('Unauthorized access to this app');
     }
 
@@ -611,7 +638,9 @@ export class AppService {
       throw new Error('App not found');
     }
 
-    if (app.organization_id !== organizationId) {
+    // Handle legacy apps where organization_id might be null
+    const hasAccess = await verifyAppBelongsToOrganization(app, organizationId);
+    if (!hasAccess) {
       throw new Error('Unauthorized access to this app');
     }
 
@@ -760,7 +789,9 @@ export class AppService {
       throw new Error('App not found');
     }
 
-    if (app.organization_id !== organizationId) {
+    // Handle legacy apps where organization_id might be null
+    const hasAccess = await verifyAppBelongsToOrganization(app, organizationId);
+    if (!hasAccess) {
       throw new Error('Unauthorized access to this app');
     }
 
@@ -780,6 +811,9 @@ export class AppService {
     }
 
     // Parse and prepare update data
+    // Note: code, channel, language are IMMUTABLE for installed templates
+    // These fields are silently ignored to prevent unique constraint violations
+    // and maintain template identity consistency
     const updateData: any = {};
 
     if (data.subject !== undefined) updateData.subject = data.subject;
@@ -798,44 +832,51 @@ export class AppService {
     if (data.editor_type !== undefined) {
       updateData.editor_type = normalizeEditorType(data.editor_type);
     }
-    if (data.code !== undefined) updateData.code = data.code;
-    if (data.channel !== undefined) updateData.channel = data.channel;
-    if (data.language !== undefined) updateData.language = data.language;
+    // code, channel, language are intentionally NOT updated for installed templates
+    // These define the template's identity and should remain immutable
 
     // Update template version on any change
     if (Object.keys(updateData).length > 0) {
       updateData.version = (currentTemplate.version || 0) + 1;
 
-      const updated = await prismaWrite.template.update({
-        where: { id: templateId },
-        data: updateData,
-        select: {
-          id: true,
-          code: true,
-          channel: true,
-          category: true,
-          subject: true,
-          content: true,
-          language: true,
-          version: true,
-          active: true,
-          requiredVariables: true,
-          design_json: true,
-          editor_type: true,
-          description: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
+      try {
+        const updated = await prismaWrite.template.update({
+          where: { id: templateId },
+          data: updateData,
+          select: {
+            id: true,
+            code: true,
+            channel: true,
+            category: true,
+            subject: true,
+            content: true,
+            language: true,
+            version: true,
+            active: true,
+            requiredVariables: true,
+            design_json: true,
+            editor_type: true,
+            description: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
 
-      logger.info({ templateId, appId, version: updated.version }, 'Template updated');
+        logger.info({ templateId, appId, version: updated.version }, 'Template updated');
 
-      return {
-        installationId: appTemplate.id,
-        appId,
-        status: appTemplate.status,
-        template: updated,
-      };
+        return {
+          installationId: appTemplate.id,
+          appId,
+          status: appTemplate.status,
+          template: updated,
+        };
+      } catch (error: any) {
+        // Handle unique constraint violation (P2002)
+        if (error?.code === 'P2002') {
+          throw new Error('A template with this code already exists for this channel and language');
+        }
+        throw error;
+      }
     }
 
     // No changes
@@ -854,7 +895,9 @@ export class AppService {
       throw new Error('App not found');
     }
 
-    if (app.organization_id !== organizationId) {
+    // Handle legacy apps where organization_id might be null
+    const hasAccess = await verifyAppBelongsToOrganization(app, organizationId);
+    if (!hasAccess) {
       throw new Error('Unauthorized access to this app');
     }
 
