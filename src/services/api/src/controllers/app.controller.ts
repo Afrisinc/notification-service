@@ -215,41 +215,101 @@ export async function createAppTemplate(req: FastifyRequest, reply: FastifyReply
 }
 
 export async function updateAppTemplate(req: FastifyRequest, reply: FastifyReply) {
-  const { orgId, appId, templateId } = req.params as { orgId: string; appId: string; templateId: string };
-  const body = req.body as any;
+  try {
+    const { orgId, appId, templateId } = req.params as { orgId: string; appId: string; templateId: string };
+    const body = req.body as any;
 
-  const result = await appService.updateAppTemplate(appId, templateId, orgId, body);
+    const result = await appService.updateAppTemplate(appId, templateId, orgId, body);
 
-  return ApiResponseHelper.success(reply, 'Template updated successfully', result);
+    return ApiResponseHelper.success(reply, 'Template updated successfully', result);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    if (errorMessage.includes('not found')) {
+      return ApiResponseHelper.notFound(reply, errorMessage);
+    }
+
+    if (errorMessage.includes('Unauthorized')) {
+      return ApiResponseHelper.forbidden(reply, errorMessage);
+    }
+
+    if (errorMessage.includes('already exists')) {
+      return ApiResponseHelper.duplicate(reply, errorMessage);
+    }
+
+    return ApiResponseHelper.badRequest(reply, errorMessage);
+  }
 }
 
 export async function deleteAppTemplate(req: FastifyRequest, reply: FastifyReply) {
-  const userId = (req as any).user?.id;
-  const { orgId, appId, templateId } = req.params as { orgId: string; appId: string; templateId: string };
+  try {
+    const userId = (req as any).user?.id;
+    const { orgId, appId, templateId } = req.params as { orgId: string; appId: string; templateId: string };
 
-  if (!userId) {
-    throw new Error('User information not found');
+    if (!userId) {
+      return ApiResponseHelper.unauthorized(reply, 'User information not found');
+    }
+
+    const result = await appService.deleteAppTemplate(appId, templateId, orgId, userId);
+
+    return ApiResponseHelper.success(reply, result.message, {}, 200);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    if (errorMessage.includes('not found')) {
+      return ApiResponseHelper.notFound(reply, errorMessage);
+    }
+
+    if (errorMessage.includes('Unauthorized')) {
+      return ApiResponseHelper.forbidden(reply, errorMessage);
+    }
+
+    return ApiResponseHelper.badRequest(reply, errorMessage);
   }
-
-  const result = await appService.deleteAppTemplate(appId, templateId, orgId, userId);
-
-  return ApiResponseHelper.success(reply, result.message, {}, 200);
 }
 
 export async function getAppTemplateById(req: FastifyRequest, reply: FastifyReply) {
-  const { orgId, appId, templateId } = req.params as { orgId: string; appId: string; templateId: string };
+  try {
+    const { orgId, appId, templateId } = req.params as { orgId: string; appId: string; templateId: string };
 
-  const result = await appService.getAppTemplateById(appId, templateId, orgId);
+    const result = await appService.getAppTemplateById(appId, templateId, orgId);
 
-  return ApiResponseHelper.success(reply, 'App template retrieved successfully', result);
+    return ApiResponseHelper.success(reply, 'App template retrieved successfully', result);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    if (errorMessage.includes('not found')) {
+      return ApiResponseHelper.notFound(reply, errorMessage);
+    }
+
+    if (errorMessage.includes('Unauthorized')) {
+      return ApiResponseHelper.forbidden(reply, errorMessage);
+    }
+
+    return ApiResponseHelper.badRequest(reply, errorMessage);
+  }
 }
 
 export async function getAppTemplates(req: FastifyRequest, reply: FastifyReply) {
-  const { orgId, appId } = req.params as { orgId: string; appId: string };
+  try {
+    const { orgId, appId } = req.params as { orgId: string; appId: string };
 
-  const result = await appService.getAppTemplates(appId, orgId);
+    const result = await appService.getAppTemplates(appId, orgId);
 
-  return ApiResponseHelper.success(reply, 'App templates retrieved successfully', result);
+    return ApiResponseHelper.success(reply, 'App templates retrieved successfully', result);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    if (errorMessage.includes('not found')) {
+      return ApiResponseHelper.notFound(reply, errorMessage);
+    }
+
+    if (errorMessage.includes('Unauthorized')) {
+      return ApiResponseHelper.forbidden(reply, errorMessage);
+    }
+
+    return ApiResponseHelper.badRequest(reply, errorMessage);
+  }
 }
 
 export async function getAppOverview(req: FastifyRequest, reply: FastifyReply) {
