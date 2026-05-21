@@ -51,6 +51,14 @@ export class AccountRepository {
     });
   }
 
+  //  Find single account by organization ID (1 org = 1 account)
+  async findAccountByOrganizationId<T extends Record<string, boolean>>(organizationId: string, select?: T) {
+    return prismaRead.account.findFirst({
+      where: { organization_id: organizationId },
+      ...(select && { select }),
+    });
+  }
+
   /**
    * Find accounts by owner (user) ID
    */

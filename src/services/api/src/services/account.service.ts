@@ -4,8 +4,22 @@
  */
 
 import { prismaWrite, prismaRead } from '@shared/database';
+import { accountRepository } from '../repositories/account.repository';
 
 export class AccountService {
+  /**
+   * Get accountId from organizationId (1 org = 1 account)
+   * @param orgId Organization ID
+   * @returns Account ID
+   */
+  async getAccountIdByOrgId(orgId: string): Promise<string> {
+    const account = await accountRepository.findAccountByOrganizationId(orgId, { id: true });
+    if (!account) {
+      throw new Error('Organization account not found. Please contact support.');
+    }
+    return account.id;
+  }
+
   /**
    * Get account details with enrollment information
    * @param accountId Account ID

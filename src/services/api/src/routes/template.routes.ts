@@ -17,34 +17,61 @@ import {
 
 /**
  * Template management routes
+ * Protected routes use /organizations/:orgId/templates/... pattern
+ * Public routes use /templates/... pattern
  */
 export async function registerTemplateRoutes(fastify: FastifyInstance) {
   const controller = new TemplateController();
 
-  // Search templates (specific path BEFORE generic params) - PUBLIC ENDPOINT
+  // ==================== PUBLIC ENDPOINTS ====================
+
+  // Search templates - PUBLIC
   fastify.get(
     '/templates/search',
     { schema: GetAllTemplatesRouteSchema },
     asyncWrapper(controller.searchTemplates.bind(controller))
   );
 
-  // Preview template rendering (specific path BEFORE generic params)
+  // List templates (with filtering and pagination) - PUBLIC
+  fastify.get(
+    '/templates',
+    { schema: ListTemplatesRouteSchema },
+    asyncWrapper(controller.listTemplates.bind(controller))
+  );
+
+  // Get all templates without pagination - PUBLIC
+  fastify.get(
+    '/templates/all',
+    { schema: GetAllTemplatesRouteSchema },
+    asyncWrapper(controller.getAllTemplates.bind(controller))
+  );
+
+  // Get template by ID - PUBLIC
+  fastify.get(
+    '/templates/:id',
+    { schema: GetTemplateRouteSchema },
+    asyncWrapper(controller.getTemplate.bind(controller))
+  );
+
+  // ==================== PROTECTED ENDPOINTS ====================
+
+  // Preview template rendering - PROTECTED
   fastify.post(
-    '/templates/preview',
+    '/organizations/:orgId/templates/preview',
     { onRequest: [validateBaseToken], schema: PreviewTemplateRouteSchema },
     asyncWrapper(controller.previewTemplate.bind(controller))
   );
 
-  // List user's templates (specific path BEFORE generic params) - PROTECTED
+  // List user's templates - PROTECTED
   fastify.get(
-    '/templates/my-templates',
+    '/organizations/:orgId/templates/my-templates',
     { onRequest: [validateBaseToken] },
     asyncWrapper(controller.listMyTemplates.bind(controller))
   );
 
-  // Create new template
+  // Create new template - PROTECTED
   fastify.post(
-    '/templates',
+    '/organizations/:orgId/templates',
     {
       onRequest: [validateBaseToken],
       preHandler: [planGuards.checkEntityLimit('templates')],
@@ -53,66 +80,61 @@ export async function registerTemplateRoutes(fastify: FastifyInstance) {
     asyncWrapper(controller.createTemplate.bind(controller))
   );
 
-  // List templates (with filtering and pagination) - PUBLIC ENDPOINT
-  fastify.get(
-    '/templates',
-    { schema: ListTemplatesRouteSchema },
-    asyncWrapper(controller.listTemplates.bind(controller))
-  );
-
-  // Get all templates without pagination (specific path BEFORE generic params) - PUBLIC ENDPOINT
-  fastify.get(
-    '/templates/all',
-    { schema: GetAllTemplatesRouteSchema },
-    asyncWrapper(controller.getAllTemplates.bind(controller))
-  );
-
-  // Create new version
+  // Create new version - PROTECTED
   fastify.post(
-    '/templates/:id/versions',
+    '/organizations/:orgId/templates/:id/versions',
     { onRequest: [validateBaseToken], schema: CreateVersionRouteSchema },
     asyncWrapper(controller.createVersion.bind(controller))
   );
 
-  // Activate version
+  // Activate version - PROTECTED
   fastify.post(
-    '/templates/:id/versions/:versionId/activate',
+    '/organizations/:orgId/templates/:id/versions/:versionId/activate',
     { onRequest: [validateBaseToken], schema: ActivateVersionRouteSchema },
     asyncWrapper(controller.activateVersion.bind(controller))
   );
 
-  // Publish template to marketplace (specific path BEFORE generic :id) - PROTECTED
-  // Note: No schema validation - supports both JSON and multipart/form-data
+  // Publish template to marketplace - PROTECTED
   fastify.post(
-    '/templates/:id/publish',
+    '/organizations/:orgId/templates/:id/publish',
     { onRequest: [validateBaseToken] },
     asyncWrapper(controller.publishTemplate.bind(controller))
   );
 
-  // Unpublish template from marketplace (specific path BEFORE generic :id) - PROTECTED
+  // Unpublish template from marketplace - PROTECTED
   fastify.put(
-    '/templates/:id/unpublish',
+    '/organizations/:orgId/templates/:id/unpublish',
     { onRequest: [validateBaseToken] },
     asyncWrapper(controller.unpublishTemplate.bind(controller))
   );
 
-  // Install template in project (specific path BEFORE generic :id) - PROTECTED
+  // Duplicate template - PROTECTED
   fastify.post(
-    '/templates/:id/install',
+    '/organizations/:orgId/templates/:id/duplicate',
+    {
+      onRequest: [validateBaseToken],
+      preHandler: [planGuards.checkEntityLimit('templates')],
+    },
+    asyncWrapper(controller.duplicateTemplate.bind(controller))
+  );
+
+  // Install template in project - PROTECTED
+  fastify.post(
+    '/organizations/:orgId/templates/:id/install',
     { onRequest: [validateBaseToken], schema: CreateTemplateRouteSchema },
     asyncWrapper(controller.installTemplate.bind(controller))
   );
 
-  // Get template installation status (specific path BEFORE generic :id) - PROTECTED
+  // Get template installation status - PROTECTED
   fastify.get(
-    '/templates/:id/status',
+    '/organizations/:orgId/templates/:id/status',
     { onRequest: [validateBaseToken], schema: GetTemplateRouteSchema },
     asyncWrapper(controller.getInstallationStatus.bind(controller))
   );
 
-  // Get template analytics (specific path BEFORE generic :id) - PROTECTED, requires advanced_analytics
+  // Get template analytics - PROTECTED (requires advanced_analytics feature)
   fastify.get(
-    '/templates/:id/analytics',
+    '/organizations/:orgId/templates/:id/analytics',
     {
       onRequest: [validateBaseToken],
       preHandler: [planGuards.requireFeature('advanced_analytics')],
@@ -121,30 +143,23 @@ export async function registerTemplateRoutes(fastify: FastifyInstance) {
     asyncWrapper(controller.getTemplateAnalytics.bind(controller))
   );
 
-  // Get template for editing (before generic :id routes) - PROTECTED
+  // Get template for editing - PROTECTED
   fastify.get(
-    '/templates/:id/edit',
+    '/organizations/:orgId/templates/:id/edit',
     { onRequest: [validateBaseToken] },
     asyncWrapper(controller.getTemplateForEdit.bind(controller))
   );
 
-  // Get template by ID - PUBLIC ENDPOINT
-  fastify.get(
-    '/templates/:id',
-    { schema: GetTemplateRouteSchema },
-    asyncWrapper(controller.getTemplate.bind(controller))
-  );
-
-  // Update template
+  // Update template - PROTECTED
   fastify.put(
-    '/templates/:id',
+    '/organizations/:orgId/templates/:id',
     { onRequest: [validateBaseToken], schema: UpdateTemplateRouteSchema },
     asyncWrapper(controller.updateTemplate.bind(controller))
   );
 
-  // Delete template
+  // Delete template - PROTECTED
   fastify.delete(
-    '/templates/:id',
+    '/organizations/:orgId/templates/:id',
     { onRequest: [validateBaseToken], schema: DeleteTemplateRouteSchema },
     asyncWrapper(controller.deleteTemplate.bind(controller))
   );

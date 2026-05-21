@@ -1,6 +1,20 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { PlanEnforcementMiddleware } from '../middleware/plan-enforcement.middleware';
 import { ApiResponseHelper } from '../utils/api-response';
+import { accountRepository } from '../repositories/account.repository';
+
+async function getAccountId(request: FastifyRequest): Promise<string | null> {
+  const { orgId } = request.params as { orgId?: string };
+  const headerAccountId = request.headers['x-account-id'] as string;
+
+  if (orgId) {
+    const account = await accountRepository.findAccountByOrganizationId(orgId);
+
+    return account?.id || null;
+  }
+
+  return headerAccountId || null;
+}
 
 export const planGuards = {
   /**
@@ -8,10 +22,10 @@ export const planGuards = {
    */
   requireFeature: (feature: string) => {
     return async (request: FastifyRequest, reply: FastifyReply) => {
-      const accountId = request.headers['x-account-id'] as string;
+      const accountId = await getAccountId(request);
 
       if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'Account ID required');
+        return ApiResponseHelper.unauthorized(reply, 'Organization ID or Account ID required');
       }
 
       const allowed = await PlanEnforcementMiddleware.checkFeatureAccess(accountId, feature);
@@ -32,10 +46,10 @@ export const planGuards = {
    */
   checkUsageLimit: (metric: string, quantityRequired: number = 1) => {
     return async (request: FastifyRequest, reply: FastifyReply) => {
-      const accountId = request.headers['x-account-id'] as string;
+      const accountId = await getAccountId(request);
 
       if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'Account ID required');
+        return ApiResponseHelper.unauthorized(reply, 'Organization ID or Account ID required');
       }
 
       const result = await PlanEnforcementMiddleware.checkUsageLimit(accountId, metric);
@@ -56,10 +70,10 @@ export const planGuards = {
    */
   checkEntityLimit: (entity: 'apps' | 'templates' | 'campaigns' | 'contacts' | 'team_members' | 'api_keys') => {
     return async (request: FastifyRequest, reply: FastifyReply) => {
-      const accountId = request.headers['x-account-id'] as string;
+      const accountId = await getAccountId(request);
 
       if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'Account ID required');
+        return ApiResponseHelper.unauthorized(reply, 'Organization ID or Account ID required');
       }
 
       const result = await PlanEnforcementMiddleware.checkEntityLimit(accountId, entity);
@@ -81,10 +95,10 @@ export const planGuards = {
    */
   checkWebhookLimit: () => {
     return async (request: FastifyRequest, reply: FastifyReply) => {
-      const accountId = request.headers['x-account-id'] as string;
+      const accountId = await getAccountId(request);
 
       if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'Account ID required');
+        return ApiResponseHelper.unauthorized(reply, 'Organization ID or Account ID required');
       }
 
       const result = await PlanEnforcementMiddleware.checkUsageLimit(accountId, 'webhooks');
@@ -105,10 +119,10 @@ export const planGuards = {
    */
   checkCustomDomainLimit: () => {
     return async (request: FastifyRequest, reply: FastifyReply) => {
-      const accountId = request.headers['x-account-id'] as string;
+      const accountId = await getAccountId(request);
 
       if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'Account ID required');
+        return ApiResponseHelper.unauthorized(reply, 'Organization ID or Account ID required');
       }
 
       const result = await PlanEnforcementMiddleware.checkUsageLimit(accountId, 'custom_domain');
