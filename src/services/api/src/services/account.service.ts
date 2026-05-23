@@ -5,6 +5,7 @@
 
 import { prismaWrite, prismaRead } from '@shared/database';
 import { accountRepository } from '../repositories/account.repository';
+import { appRepository } from '../repositories/app.repository';
 
 export class AccountService {
   /**
@@ -18,6 +19,14 @@ export class AccountService {
       throw new Error('Organization account not found. Please contact support.');
     }
     return account.id;
+  }
+
+  async getAccountIdByAppId(appId: string): Promise<string> {
+    const accountId = await appRepository.getAccountIdByAppId(appId);
+    if (!accountId) {
+      throw new Error('App not found');
+    }
+    return accountId;
   }
 
   /**

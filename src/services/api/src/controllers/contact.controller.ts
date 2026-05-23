@@ -6,10 +6,13 @@ import { PaygService } from '../services/payg.service';
 import { PlanEnforcementMiddleware } from '../middleware/plan-enforcement.middleware';
 import { ApiResponseHelper } from '../utils';
 import { prismaRead } from '@shared/database';
+import { AccountService } from '../services/account.service';
+import { CreateContactDto, UpdateContactDto, ListContactsQuery } from '../types/contact.types';
 import pino from 'pino';
 
 const logger = pino();
 const notifyService = new NotifyService();
+const accountService = new AccountService();
 
 const getErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : 'Unknown error';
@@ -17,20 +20,9 @@ const getErrorMessage = (error: unknown): string => {
 
 export async function listContacts(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const accountId = req.headers['x-account-id'] as string;
     const { appId } = req.params as { appId: string };
-    const query = req.query as {
-      page?: string;
-      limit?: string;
-      search?: string;
-      status?: string;
-      tags?: string;
-      subscribed?: string;
-    };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
+    const query = req.query as ListContactsQuery;
+    await accountService.getAccountIdByAppId(appId); // Validates app exists
 
     const subscribed = query.subscribed ? query.subscribed === 'true' : undefined;
 
@@ -54,37 +46,13 @@ export async function listContacts(req: FastifyRequest, reply: FastifyReply) {
 export async function createContact(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { appId } = req.params as { appId: string };
-    const body = req.body as {
-      email: string;
-      firstName?: string;
-      lastName?: string;
-      phone?: string;
-      company?: string;
-      subject?: string;
-      message?: string;
-      status?: string;
-      subscribed?: boolean;
-      tags?: string[];
-      attributes?: Record<string, any>;
-      source?: string;
-    };
+    const body = req.body as CreateContactDto;
 
     if (!body.email) {
       return ApiResponseHelper.badRequest(reply, 'Email is required');
     }
 
-    // Get account ID from header (authenticated) or app context (public)
-    let accountId = req.headers['x-account-id'] as string;
-    if (!accountId) {
-      const app = await prismaRead.app.findUnique({
-        where: { id: appId },
-        select: { account_id: true },
-      });
-      if (!app) {
-        return ApiResponseHelper.notFound(reply, 'App not found');
-      }
-      accountId = app.account_id;
-    }
+    const accountId = await accountService.getAccountIdByAppId(appId);
 
     // Check contact limit before creation
     const limitCheck = await PlanEnforcementMiddleware.checkEntityLimit(accountId, 'contacts');
@@ -224,12 +192,8 @@ export async function createContact(req: FastifyRequest, reply: FastifyReply) {
 
 export async function getContact(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const accountId = req.headers['x-account-id'] as string;
     const { appId, contactId } = req.params as { appId: string; contactId: string };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
+    await accountService.getAccountIdByAppId(appId); // Validates app exists
 
     const contact = await contactService.getContact(appId, contactId);
 
@@ -246,21 +210,9 @@ export async function getContact(req: FastifyRequest, reply: FastifyReply) {
 
 export async function updateContact(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const accountId = req.headers['x-account-id'] as string;
     const { appId, contactId } = req.params as { appId: string; contactId: string };
-    const body = req.body as {
-      firstName?: string;
-      lastName?: string;
-      phone?: string;
-      status?: string;
-      subscribed?: boolean;
-      tags?: string[];
-      attributes?: Record<string, any>;
-    };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
+    const body = req.body as UpdateContactDto;
+    await accountService.getAccountIdByAppId(appId); // Validates app exists
 
     const contact = await contactService.updateContact(appId, contactId, {
       first_name: body.firstName,
@@ -285,12 +237,8 @@ export async function updateContact(req: FastifyRequest, reply: FastifyReply) {
 
 export async function deleteContact(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const accountId = req.headers['x-account-id'] as string;
     const { appId, contactId } = req.params as { appId: string; contactId: string };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
+    await accountService.getAccountIdByAppId(appId); // Validates app exists
 
     const result = await contactService.deleteContact(appId, contactId);
 
@@ -307,7 +255,6 @@ export async function deleteContact(req: FastifyRequest, reply: FastifyReply) {
 
 export async function bulkImportContacts(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const accountId = req.headers['x-account-id'] as string;
     const { appId } = req.params as { appId: string };
     const body = req.body as {
       contacts: Array<{
@@ -323,10 +270,7 @@ export async function bulkImportContacts(req: FastifyRequest, reply: FastifyRepl
       tags?: string[];
       updateIfExists?: boolean;
     };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
+    const accountId = await accountService.getAccountIdByAppId(appId);
 
     if (!body.contacts || !Array.isArray(body.contacts)) {
       return ApiResponseHelper.badRequest(reply, 'Contacts array is required');
@@ -367,17 +311,13 @@ export async function bulkImportContacts(req: FastifyRequest, reply: FastifyRepl
 
 export async function searchContacts(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const accountId = req.headers['x-account-id'] as string;
     const { appId } = req.params as { appId: string };
     const query = req.query as {
       q?: string;
       fields?: string;
       limit?: string;
     };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
+    await accountService.getAccountIdByAppId(appId); // Validates app exists
 
     if (!query.q) {
       return ApiResponseHelper.badRequest(reply, 'Search query (q) is required');
@@ -398,7 +338,6 @@ export async function searchContacts(req: FastifyRequest, reply: FastifyReply) {
 
 export async function exportContacts(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const accountId = req.headers['x-account-id'] as string;
     const { appId } = req.params as { appId: string };
     const query = req.query as {
       format?: string;
@@ -406,10 +345,7 @@ export async function exportContacts(req: FastifyRequest, reply: FastifyReply) {
       tags?: string;
       fields?: string;
     };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
+    await accountService.getAccountIdByAppId(appId); // Validates app exists
 
     const format = query.format || 'csv';
     const contacts = await contactService.getContactsForExport(appId, {

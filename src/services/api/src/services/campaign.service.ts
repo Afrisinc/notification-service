@@ -1,13 +1,50 @@
 import pino from 'pino';
-import {
-  campaignRepository,
-  CreateCampaignInput,
-  UpdateCampaignInput,
-  CampaignFilters,
-} from '../repositories/campaign.repository';
+import { campaignRepository, CreateCampaignInput, UpdateCampaignInput } from '../repositories/campaign.repository';
 import { Channel } from '@prisma/client';
 
 const logger = pino();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CHANNEL CONTENT VALIDATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+type CampaignChannel = 'EMAIL' | 'SMS' | 'PUSH' | 'IN_APP';
+
+/** Channel-specific required fields configuration */
+const CHANNEL_REQUIRED_FIELDS: Record<CampaignChannel, { fields: string[]; description: string }> = {
+  EMAIL: { fields: ['subject', 'html_content'], description: 'subject and html_content' },
+  SMS: { fields: ['text_content'], description: 'text_content' },
+  PUSH: { fields: ['push_title', 'push_body'], description: 'push_title and push_body' },
+  IN_APP: { fields: ['inapp_title', 'inapp_body'], description: 'inapp_title and inapp_body' },
+};
+
+interface ChannelContentCheck {
+  hasContent: boolean;
+  missingFields: string[];
+}
+
+/**
+ * Check if direct content is provided for a specific channel
+ */
+function checkChannelContent(channel: CampaignChannel, data: CreateCampaignInput): ChannelContentCheck {
+  const config = CHANNEL_REQUIRED_FIELDS[channel];
+  if (!config) {
+    return { hasContent: false, missingFields: [] };
+  }
+
+  const missingFields = config.fields.filter((field) => !data[field as keyof CreateCampaignInput]);
+  return {
+    hasContent: missingFields.length === 0,
+    missingFields,
+  };
+}
+
+/**
+ * Get required fields description for each channel
+ */
+function getChannelRequiredFields(channel: CampaignChannel): string {
+  return CHANNEL_REQUIRED_FIELDS[channel]?.description || 'content fields';
+}
 
 export class CampaignService {
   /**
@@ -15,6 +52,28 @@ export class CampaignService {
    */
   async createCampaign(appId: string, data: CreateCampaignInput) {
     try {
+      const channel = data.channel as CampaignChannel;
+      const hasTemplate = !!data.template_id;
+      const contentCheck = checkChannelContent(channel, data);
+
+      // Validate: either templateId OR channel-specific direct content
+      if (!hasTemplate && !contentCheck.hasContent) {
+        const requiredFields = getChannelRequiredFields(channel);
+        throw new Error(`Either templateId or direct content (${requiredFields}) is required for ${channel} channel`);
+      }
+
+      // Validate: cannot have both template and direct content
+      if (hasTemplate && contentCheck.hasContent) {
+        throw new Error('Cannot provide both templateId and direct content. Use one mode only.');
+      }
+
+      // Validate: if using direct content, ensure all required fields are present
+      if (!hasTemplate && contentCheck.missingFields.length > 0) {
+        throw new Error(
+          `Missing required fields for ${channel} direct content: ${contentCheck.missingFields.join(', ')}`
+        );
+      }
+
       // Validate campaign name uniqueness
       const nameExists = await campaignRepository.nameExists(appId, data.name);
       if (nameExists) {
@@ -359,7 +418,7 @@ export class CampaignService {
   }
 
   /**
-   * Format campaign response
+   * Format campaign response with channel-specific content
    */
   private formatCampaignResponse(campaign: any) {
     return {
@@ -368,6 +427,29 @@ export class CampaignService {
       name: campaign.name,
       channel: campaign.channel,
       templateId: campaign.template_id,
+
+      // EMAIL content
+      subject: campaign.subject,
+      htmlContent: campaign.html_content,
+
+      // SMS content
+      textContent: campaign.text_content,
+
+      // PUSH content
+      pushTitle: campaign.push_title,
+      pushBody: campaign.push_body,
+      pushImageUrl: campaign.push_image_url,
+      pushActionUrl: campaign.push_action_url,
+      pushData: campaign.push_data,
+
+      // IN_APP content
+      inappTitle: campaign.inapp_title,
+      inappBody: campaign.inapp_body,
+      inappImageUrl: campaign.inapp_image_url,
+      inappActionUrl: campaign.inapp_action_url,
+      inappActionText: campaign.inapp_action_text,
+
+      // Common fields
       recipientType: campaign.recipient_type,
       recipientCount: campaign.recipient_count,
       status: campaign.status,

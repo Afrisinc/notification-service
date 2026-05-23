@@ -5,7 +5,32 @@ export interface CreateCampaignInput {
   app_id: string;
   name: string;
   channel: Channel;
-  template_id: string;
+
+  // Template mode
+  template_id?: string;
+
+  // EMAIL direct content
+  subject?: string;
+  html_content?: string;
+
+  // SMS direct content
+  text_content?: string;
+
+  // PUSH direct content
+  push_title?: string;
+  push_body?: string;
+  push_image_url?: string;
+  push_action_url?: string;
+  push_data?: Record<string, any>;
+
+  // IN_APP direct content
+  inapp_title?: string;
+  inapp_body?: string;
+  inapp_image_url?: string;
+  inapp_action_url?: string;
+  inapp_action_text?: string;
+
+  // Common fields
   recipient_type?: string;
   recipient_count?: number;
   recipient_tags?: string[];
@@ -17,6 +42,29 @@ export interface CreateCampaignInput {
 
 export interface UpdateCampaignInput {
   name?: string;
+
+  // EMAIL direct content
+  subject?: string;
+  html_content?: string;
+
+  // SMS direct content
+  text_content?: string;
+
+  // PUSH direct content
+  push_title?: string;
+  push_body?: string;
+  push_image_url?: string;
+  push_action_url?: string;
+  push_data?: Record<string, any>;
+
+  // IN_APP direct content
+  inapp_title?: string;
+  inapp_body?: string;
+  inapp_image_url?: string;
+  inapp_action_url?: string;
+  inapp_action_text?: string;
+
+  // Common fields
   recipient_type?: string;
   recipient_count?: number;
   recipient_tags?: string[];
@@ -44,6 +92,29 @@ export class CampaignRepository {
         name: data.name,
         channel: data.channel,
         template_id: data.template_id,
+
+        // EMAIL content
+        subject: data.subject,
+        html_content: data.html_content,
+
+        // SMS content
+        text_content: data.text_content,
+
+        // PUSH content
+        push_title: data.push_title,
+        push_body: data.push_body,
+        push_image_url: data.push_image_url,
+        push_action_url: data.push_action_url,
+        push_data: data.push_data,
+
+        // IN_APP content
+        inapp_title: data.inapp_title,
+        inapp_body: data.inapp_body,
+        inapp_image_url: data.inapp_image_url,
+        inapp_action_url: data.inapp_action_url,
+        inapp_action_text: data.inapp_action_text,
+
+        // Common fields
         recipient_type: data.recipient_type || 'all',
         recipient_count: data.recipient_count || 0,
         recipient_tags: data.recipient_tags || [],
@@ -106,6 +177,29 @@ export class CampaignRepository {
       where: { id },
       data: {
         name: data.name,
+
+        // EMAIL content
+        subject: data.subject,
+        html_content: data.html_content,
+
+        // SMS content
+        text_content: data.text_content,
+
+        // PUSH content
+        push_title: data.push_title,
+        push_body: data.push_body,
+        push_image_url: data.push_image_url,
+        push_action_url: data.push_action_url,
+        push_data: data.push_data,
+
+        // IN_APP content
+        inapp_title: data.inapp_title,
+        inapp_body: data.inapp_body,
+        inapp_image_url: data.inapp_image_url,
+        inapp_action_url: data.inapp_action_url,
+        inapp_action_text: data.inapp_action_text,
+
+        // Common fields
         recipient_type: data.recipient_type,
         recipient_count: data.recipient_count,
         recipient_tags: data.recipient_tags,
@@ -174,6 +268,29 @@ export class CampaignRepository {
         name: newName,
         channel: campaign.channel,
         template_id: campaign.template_id,
+
+        // EMAIL content
+        subject: campaign.subject,
+        html_content: campaign.html_content,
+
+        // SMS content
+        text_content: campaign.text_content,
+
+        // PUSH content
+        push_title: campaign.push_title,
+        push_body: campaign.push_body,
+        push_image_url: campaign.push_image_url,
+        push_action_url: campaign.push_action_url,
+        push_data: campaign.push_data as Record<string, any> | undefined,
+
+        // IN_APP content
+        inapp_title: campaign.inapp_title,
+        inapp_body: campaign.inapp_body,
+        inapp_image_url: campaign.inapp_image_url,
+        inapp_action_url: campaign.inapp_action_url,
+        inapp_action_text: campaign.inapp_action_text,
+
+        // Common fields
         recipient_type: campaign.recipient_type,
         recipient_count: campaign.recipient_count,
         recipient_tags: campaign.recipient_tags,

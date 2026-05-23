@@ -14,19 +14,7 @@ export const AppResponseSchema = {
     notificationsSent: { type: 'number', description: 'Total notifications sent' },
     apiKeyCount: { type: 'number', description: 'Total API keys for this app' },
   },
-  required: [
-    'id',
-    'account_id',
-    'name',
-    'environment',
-    'api_key',
-    'status',
-    'createdAt',
-    'updatedAt',
-    'templateCount',
-    'notificationsSent',
-    'apiKeyCount',
-  ],
+  required: ['id', 'account_id', 'name', 'environment', 'api_key', 'status', 'createdAt', 'updatedAt'],
 } as const;
 
 export const CreateAppResponseSchema = {
@@ -136,19 +124,7 @@ export const AppWithMetricsResponseSchema = {
     notificationsSent: { type: 'number', description: 'Total notifications sent' },
     apiKeyCount: { type: 'number', description: 'Total API keys for this app' },
   },
-  required: [
-    'id',
-    'account_id',
-    'name',
-    'environment',
-    'api_key',
-    'status',
-    'createdAt',
-    'updatedAt',
-    'templateCount',
-    'notificationsSent',
-    'apiKeyCount',
-  ],
+  required: ['id', 'account_id', 'name', 'environment', 'api_key', 'status', 'createdAt', 'updatedAt'],
 } as const;
 
 export const GetAppsByOrganizationResponseSchema = {

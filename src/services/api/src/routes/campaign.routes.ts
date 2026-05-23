@@ -51,7 +51,6 @@ export async function registerCampaignRoutes(app: FastifyInstance) {
   app.post(
     '/apps/:appId/campaigns',
     {
-      onRequest: [validateBaseToken],
       preHandler: [planGuards.checkEntityLimit('campaigns')],
       schema: CreateCampaignSchema,
     },

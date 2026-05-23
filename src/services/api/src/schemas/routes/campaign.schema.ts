@@ -6,8 +6,33 @@ const campaignObject = {
     id: { type: 'string', format: 'uuid' },
     appId: { type: 'string', format: 'uuid' },
     name: { type: 'string' },
-    channel: { type: 'string', enum: ['email', 'sms', 'push', 'in_app'] },
-    templateId: { type: 'string', format: 'uuid' },
+    channel: { type: 'string', enum: ['EMAIL', 'SMS', 'PUSH', 'IN_APP'] },
+
+    // Template mode
+    templateId: { type: ['string', 'null'], format: 'uuid' },
+
+    // EMAIL content
+    subject: { type: ['string', 'null'] },
+    htmlContent: { type: ['string', 'null'] },
+
+    // SMS content
+    textContent: { type: ['string', 'null'] },
+
+    // PUSH content
+    pushTitle: { type: ['string', 'null'] },
+    pushBody: { type: ['string', 'null'] },
+    pushImageUrl: { type: ['string', 'null'] },
+    pushActionUrl: { type: ['string', 'null'] },
+    pushData: { type: ['object', 'null'] },
+
+    // IN_APP content
+    inappTitle: { type: ['string', 'null'] },
+    inappBody: { type: ['string', 'null'] },
+    inappImageUrl: { type: ['string', 'null'] },
+    inappActionUrl: { type: ['string', 'null'] },
+    inappActionText: { type: ['string', 'null'] },
+
+    // Common fields
     recipientType: { type: 'string', enum: ['all', 'tags', 'segment', 'custom'] },
     recipientCount: { type: 'integer' },
     status: { type: 'string', enum: ['draft', 'scheduled', 'completed', 'cancelled'] },
@@ -36,17 +61,10 @@ export const ListCampaignsSchema = {
       page: { type: 'integer', default: 1, description: 'Page number' },
       limit: { type: 'integer', default: 20, maximum: 100, description: 'Items per page' },
       status: { type: 'string', enum: ['draft', 'scheduled', 'completed', 'cancelled'] },
-      channel: { type: 'string', enum: ['email', 'sms', 'push', 'in_app'] },
+      channel: { type: 'string', enum: ['EMAIL', 'SMS', 'PUSH', 'IN_APP'] },
       sortBy: { type: 'string', enum: ['name', 'createdAt', 'status', 'sentCount'], default: 'createdAt' },
       sortOrder: { type: 'string', enum: ['asc', 'desc'], default: 'desc' },
     },
-  },
-  headers: {
-    type: 'object',
-    properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
-    },
-    required: ['x-account-id'],
   },
   response: {
     200: {
@@ -74,7 +92,8 @@ export const ListCampaignsSchema = {
 };
 
 export const CreateCampaignSchema = {
-  description: 'Create a new campaign',
+  description:
+    'Create a new campaign. Use templateId for template mode, or provide channel-specific content for direct mode.',
   tags: ['Campaigns'],
   params: {
     type: 'object',
@@ -87,24 +106,44 @@ export const CreateCampaignSchema = {
     type: 'object',
     properties: {
       name: { type: 'string', description: 'Campaign name (required)' },
-      channel: { type: 'string', enum: ['email', 'sms', 'push', 'in_app'], description: 'Channel (required)' },
-      templateId: { type: 'string', format: 'uuid', description: 'Template ID (required)' },
+      channel: { type: 'string', enum: ['EMAIL', 'SMS', 'PUSH', 'IN_APP'], description: 'Channel (required)' },
+
+      // Template mode (optional - use this OR direct content)
+      templateId: { type: 'string', format: 'uuid', description: 'Template ID (use template mode)' },
+
+      // EMAIL direct content
+      subject: { type: 'string', description: 'Email subject (EMAIL channel)' },
+      html_content: { type: 'string', description: 'Email HTML body (EMAIL channel)' },
+
+      // SMS direct content
+      text_content: { type: 'string', description: 'SMS text message (SMS channel)' },
+
+      // PUSH direct content
+      push_title: { type: 'string', description: 'Push notification title (PUSH channel)' },
+      push_body: { type: 'string', description: 'Push notification body (PUSH channel)' },
+      push_image_url: { type: 'string', description: 'Push image URL (PUSH channel)' },
+      push_action_url: { type: 'string', description: 'Push action URL (PUSH channel)' },
+      push_data: { type: 'object', description: 'Push custom data payload (PUSH channel)' },
+
+      // IN_APP direct content
+      inapp_title: { type: 'string', description: 'In-app title (IN_APP channel)' },
+      inapp_body: { type: 'string', description: 'In-app body (IN_APP channel)' },
+      inapp_image_url: { type: 'string', description: 'In-app image URL (IN_APP channel)' },
+      inapp_action_url: { type: 'string', description: 'In-app action URL (IN_APP channel)' },
+      inapp_action_text: { type: 'string', description: 'In-app CTA button text (IN_APP channel)' },
+
+      // Recipient targeting
       recipientType: { type: 'string', enum: ['all', 'tags', 'segment', 'custom'], default: 'all' },
       recipientCount: { type: 'integer', default: 0 },
       recipientTags: { type: 'array', items: { type: 'string' } },
       recipientSegment: { type: 'string' },
-      status: { type: 'string', enum: ['draft', 'scheduled', 'completed'], default: 'draft' },
+
+      // Campaign settings
+      status: { type: 'string', enum: ['draft', 'scheduled'], default: 'draft' },
       scheduledAt: { type: 'string', format: 'date-time' },
       metadata: { type: 'object' },
     },
-    required: ['name', 'channel', 'templateId'],
-  },
-  headers: {
-    type: 'object',
-    properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
-    },
-    required: ['x-account-id'],
+    required: ['name', 'channel'],
   },
   response: {
     201: {
@@ -132,13 +171,6 @@ export const GetCampaignSchema = {
     },
     required: ['appId', 'campaignId'],
   },
-  headers: {
-    type: 'object',
-    properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
-    },
-    required: ['x-account-id'],
-  },
   response: {
     200: {
       type: 'object',
@@ -155,7 +187,7 @@ export const GetCampaignSchema = {
 };
 
 export const UpdateCampaignSchema = {
-  description: 'Update a campaign',
+  description: 'Update a campaign (only draft campaigns can have content modified)',
   tags: ['Campaigns'],
   params: {
     type: 'object',
@@ -169,21 +201,39 @@ export const UpdateCampaignSchema = {
     type: 'object',
     properties: {
       name: { type: 'string' },
+
+      // EMAIL direct content
+      subject: { type: 'string', description: 'Email subject' },
+      html_content: { type: 'string', description: 'Email HTML body' },
+
+      // SMS direct content
+      text_content: { type: 'string', description: 'SMS text message' },
+
+      // PUSH direct content
+      push_title: { type: 'string', description: 'Push notification title' },
+      push_body: { type: 'string', description: 'Push notification body' },
+      push_image_url: { type: 'string', description: 'Push image URL' },
+      push_action_url: { type: 'string', description: 'Push action URL' },
+      push_data: { type: 'object', description: 'Push custom data payload' },
+
+      // IN_APP direct content
+      inapp_title: { type: 'string', description: 'In-app title' },
+      inapp_body: { type: 'string', description: 'In-app body' },
+      inapp_image_url: { type: 'string', description: 'In-app image URL' },
+      inapp_action_url: { type: 'string', description: 'In-app action URL' },
+      inapp_action_text: { type: 'string', description: 'In-app CTA button text' },
+
+      // Recipient targeting
       recipientType: { type: 'string', enum: ['all', 'tags', 'segment', 'custom'] },
       recipientCount: { type: 'integer' },
       recipientTags: { type: 'array', items: { type: 'string' } },
       recipientSegment: { type: 'string' },
+
+      // Campaign settings
       status: { type: 'string', enum: ['draft', 'scheduled', 'completed', 'cancelled'] },
       scheduledAt: { type: 'string', format: 'date-time' },
       metadata: { type: 'object' },
     },
-  },
-  headers: {
-    type: 'object',
-    properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
-    },
-    required: ['x-account-id'],
   },
   response: {
     200: {
@@ -210,13 +260,6 @@ export const DeleteCampaignSchema = {
       campaignId: { type: 'string', format: 'uuid', description: 'Campaign ID' },
     },
     required: ['appId', 'campaignId'],
-  },
-  headers: {
-    type: 'object',
-    properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
-    },
-    required: ['x-account-id'],
   },
   response: {
     200: {
@@ -255,13 +298,6 @@ export const SendCampaignSchema = {
     properties: {
       dryRun: { type: 'boolean', default: false, description: 'Simulate send without actually sending' },
     },
-  },
-  headers: {
-    type: 'object',
-    properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
-    },
-    required: ['x-account-id'],
   },
   response: {
     200: {
@@ -306,13 +342,6 @@ export const ScheduleCampaignSchema = {
     },
     required: ['scheduledAt'],
   },
-  headers: {
-    type: 'object',
-    properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
-    },
-    required: ['x-account-id'],
-  },
   response: {
     200: {
       type: 'object',
@@ -346,13 +375,6 @@ export const DuplicateCampaignSchema = {
     },
     required: ['newName'],
   },
-  headers: {
-    type: 'object',
-    properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
-    },
-    required: ['x-account-id'],
-  },
   response: {
     201: {
       type: 'object',
@@ -378,13 +400,6 @@ export const GetCampaignStatsSchema = {
       campaignId: { type: 'string', format: 'uuid', description: 'Campaign ID' },
     },
     required: ['appId', 'campaignId'],
-  },
-  headers: {
-    type: 'object',
-    properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
-    },
-    required: ['x-account-id'],
   },
   response: {
     200: {
@@ -426,17 +441,10 @@ export const GetCampaignsSummaryStatsSchema = {
     type: 'object',
     properties: {
       status: { type: 'string', enum: ['draft', 'scheduled', 'completed', 'cancelled'] },
-      channel: { type: 'string', enum: ['email', 'sms', 'push', 'in_app'] },
+      channel: { type: 'string', enum: ['EMAIL', 'SMS', 'PUSH', 'IN_APP'] },
       dateFrom: { type: 'string', format: 'date-time', description: 'Filter start date (default: 30 days ago)' },
       dateTo: { type: 'string', format: 'date-time', description: 'Filter end date (default: today)' },
     },
-  },
-  headers: {
-    type: 'object',
-    properties: {
-      'x-account-id': { type: 'string', description: 'Account ID' },
-    },
-    required: ['x-account-id'],
   },
   response: {
     200: {
