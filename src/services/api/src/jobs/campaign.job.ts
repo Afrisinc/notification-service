@@ -52,27 +52,26 @@ async function processScheduledCampaigns() {
 
   for (const campaign of dueCampaigns) {
     try {
-      // Mark as sending to prevent duplicate processing
-      await campaignRepository.markAsSending(campaign.id);
-
-      // Send the campaign
-      await campaignService.sendCampaign(campaign.app_id, campaign.id, false);
+      // Send the campaign (handles marking as sending, processing, and completion internally)
+      const result = await campaignService.sendCampaign(campaign.app_id, campaign.id, false);
 
       processed++;
-      logger.info({ campaignId: campaign.id, campaignName: campaign.name }, 'Scheduled campaign sent successfully');
+      logger.info(
+        {
+          campaignId: campaign.id,
+          campaignName: campaign.name,
+          sentCount: result.sentCount,
+          failedCount: result.failedCount,
+        },
+        'Scheduled campaign sent successfully'
+      );
     } catch (error) {
       failed++;
       logger.error(
         { error, campaignId: campaign.id, campaignName: campaign.name },
         'Failed to send scheduled campaign'
       );
-
-      // Revert status back to scheduled on failure for retry
-      try {
-        await campaignRepository.schedule(campaign.id, campaign.scheduled_at!);
-      } catch (revertError) {
-        logger.error({ error: revertError, campaignId: campaign.id }, 'Failed to revert campaign status');
-      }
+      // Note: sendCampaign handles reverting status internally on failure
     }
   }
 

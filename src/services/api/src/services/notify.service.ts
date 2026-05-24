@@ -81,8 +81,14 @@ export class NotifyService {
       }
 
       renderedContent = request.payload.message;
+
+      // For EMAIL channel, also extract subject from payload
+      if (request.channel === 'EMAIL' && request.payload.subject) {
+        renderedSubject = request.payload.subject;
+      }
+
       logger.debug(
-        { accountId, app_id: appId, channel: request.channel },
+        { accountId, app_id: appId, channel: request.channel, hasSubject: !!renderedSubject },
         'Sending notification in direct message mode'
       );
     }

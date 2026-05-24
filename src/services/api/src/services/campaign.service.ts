@@ -1,8 +1,21 @@
 import pino from 'pino';
 import { campaignRepository, CreateCampaignInput, UpdateCampaignInput } from '../repositories/campaign.repository';
+import { contactRepository } from '../repositories/contact.repository';
+import { notifyService } from './notify.service';
+import { prismaRead } from '@shared/database';
 import { Channel } from '@prisma/client';
 
 const logger = pino();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAMPAIGN SENDING CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Batch size for processing recipients */
+const BATCH_SIZE = 100;
+
+/** Delay between batches in milliseconds to prevent overwhelming the queue */
+const BATCH_DELAY_MS = 50;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CHANNEL CONTENT VALIDATION
@@ -203,11 +216,17 @@ export class CampaignService {
   }
 
   /**
-   * Send campaign
+   * Send campaign - queues notifications to all targeted recipients
    */
   async sendCampaign(appId: string, campaignId: string, dryRun: boolean = false) {
+    const startTime = Date.now();
+
     try {
-      const campaign = await campaignRepository.findById(campaignId, appId);
+      // Fetch campaign with app relation for account_id
+      const campaign = await prismaRead.campaign.findFirst({
+        where: { id: campaignId, app_id: appId },
+        include: { app: true, template: true },
+      });
 
       if (!campaign) {
         throw new Error('Campaign not found');
@@ -217,28 +236,280 @@ export class CampaignService {
         throw new Error('Campaign has already been sent');
       }
 
-      // In real scenario, this would queue the campaign for sending
-      // For now, we'll simulate the send
-      if (!dryRun) {
-        const sentCount = campaign.recipient_count;
-        const failedCount = 0;
-        const deliveredCount = sentCount;
-
-        await campaignRepository.markAsSent(campaignId, sentCount, deliveredCount, failedCount);
+      if (campaign.status === 'sending') {
+        throw new Error('Campaign is already being sent');
       }
+
+      const accountId = campaign.app.account_id;
+
+      // Get recipient count first
+      const totalRecipients = await contactRepository.countCampaignRecipients(appId, campaign.recipient_type, {
+        tags: campaign.recipient_tags,
+        segment: campaign.recipient_segment || undefined,
+      });
+
+      if (totalRecipients === 0) {
+        throw new Error(
+          'No recipients found for this campaign. Ensure you have subscribed contacts matching the targeting criteria.'
+        );
+      }
+
+      logger.info({ campaignId, appId, totalRecipients, dryRun, channel: campaign.channel }, 'Starting campaign send');
+
+      // For dry run, just return the count without sending
+      if (dryRun) {
+        return {
+          campaignId,
+          status: 'dry_run',
+          totalRecipients,
+          sentCount: 0,
+          failedCount: 0,
+          dryRun: true,
+          message: `Dry run complete. Would send to ${totalRecipients} recipients.`,
+        };
+      }
+
+      // Mark campaign as sending
+      await campaignRepository.markAsSending(campaignId);
+
+      // Process recipients in batches
+      const result = await this.processRecipientBatches(campaign, accountId, appId, totalRecipients);
+
+      // Mark campaign as completed
+      await campaignRepository.markAsSent(
+        campaignId,
+        result.sentCount,
+        result.sentCount, // delivered count starts same as sent, updated via webhooks
+        result.failedCount
+      );
+
+      const duration = Date.now() - startTime;
+      logger.info(
+        {
+          campaignId,
+          appId,
+          sentCount: result.sentCount,
+          failedCount: result.failedCount,
+          durationMs: duration,
+        },
+        'Campaign send completed'
+      );
 
       return {
         campaignId,
         status: 'completed',
-        sentCount: campaign.recipient_count,
-        failedCount: 0,
+        totalRecipients,
+        sentCount: result.sentCount,
+        failedCount: result.failedCount,
         sentAt: new Date().toISOString(),
-        estimatedDeliveryTime: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+        durationMs: duration,
       };
     } catch (error) {
       logger.error({ error, appId, campaignId }, 'Failed to send campaign');
+
+      // If we started sending, revert to scheduled status for retry
+      try {
+        const campaign = await campaignRepository.findById(campaignId, appId);
+        if (campaign?.status === 'sending') {
+          await campaignRepository.update(campaignId, appId, { status: 'scheduled' });
+          logger.info({ campaignId }, 'Reverted campaign status to scheduled for retry');
+        }
+      } catch (revertError) {
+        logger.error({ revertError, campaignId }, 'Failed to revert campaign status');
+      }
+
       throw error;
     }
+  }
+
+  /**
+   * Process recipients in batches to avoid memory issues and queue overload
+   */
+  private async processRecipientBatches(
+    campaign: any,
+    accountId: string,
+    appId: string,
+    totalRecipients: number
+  ): Promise<{ sentCount: number; failedCount: number; errors: Array<{ email: string; error: string }> }> {
+    let sentCount = 0;
+    let failedCount = 0;
+    const errors: Array<{ email: string; error: string }> = [];
+    let offset = 0;
+
+    // Prepare notification content based on campaign channel
+    const notificationBase = this.prepareNotificationContent(campaign);
+
+    while (offset < totalRecipients) {
+      // Fetch batch of recipients
+      const recipients = await contactRepository.findCampaignRecipients(appId, campaign.recipient_type, {
+        tags: campaign.recipient_tags,
+        segment: campaign.recipient_segment || undefined,
+        limit: BATCH_SIZE,
+        offset,
+      });
+
+      if (recipients.length === 0) break;
+
+      // Process batch concurrently with controlled parallelism
+      const batchResults = await Promise.allSettled(
+        recipients.map((contact) => this.sendToRecipient(accountId, appId, contact, notificationBase, campaign))
+      );
+
+      // Count results
+      for (let i = 0; i < batchResults.length; i++) {
+        const result = batchResults[i];
+        if (result.status === 'fulfilled') {
+          sentCount++;
+        } else {
+          failedCount++;
+          errors.push({
+            email: recipients[i].email,
+            error: result.reason?.message || 'Unknown error',
+          });
+        }
+      }
+
+      // Update campaign stats incrementally
+      if (sentCount > 0 || failedCount > 0) {
+        await campaignRepository.incrementStats(campaign.id, {
+          sent: recipients.filter((_, i) => batchResults[i].status === 'fulfilled').length,
+          failed: recipients.filter((_, i) => batchResults[i].status === 'rejected').length,
+        });
+      }
+
+      offset += BATCH_SIZE;
+
+      // Small delay between batches to prevent overwhelming the queue
+      if (offset < totalRecipients) {
+        await this.delay(BATCH_DELAY_MS);
+      }
+
+      logger.debug(
+        { campaignId: campaign.id, processed: offset, total: totalRecipients, sentCount, failedCount },
+        'Batch processed'
+      );
+    }
+
+    // Log errors summary if any
+    if (errors.length > 0) {
+      logger.warn(
+        { campaignId: campaign.id, errorCount: errors.length, sampleErrors: errors.slice(0, 5) },
+        'Some campaign notifications failed'
+      );
+    }
+
+    return { sentCount, failedCount, errors };
+  }
+
+  /**
+   * Send notification to a single recipient
+   */
+  private async sendToRecipient(
+    accountId: string,
+    appId: string,
+    contact: {
+      id: string;
+      email: string;
+      first_name: string | null;
+      last_name: string | null;
+      phone: string | null;
+      attributes: any;
+    },
+    notificationBase: { channel: string; templateId?: string; payload: Record<string, any> },
+    campaign: any
+  ): Promise<void> {
+    // Determine recipient based on channel
+    let recipient: string;
+    switch (campaign.channel) {
+      case 'SMS':
+        if (!contact.phone) {
+          throw new Error('Contact has no phone number');
+        }
+        recipient = contact.phone;
+        break;
+      case 'EMAIL':
+      default:
+        recipient = contact.email;
+        break;
+    }
+
+    // Merge contact data into payload for template personalization
+    const payload = {
+      ...notificationBase.payload,
+      firstName: contact.first_name || '',
+      lastName: contact.last_name || '',
+      email: contact.email,
+      ...((contact.attributes as Record<string, any>) || {}),
+    };
+
+    await notifyService.sendNotification(accountId, appId, {
+      channel: campaign.channel,
+      recipient,
+      templateId: notificationBase.templateId,
+      app_id: appId,
+      payload,
+      priority: 'NORMAL',
+    });
+
+    // Increment contact's notification count
+    await contactRepository.incrementNotificationCount(contact.id);
+  }
+
+  /**
+   * Prepare notification content from campaign
+   */
+  private prepareNotificationContent(campaign: any): {
+    channel: string;
+    templateId?: string;
+    payload: Record<string, any>;
+  } {
+    const payload: Record<string, any> = {};
+
+    // If using template, just pass templateId
+    if (campaign.template_id) {
+      return {
+        channel: campaign.channel,
+        templateId: campaign.template_id,
+        payload: campaign.metadata || {},
+      };
+    }
+
+    // Direct content mode - build payload based on channel
+    switch (campaign.channel) {
+      case 'EMAIL':
+        payload.message = campaign.html_content;
+        payload.subject = campaign.subject;
+        break;
+      case 'SMS':
+        payload.message = campaign.text_content;
+        break;
+      case 'PUSH':
+        payload.title = campaign.push_title;
+        payload.message = campaign.push_body;
+        payload.imageUrl = campaign.push_image_url;
+        payload.actionUrl = campaign.push_action_url;
+        payload.data = campaign.push_data;
+        break;
+      case 'IN_APP':
+        payload.title = campaign.inapp_title;
+        payload.message = campaign.inapp_body;
+        payload.imageUrl = campaign.inapp_image_url;
+        payload.actionUrl = campaign.inapp_action_url;
+        payload.actionText = campaign.inapp_action_text;
+        break;
+    }
+
+    return {
+      channel: campaign.channel,
+      payload,
+    };
+  }
+
+  /**
+   * Delay helper for batch processing
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
