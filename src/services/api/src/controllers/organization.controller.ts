@@ -14,7 +14,7 @@ export class OrganizationController {
   }
 
   /**
-   * Create a new organization
+   * Create a new organization with billing
    */
   async createOrganization(request: FastifyRequest, reply: FastifyReply) {
     try {
@@ -27,6 +27,9 @@ export class OrganizationController {
         taxId?: string;
         email?: string;
         phone?: string;
+        planId: string;
+        billingCycle?: 'monthly' | 'annual';
+        paymentMethodId?: string;
       };
 
       if (!userId) {
@@ -35,6 +38,10 @@ export class OrganizationController {
 
       if (!body.name) {
         return ApiResponseHelper.badRequest(reply, 'Organization name is required');
+      }
+
+      if (!body.planId) {
+        return ApiResponseHelper.badRequest(reply, 'Plan ID is required');
       }
 
       const org = await this.organizationService.createOrganization(body, userId);
@@ -52,7 +59,13 @@ export class OrganizationController {
         createdAt: org.createdAt,
       });
     } catch (error) {
-      logger.error({ error }, 'Failed to create organization');
+      const message = error instanceof Error ? error.message : 'Failed to create organization';
+      logger.error({ error }, message);
+
+      if (message.includes('Plan not found') || message.includes('Payment method is required')) {
+        return ApiResponseHelper.badRequest(reply, message);
+      }
+
       return ApiResponseHelper.internalError(reply, 'Failed to create organization');
     }
   }

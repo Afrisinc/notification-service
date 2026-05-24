@@ -68,7 +68,9 @@ export class UsageTrackingService {
         },
       });
 
-      if (!subscription || subscription.status !== 'active') return;
+      // Enforce limits for both active and trialing subscriptions
+      // Trial users get full access to selected plan's limits (no billing until trial ends)
+      if (!subscription || !['active', 'trialing'].includes(subscription.status)) return;
 
       const planLimit = subscription.plan.limits.find((l) => l.metric === metric);
       // -1 = unlimited, 0 = feature not available on this plan — either way skip
@@ -157,10 +159,27 @@ export class UsageTrackingService {
 
       const usage = await UsageTrackingService.getCurrentPeriodUsage(accountId);
 
+      // Calculate trial info if applicable
+      // Note: trial_ends_at will be available after running `prisma generate`
+      const isTrialing = subscription.status === 'trialing';
+      const trialEndsAt = (subscription as any).trial_ends_at as Date | null;
+      const trialDaysRemaining = trialEndsAt
+        ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+        : 0;
+
       return {
         plan: subscription.plan.name,
         billingCycle: subscription.billing_cycle,
         status: subscription.status,
+        // Trial information
+        trial: isTrialing
+          ? {
+              isTrialing: true,
+              endsAt: trialEndsAt,
+              daysRemaining: trialDaysRemaining,
+              billingStartsAfterTrial: true,
+            }
+          : null,
         limits: subscription.plan.limits.map((limit) => ({
           metric: limit.metric,
           limit: limit.limit_value,

@@ -4,13 +4,13 @@ import { OrganizationRepository } from '../repositories/identity-repositories/or
 import { AuthorizationCodeRepository } from '../repositories/identity-repositories/authorization-code.repository';
 import { comparePassword, generateBaseToken, generateResetToken, hashPassword, verifyToken } from '../utils/auth-utils';
 import { env } from '../config/env';
-import { prismaWrite } from '@shared/database';
+import { prismaWrite, prismaRead } from '@shared/database';
 import { recordLoginFailure } from '../utils/securityRecorder';
 import type { LoginUserRequest, SignupPayload } from '../../../../types/auth';
 import { AccountService } from './account.service';
-import { NOTIFICATION_TEMPLATES, NOTIFICATION_CHANNELS } from '../config/constants';
+import { NOTIFICATION_CHANNELS } from '../config/constants';
 import { logger } from '../config/logger';
-import { getQueuePublisher, NotifyService } from './notify.service';
+import { NotifyService } from './notify.service';
 
 const userRepo = new UserRepository();
 const accountRepo = new AccountRepository();
@@ -30,6 +30,21 @@ export class AuthService {
       if (!data.organizationName || !data.companyEmail) {
         throw new Error('organizationName and companyEmail are required for company accounts');
       }
+    }
+
+    // Validate payment method for paid plans
+    const plan = await prismaRead.plan.findUnique({
+      where: { id: data.planId },
+    });
+
+    if (!plan) {
+      throw new Error(`Plan not found: ${data.planId}`);
+    }
+
+    // Paid plans (non-FREE) require payment method
+    const isPaidPlan = plan.name.toUpperCase() !== 'FREE';
+    if (isPaidPlan && !data.paymentMethodId) {
+      throw new Error('Payment method is required for paid plans');
     }
 
     const hashed = await hashPassword(data.password);
@@ -110,10 +125,14 @@ export class AuthService {
       throw new Error('Invalid account_type');
     });
 
-    // Create subscription with selected plan or default to FREE
+    // Create subscription with selected plan
     if (result.account) {
-      const plan = data.plan || 'FREE';
-      await accountService.createSubscription(result.account.id, plan);
+      await accountService.createSubscriptionByPlanId(
+        result.account.id,
+        data.planId,
+        data.billingCycle,
+        data.paymentMethodId
+      );
     }
 
     // Publish email verification message to notify service

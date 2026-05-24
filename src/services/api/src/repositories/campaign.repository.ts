@@ -35,7 +35,7 @@ export interface CreateCampaignInput {
   recipient_count?: number;
   recipient_tags?: string[];
   recipient_segment?: string;
-  status?: 'draft' | 'scheduled' | 'completed' | 'cancelled';
+  status?: 'draft' | 'scheduled' | 'sending' | 'completed' | 'cancelled';
   scheduled_at?: Date;
   metadata?: Record<string, any>;
 }
@@ -69,7 +69,7 @@ export interface UpdateCampaignInput {
   recipient_count?: number;
   recipient_tags?: string[];
   recipient_segment?: string;
-  status?: 'draft' | 'scheduled' | 'completed' | 'cancelled';
+  status?: 'draft' | 'scheduled' | 'sending' | 'completed' | 'cancelled';
   scheduled_at?: Date;
   metadata?: Record<string, any>;
 }
@@ -393,6 +393,40 @@ export class CampaignRepository {
     return prismaRead.campaign.findMany({
       where: { app_id: appId, status: status as any },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Find scheduled campaigns that are ready to be sent
+   * Returns campaigns where status is 'scheduled' and scheduled_at <= now
+   */
+  async findScheduledCampaignsDue() {
+    const now = new Date();
+
+    return prismaRead.campaign.findMany({
+      where: {
+        status: 'scheduled',
+        scheduled_at: {
+          lte: now,
+        },
+      },
+      include: {
+        app: true,
+      },
+      orderBy: { scheduled_at: 'asc' },
+    });
+  }
+
+  /**
+   * Mark campaign as sending (in progress)
+   */
+  async markAsSending(id: string) {
+    return prismaWrite.campaign.update({
+      where: { id },
+      data: {
+        status: 'sending',
+        updatedAt: new Date(),
+      },
     });
   }
 

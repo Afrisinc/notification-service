@@ -6,6 +6,7 @@
 enum CampaignStatus {
   draft
   scheduled
+  sending
   completed
   cancelled
 }

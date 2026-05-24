@@ -43,6 +43,13 @@ export const env = cleanEnv(process.env, {
   USAGE_LIMIT_EXCEEDED_TEMPLATE_ID: str({ default: '' }),
   ALERT_WEBHOOK_URL: str({ default: '' }),
 
+  // Trial & Billing Notifications
+  TRIAL_REMINDER_TEMPLATE_ID: str({ default: 'system-trial-reminder' }),
+  TRIAL_EXPIRED_TEMPLATE_ID: str({ default: 'system-trial-expired' }),
+  BILLING_CONFIRMATION_TEMPLATE_ID: str({ default: 'system-billing-confirmation' }),
+  PAYMENT_FAILED_TEMPLATE_ID: str({ default: 'system-payment-failed' }),
+  TRIAL_REMINDER_DAYS_BEFORE: str({ default: '3' }),
+
   // SMTP Configuration (optional)
   SMTP_HOST: str({ default: 'localhost' }),
   SMTP_PORT: port({ default: 587 }),
