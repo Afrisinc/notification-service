@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { SubscriptionService } from '../services/subscription.service';
+import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { UsageTrackingService } from '../services/usage-tracking.service';
 import { ApiResponseHelper } from '../utils/api-response';
 import { logger } from '../config/logger';
@@ -57,17 +58,24 @@ export class SubscriptionController {
   async changePlan(request: FastifyRequest, reply: FastifyReply) {
     try {
       const accountId = request.headers['x-account-id'] as string;
-      const { planId } = request.body as { planId: string };
+      const { planId, planName } = request.body as { planId?: string; planName?: string };
 
       if (!accountId) {
         return ApiResponseHelper.unauthorized(reply, 'Account ID required');
       }
 
-      if (!planId) {
-        return ApiResponseHelper.badRequest(reply, 'Plan ID is required');
+      let resolvedPlanId = planId;
+      if (!resolvedPlanId && planName) {
+        const plan = await SubscriptionRepository.getPlanByName(planName.toUpperCase());
+        if (!plan) return ApiResponseHelper.notFound(reply, `Plan '${planName}' not found`);
+        resolvedPlanId = plan.id;
       }
 
-      const result = await SubscriptionService.changePlan(accountId, planId);
+      if (!resolvedPlanId) {
+        return ApiResponseHelper.badRequest(reply, 'planId or planName is required');
+      }
+
+      const result = await SubscriptionService.changePlan(accountId, resolvedPlanId);
 
       logger.info({ accountId, planId, correlationId: request.id }, 'Plan changed');
 

@@ -9,7 +9,9 @@ export interface SignupPayload {
   password: string;
   account_type: AccountType;
   account_name?: string;
-  plan?: 'FREE' | 'PRO' | 'ENTERPRISE';
+  planId: string;
+  billingCycle?: 'monthly' | 'annual';
+  paymentMethodId?: string;
   displayName?: string;
   organizationName: string;
   jobTitle?: string;
@@ -57,10 +59,18 @@ export const RegisterRequestSchema = {
       type: 'string',
       description: 'Account name (optional)',
     },
-    plan: {
+    planId: {
       type: 'string',
-      enum: ['FREE', 'PRO', 'ENTERPRISE'],
-      description: 'Subscription plan (optional, defaults to FREE)',
+      description: 'Plan ID for subscription (e.g., "plan_starter_123")',
+    },
+    billingCycle: {
+      type: 'string',
+      enum: ['monthly', 'annual'],
+      description: 'Billing cycle (optional, defaults to monthly)',
+    },
+    paymentMethodId: {
+      type: 'string',
+      description: 'Stripe payment method ID (required for paid plans)',
     },
     displayName: {
       type: 'string',
@@ -92,7 +102,7 @@ export const RegisterRequestSchema = {
       description: 'Website (optional)',
     },
   },
-  required: ['firstName', 'lastName', 'email', 'password', 'account_type', 'phone'],
+  required: ['firstName', 'lastName', 'email', 'password', 'account_type', 'phone', 'planId'],
   additionalProperties: false,
 } as const;
 

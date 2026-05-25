@@ -2,7 +2,10 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../config/logger';
 import { notifyService, SendNotificationRequest, BulkSendRequest } from '../services/notify.service';
 import { UsageTrackingService } from '../services/usage-tracking.service';
+import { PaygService } from '../services/payg.service';
+import { PlanEnforcementMiddleware } from '../middleware/plan-enforcement.middleware';
 import { ApiResponseHelper } from '../utils';
+import type { PaygChannel } from '../types/payg.types';
 
 export class NotifyController {
   async sendNotification(request: FastifyRequest, reply: FastifyReply) {
@@ -31,15 +34,63 @@ export class NotifyController {
         app_id = body.app_id;
       }
 
+      // ── PAYG: check balance before sending ────────────────────────────────
+      const isPayg = await PlanEnforcementMiddleware.isPaygAccount(accountId);
+      logger.debug({ accountId, isPayg, correlationId: request.id }, '[PAYG] Account plan check');
+
+      if (isPayg) {
+        const channel = body.channel as PaygChannel;
+        const balanceCheck = await PaygService.checkSufficientBalance(accountId, channel, 1);
+        logger.debug({ accountId, channel, balanceCheck, correlationId: request.id }, '[PAYG] Pre-send balance check');
+        if (!balanceCheck.sufficient) {
+          return ApiResponseHelper.error(
+            reply,
+            `Insufficient PAYG credit balance. Required: $${balanceCheck.required.toFixed(4)}, Available: $${balanceCheck.available.toFixed(4)}. Please top up at /api/payg/topup.`,
+            4030,
+            402
+          );
+        }
+      }
+
       const notification = await notifyService.sendNotification(accountId, app_id, { ...body, app_id });
 
       logger.info(
-        { notificationId: notification.id, appId: app_id, correlationId: request.id },
+        { notificationId: notification.id, appId: app_id, isPayg, correlationId: request.id },
         'Notification sent successfully'
       );
 
-      const metric = `${body.channel.toLowerCase()}s_per_month`;
-      await UsageTrackingService.recordUsage(accountId, app_id, metric, 1);
+      if (isPayg) {
+        // ── PAYG: deduct credits & fire low-balance alert ──────────────────
+        const deductResult = await PaygService.deductCredits({
+          accountId,
+          channel: body.channel as PaygChannel,
+          quantity: 1,
+          notificationId: notification.id,
+        });
+        logger.info(
+          {
+            accountId,
+            notificationId: notification.id,
+            channel: body.channel,
+            deducted: deductResult.amountDeducted,
+            newBalance: deductResult.newBalance,
+            success: deductResult.success,
+            correlationId: request.id,
+          },
+          '[PAYG] Credit deduction result'
+        );
+        if (!deductResult.success) {
+          logger.error(
+            { accountId, notificationId: notification.id, deductResult },
+            '[PAYG] Credit deduction failed after notification was queued'
+          );
+        }
+        PaygService.checkAndAlertLowBalance(accountId).catch(() => {});
+      } else {
+        // ── Subscription: record usage against monthly quota ───────────────
+        const metric = `${body.channel.toLowerCase()}s_per_month`;
+        await UsageTrackingService.recordUsage(accountId, app_id, metric, 1);
+      }
 
       ApiResponseHelper.accepted(reply, 'Notification queued for processing', {
         id: notification.id,
@@ -80,23 +131,71 @@ export class NotifyController {
 
       // Use app_id from first notification (all should have the same app_id for bulk operations)
       const appId = body.notifications[0].app_id;
+      const channel = (body.notifications[0]?.channel ?? 'EMAIL') as PaygChannel;
 
-      const { response } = await notifyService.bulkSend(accountId, appId, body.notifications);
+      // ── PAYG: pre-flight balance check for the full batch ─────────────────
+      const isPayg = await PlanEnforcementMiddleware.isPaygAccount(accountId);
+      logger.debug({ accountId, isPayg, correlationId: request.id }, '[PAYG] Bulk send plan check');
+
+      if (isPayg) {
+        const quantity = body.notifications.length;
+        const balanceCheck = await PaygService.checkSufficientBalance(accountId, channel, quantity);
+        logger.debug(
+          { accountId, channel, quantity, balanceCheck, correlationId: request.id },
+          '[PAYG] Bulk pre-send balance check'
+        );
+        if (!balanceCheck.sufficient) {
+          return ApiResponseHelper.error(
+            reply,
+            `Insufficient PAYG credit balance for ${quantity} ${channel} messages. Required: $${balanceCheck.required.toFixed(4)}, Available: $${balanceCheck.available.toFixed(4)}. Please top up at /api/payg/topup.`,
+            4030,
+            402
+          );
+        }
+      }
+
+      const { notifications: sent, response } = await notifyService.bulkSend(accountId, appId, body.notifications);
 
       logger.info(
-        {
-          accepted: response.accepted,
-          rejected: response.rejected,
-          correlationId: request.id,
-        },
+        { accepted: response.accepted, rejected: response.rejected, isPayg, correlationId: request.id },
         'Bulk notifications processed'
       );
 
-      // Track usage for accepted notifications
-      const channel = body.notifications[0]?.channel?.toLowerCase() || 'email';
-      const metric = `${channel}s_per_month`;
-      await UsageTrackingService.recordUsage(accountId, appId, metric, response.accepted);
+      if (isPayg) {
+        // ── PAYG: deduct credits for each accepted message ─────────────────
+        if (response.accepted > 0) {
+          const deductResult = await PaygService.deductCredits({
+            accountId,
+            channel,
+            quantity: response.accepted,
+          });
+          logger.info(
+            {
+              accountId,
+              channel,
+              quantity: response.accepted,
+              deducted: deductResult.amountDeducted,
+              newBalance: deductResult.newBalance,
+              success: deductResult.success,
+              correlationId: request.id,
+            },
+            '[PAYG] Bulk credit deduction result'
+          );
+          if (!deductResult.success) {
+            logger.error(
+              { accountId, deductResult },
+              '[PAYG] Bulk credit deduction failed after notifications were queued'
+            );
+          }
+          PaygService.checkAndAlertLowBalance(accountId).catch(() => {});
+        }
+      } else {
+        // ── Subscription: record usage against monthly quota ───────────────
+        const metric = `${channel.toLowerCase()}s_per_month`;
+        await UsageTrackingService.recordUsage(accountId, appId, metric, response.accepted);
+      }
 
+      void sent; // returned for completeness; response summary is what callers need
       ApiResponseHelper.accepted(reply, 'Bulk notifications queued for processing', response);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

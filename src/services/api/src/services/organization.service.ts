@@ -1,16 +1,17 @@
-import { randomUUID, createHash } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import pino from 'pino';
 import { prismaRead, prismaWrite } from '@shared/database';
 import { NotifyService } from './notify.service';
 import { env } from '../config/env';
-import { template } from 'handlebars';
 import { accountRepository } from '../repositories/account.repository';
+import { AccountService } from './account.service';
 
 const logger = pino();
+const accountService = new AccountService();
 
 export class OrganizationService {
   /**
-   * Create a new organization
+   * Create a new organization with billing
    */
   async createOrganization(
     data: {
@@ -21,10 +22,28 @@ export class OrganizationService {
       taxId?: string;
       email?: string;
       phone?: string;
+      planId: string;
+      billingCycle?: 'monthly' | 'annual';
+      paymentMethodId?: string;
     },
     userId: string
   ) {
     try {
+      // Validate plan exists
+      const plan = await prismaRead.plan.findUnique({
+        where: { id: data.planId },
+      });
+
+      if (!plan) {
+        throw new Error(`Plan not found: ${data.planId}`);
+      }
+
+      // Paid plans require payment method
+      const isPaidPlan = plan.name.toUpperCase() !== 'FREE';
+      if (isPaidPlan && !data.paymentMethodId) {
+        throw new Error('Payment method is required for paid plans');
+      }
+
       // Create organization
       const org = await prismaWrite.organization.create({
         data: {
@@ -50,8 +69,8 @@ export class OrganizationService {
         },
       });
 
-      // Create account for the organization to associate with user
-      await prismaWrite.account.create({
+      // Create account for the organization
+      const account = await prismaWrite.account.create({
         data: {
           id: randomUUID(),
           owner_user_id: userId,
@@ -59,6 +78,14 @@ export class OrganizationService {
           type: 'ORGANIZATION',
         },
       });
+
+      // Create subscription with selected plan
+      await accountService.createSubscriptionByPlanId(account.id, data.planId, data.billingCycle, data.paymentMethodId);
+
+      logger.info(
+        { orgId: org.id, accountId: account.id, planId: data.planId },
+        'Organization created with subscription'
+      );
 
       return org;
     } catch (error) {

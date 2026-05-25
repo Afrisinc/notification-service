@@ -149,49 +149,18 @@ async function main() {
 
     logger.info('Created 2 individual accounts');
 
-    // Create subscription plans
-    logger.info('Creating subscription plans...');
-    const plans = await Promise.all([
-      prisma.plan.upsert({
-        where: { name: 'FREE' },
-        update: {},
-        create: {
-          name: 'FREE',
-          price_monthly: 0,
-          price_yearly: 0,
-          currency: 'USD',
-          active: true,
-        },
-      }),
-      prisma.plan.upsert({
-        where: { name: 'PRO' },
-        update: {},
-        create: {
-          name: 'PRO',
-          price_monthly: 29.99,
-          price_yearly: 299.9,
-          currency: 'USD',
-          active: true,
-        },
-      }),
-      prisma.plan.upsert({
-        where: { name: 'ENTERPRISE' },
-        update: {},
-        create: {
-          name: 'ENTERPRISE',
-          price_monthly: 99.99,
-          price_yearly: 999.9,
-          currency: 'USD',
-          active: true,
-        },
-      }),
-    ]);
-
-    logger.info('Created subscription plans');
-
-    // Seed plan limits
-    logger.info('Seeding plan limits...');
+    // Seed all plans and limits first (seedPlanLimits handles FREE/STARTER/SCALE/ENTERPRISE/PAYG)
+    logger.info('Seeding plans and limits...');
     await seedPlanLimits(prisma);
+
+    // Retrieve plans for sample subscriptions
+    const freePlan = await prisma.plan.findUnique({ where: { name: 'FREE' } });
+    const starterPlan = await prisma.plan.findUnique({ where: { name: 'STARTER' } });
+    const enterprisePlan = await prisma.plan.findUnique({ where: { name: 'ENTERPRISE' } });
+
+    if (!freePlan || !starterPlan || !enterprisePlan) {
+      throw new Error('Plans not found after seeding — check seedPlanLimits');
+    }
 
     // Create subscriptions for individual accounts
     logger.info('Creating subscriptions for individual accounts...');
@@ -205,7 +174,7 @@ async function main() {
         update: {},
         create: {
           account_id: johnAccount.id,
-          plan_id: plans[0].id, // FREE
+          plan_id: freePlan.id,
           status: 'active',
           billing_cycle: 'monthly',
           current_period_start: now,
@@ -218,7 +187,7 @@ async function main() {
         update: {},
         create: {
           account_id: janeAccount.id,
-          plan_id: plans[1].id, // PRO
+          plan_id: starterPlan.id,
           status: 'active',
           billing_cycle: 'monthly',
           current_period_start: now,
@@ -329,7 +298,7 @@ async function main() {
       update: {},
       create: {
         account_id: organizationAccount.id,
-        plan_id: plans[2].id, // ENTERPRISE
+        plan_id: enterprisePlan.id,
         status: 'active',
         billing_cycle: 'yearly',
         current_period_start: now,
@@ -397,7 +366,7 @@ async function main() {
       update: {},
       create: {
         account_id: afrisincAccount.id,
-        plan_id: plans[2].id, // ENTERPRISE
+        plan_id: enterprisePlan.id,
         status: 'active',
         billing_cycle: 'yearly',
         current_period_start: now,

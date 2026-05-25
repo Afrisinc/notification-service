@@ -2,6 +2,8 @@ import { FastifyInstance } from 'fastify';
 import { notifyController } from '../controllers/notify.controller';
 import { asyncWrapper } from '../middlewares/async_wrapper.middleware';
 import { flexAuthMiddleware, validateBaseToken } from '../middlewares/auth.middleware';
+import { rateLimiters } from '../middlewares/rate-limit.middleware';
+import { preSendLimitGuard, preBulkLimitGuard } from '../guards';
 import {
   sendNotificationSchema,
   bulkNotificationSchema,
@@ -14,7 +16,7 @@ export async function registerNotifyRoutes(fastify: FastifyInstance) {
   fastify.post(
     '/notify/send',
     {
-      onRequest: [flexAuthMiddleware],
+      onRequest: [flexAuthMiddleware, rateLimiters.notify, preSendLimitGuard],
       schema: {
         ...sendNotificationSchema,
         headers: gatewayHeaders,
@@ -26,7 +28,7 @@ export async function registerNotifyRoutes(fastify: FastifyInstance) {
   fastify.post(
     '/notify/bulk',
     {
-      onRequest: [validateBaseToken],
+      onRequest: [validateBaseToken, rateLimiters.bulk, preBulkLimitGuard],
       schema: {
         ...bulkNotificationSchema,
         headers: gatewayHeaders,
@@ -35,11 +37,10 @@ export async function registerNotifyRoutes(fastify: FastifyInstance) {
     asyncWrapper(notifyController.bulkSend.bind(notifyController))
   );
 
-  // Define /notify/logs before /notify/:id to avoid route collision
   fastify.get(
     '/notify/logs',
     {
-      onRequest: [validateBaseToken],
+      onRequest: [validateBaseToken, rateLimiters.api],
       schema: {
         ...notificationListSchema,
         headers: gatewayHeaders,
@@ -51,7 +52,7 @@ export async function registerNotifyRoutes(fastify: FastifyInstance) {
   fastify.get(
     '/notify/:id',
     {
-      onRequest: [validateBaseToken],
+      onRequest: [validateBaseToken, rateLimiters.api],
       schema: {
         ...notificationStatusSchema,
         headers: gatewayHeaders,

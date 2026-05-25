@@ -5,10 +5,11 @@ import { templateRenderer, RenderResult } from '../template/renderer';
 import { extractRequiredVariables } from '../template/validators/template.validator';
 import { getDefaultTemplate, hasDefaultTemplate, listDefaultTemplates as listDefaults } from '../templates';
 import { parseTemplateRequest } from '../utils/template-parser';
+import { accountRepository } from '../repositories/account.repository';
 
 export interface Template {
   id: string;
-  tenantId: string;
+  account_id: string;
   code: string;
   channel: string;
   subject?: string;
@@ -58,8 +59,14 @@ export class TemplateService {
   /**
    * Create a new template with initial version
    */
-  async createTemplate(accountId: string, userId: string, request: CreateTemplateRequest): Promise<Template> {
+  async createTemplate(orgId: string, userId: string, request: CreateTemplateRequest): Promise<Template> {
     try {
+      const account = await accountRepository.findAccountByOrganizationId(orgId);
+      if (!account) {
+        throw new Error('Organization account not found. Please contact support.');
+      }
+      const accountId = account.id;
+
       // Parse template request (extracts design_json from HTML comment and normalizes data)
       const parsedData = parseTemplateRequest({
         code: request.code,
@@ -97,14 +104,14 @@ export class TemplateService {
       });
 
       logger.info(
-        { accountId, templateId: template.id, code: request.code, userId },
+        { accountId: template.account_id, templateId: template.id, code: request.code, userId },
         'Template created with initial version'
       );
 
       return template;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error({ error: errorMessage, accountId, code: request.code, userId }, 'Failed to create template');
+      logger.error({ error: errorMessage, orgId, code: request.code, userId }, 'Failed to create template');
       throw error;
     }
   }
@@ -153,7 +160,7 @@ export class TemplateService {
           // Convert default template to Template interface
           const fallbackTemplate: Template = {
             id: `default-${code}`,
-            tenantId,
+            account_id: tenantId,
             code: defaultTemplate.code,
             channel: defaultTemplate.channel,
             content: defaultTemplate.html,
@@ -464,7 +471,7 @@ export class TemplateService {
 
       return {
         id: `default-${code}`,
-        tenantId: 'system',
+        account_id: 'system',
         code: defaultTemplate.code,
         channel: defaultTemplate.channel,
         content: defaultTemplate.html,
@@ -492,6 +499,80 @@ export class TemplateService {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error({ error: errorMessage, organizationId }, 'Failed to get templates for organization');
+      throw error;
+    }
+  }
+
+  /**
+   * Duplicate a template with a new code
+   * Only allows duplicating templates owned by the user
+   */
+  async duplicateTemplate(orgId: string, templateId: string, userId: string, newCode?: string): Promise<Template> {
+    try {
+      const account = await accountRepository.findAccountByOrganizationId(orgId);
+      if (!account) {
+        throw new Error('Organization account not found. Please contact support.');
+      }
+      const accountId = account.id;
+
+      // Get the original template with ownership verification
+      const original = await templateRepository.findById(accountId, templateId);
+      if (!original || original.account_id !== accountId) {
+        throw new Error('Template not found');
+      }
+
+      // Verify user owns the template
+      if (original.created_by_user_id !== userId) {
+        throw new Error('Template not found or not owned by user');
+      }
+
+      // Check if template is deleted
+      if (original.deletedAt) {
+        throw new Error('Cannot duplicate a deleted template');
+      }
+
+      // Generate new code if not provided
+      let duplicateCode = newCode || `${original.code}_COPY`;
+
+      // If no custom code provided, ensure uniqueness by adding timestamp
+      if (!newCode) {
+        const timestamp = Date.now().toString(36).toUpperCase();
+        duplicateCode = `${original.code}_COPY_${timestamp}`;
+      }
+
+      // Create the duplicate template
+      const duplicate = await templateRepository.create(
+        accountId,
+        {
+          code: duplicateCode,
+          channel: original.channel,
+          subject: original.subject,
+          content: original.content,
+          language: original.language,
+          requiredVariables: original.requiredVariables,
+          description: original.description ? `Copy of ${original.description}` : `Copy of ${original.code}`,
+          design_json: (original as any).design_json,
+          editor_type: (original as any).editor_type,
+        },
+        userId
+      );
+
+      // Create initial version for duplicate
+      await templateVersionRepository.create(duplicate.id, 1, {
+        subject: original.subject,
+        content: original.content,
+        requiredVariables: original.requiredVariables,
+      });
+
+      logger.info(
+        { originalId: templateId, duplicateId: duplicate.id, code: duplicateCode, userId },
+        'Template duplicated'
+      );
+
+      return duplicate;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, orgId, templateId, userId }, 'Failed to duplicate template');
       throw error;
     }
   }

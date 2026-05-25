@@ -5,6 +5,7 @@ export * from './types/email';
 // Export enums
 export * from './enums/channel';
 export * from './enums/status';
+export * from './enums/alert';
 
 // Export constants
 export const DEFAULT_TIMEOUT_MS = 80100;

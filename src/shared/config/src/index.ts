@@ -110,6 +110,23 @@ const EnvSchema = z.object({
   MAIL_SERVER_USER: z.string().optional().default('root'),
   MAIL_SERVER_SSH_KEY: z.string().optional(),
   MAIL_SERVER_SSH_PASSWORD: z.string().optional(),
+
+  // Admin/System Alerts Configuration
+  ADMIN_EMAILS: z.string().optional().default(''),
+  SYSTEM_ACCOUNT_ID: z.string().optional(),
+  SYSTEM_APP_ID: z.string().optional(),
+  SYSTEM_ALERT_TEMPLATE_ID: z.string().optional(),
+  ALERT_WEBHOOK_URL: z.string().optional(),
+  DLQ_ALERT_THRESHOLD: z.coerce.number().optional().default(100),
+
+  // User Limit Notification Templates
+  USAGE_APPROACHING_LIMIT_TEMPLATE_ID: z.string().optional(),
+  USAGE_LIMIT_EXCEEDED_TEMPLATE_ID: z.string().optional(),
+
+  // PAYG Low-Balance Alert Template
+  // Sent when a PAYG account's balance drops below PAYG_LOW_BALANCE_THRESHOLD_USD
+  PAYG_LOW_BALANCE_TEMPLATE_ID: z.string().optional(),
+  PAYG_LOW_BALANCE_THRESHOLD_USD: z.coerce.number().optional().default(5),
 });
 
 export type Environment = z.infer<typeof EnvSchema>;

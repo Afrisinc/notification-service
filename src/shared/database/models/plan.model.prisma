@@ -4,14 +4,15 @@
 ////////////////////////////////////////////////////////////
 
 model Plan {
-  id                String    @id @default(uuid())
-  name              String    @unique // Free | Pro | Business
-  price_monthly     Float
-  price_yearly      Float
-  currency          String    @default("USD")
-  active            Boolean   @default(true)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                      String    @id @default(uuid())
+  name                    String    @unique // Free | Pro | Business
+  price_monthly           Float
+  price_yearly            Float
+  currency                String    @default("USD")
+  active                  Boolean   @default(true)
+  payment_method_required Boolean   @default(false) // Require payment method for trial
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   // Relations
   limits            PlanLimit[]

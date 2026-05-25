@@ -26,7 +26,9 @@ export interface SignupPayload {
   password: string;
   account_type: AccountType;
   account_name?: string;
-  plan?: 'FREE' | 'PRO' | 'ENTERPRISE';
+  planId: string;
+  billingCycle?: 'monthly' | 'annual';
+  paymentMethodId?: string; // Stripe payment method ID (required for paid plans)
   displayName?: string;
   organizationName: string;
   jobTitle?: string;
