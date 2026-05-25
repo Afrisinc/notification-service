@@ -1,28 +1,26 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../config/logger';
 import { templateService, CreateTemplateRequest, UpdateTemplateRequest } from '../services/template.service';
-import { UsageTrackingService } from '../services/usage-tracking.service';
 import { templateAssetsService } from '../services/template-assets.service';
 import { ApiResponseHelper } from '../utils';
 import { appTemplateRepository } from '../repositories/template-installation.repository';
 import { prismaRead, prismaWrite } from '@shared/database';
+import { AccountService } from '../services/account.service';
+
+const accountService = new AccountService();
 
 export class TemplateController {
   async createTemplate(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const accountId = request.headers['x-account-id'] as string;
+      const { orgId } = request.params as { orgId: string };
       const userId = (request as any).user?.id;
       const body = request.body as CreateTemplateRequest;
-
-      if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'No account access');
-      }
 
       if (!userId) {
         return ApiResponseHelper.unauthorized(reply, 'User information not found');
       }
 
-      const template = await templateService.createTemplate(accountId, userId, body);
+      const template = await templateService.createTemplate(orgId, userId, body);
 
       logger.info(
         {
@@ -32,10 +30,6 @@ export class TemplateController {
         },
         'Template created'
       );
-
-      // Track usage - templates don't have a specific appId at creation, so we track per account
-      // This is tracked for the account's template count limit
-      await UsageTrackingService.recordUsage(accountId, accountId, 'templates', 1);
 
       ApiResponseHelper.created(reply, 'Template created successfully', {
         id: template.id,
@@ -61,17 +55,14 @@ export class TemplateController {
 
   async getTemplateForEdit(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const accountId = request.headers['x-account-id'] as string;
+      const { orgId, id } = request.params as { orgId: string; id: string };
       const userId = (request as any).user?.id;
-      const { id } = request.params as { id: string };
-
-      if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'No account access');
-      }
 
       if (!userId) {
         return ApiResponseHelper.unauthorized(reply, 'User information not found');
       }
+
+      const accountId = await accountService.getAccountIdByOrgId(orgId);
 
       // Protected endpoint - get template for editing (includes inactive/drafts)
       const template = await prismaRead.template.findUnique({
@@ -318,14 +309,10 @@ export class TemplateController {
 
   async updateTemplate(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const accountId = request.headers['x-account-id'] as string;
-      const { id } = request.params as { id: string };
+      const { orgId, id } = request.params as { orgId: string; id: string };
       const body = request.body as UpdateTemplateRequest;
 
-      if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'No account access');
-      }
-
+      const accountId = await accountService.getAccountIdByOrgId(orgId);
       const template = await templateService.updateTemplate(accountId, id, body);
 
       logger.info({ templateId: id, correlationId: request.id }, 'Template updated');
@@ -396,13 +383,9 @@ export class TemplateController {
 
   async deleteTemplate(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const accountId = request.headers['x-account-id'] as string;
-      const { id } = request.params as { id: string };
+      const { orgId, id } = request.params as { orgId: string; id: string };
 
-      if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'No account access');
-      }
-
+      const accountId = await accountService.getAccountIdByOrgId(orgId);
       await templateService.deleteTemplate(accountId, id);
 
       logger.info({ templateId: id, correlationId: request.id }, 'Template deleted');
@@ -426,14 +409,10 @@ export class TemplateController {
 
   async createVersion(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const accountId = request.headers['x-account-id'] as string;
-      const { id: templateId } = request.params as { id: string };
+      const { orgId, id: templateId } = request.params as { orgId: string; id: string };
       const body = request.body as any;
 
-      if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'No account access');
-      }
-
+      const accountId = await accountService.getAccountIdByOrgId(orgId);
       const version = await templateService.createVersion(accountId, templateId, {
         subject: body.subject,
         content: body.content,
@@ -471,16 +450,17 @@ export class TemplateController {
 
   async activateVersion(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const accountId = request.headers['x-account-id'] as string;
-      const { id: templateId, versionId } = request.params as {
+      const {
+        orgId,
+        id: templateId,
+        versionId,
+      } = request.params as {
+        orgId: string;
         id: string;
         versionId: string;
       };
 
-      if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'No account access');
-      }
-
+      const accountId = await accountService.getAccountIdByOrgId(orgId);
       const activated = await templateService.activateVersion(accountId, templateId, versionId);
 
       logger.info(
@@ -513,13 +493,10 @@ export class TemplateController {
 
   async previewTemplate(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const accountId = request.headers['x-account-id'] as string;
+      const { orgId } = request.params as { orgId: string };
       const body = request.body as any;
 
-      if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'No account access');
-      }
-
+      const accountId = await accountService.getAccountIdByOrgId(orgId);
       const result = await templateService.previewTemplate(
         accountId,
         body.templateCode,
@@ -715,8 +692,7 @@ export class TemplateController {
 
   async installTemplate(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const accountId = request.headers['x-account-id'] as string;
-      const { id: templateId } = request.params as { id: string };
+      const { orgId, id: templateId } = request.params as { orgId: string; id: string };
       const body = request.body as {
         app_id: string;
         customizations?: any;
@@ -725,6 +701,8 @@ export class TemplateController {
       if (!body.app_id) {
         return ApiResponseHelper.badRequest(reply, 'app_id is required');
       }
+
+      const accountId = await accountService.getAccountIdByOrgId(orgId);
 
       // Verify app exists and belongs to account
       const app = await prismaRead.app.findUnique({
@@ -781,8 +759,9 @@ export class TemplateController {
 
   async getInstallationStatus(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const accountId = request.headers['x-account-id'] as string;
-      const { id: templateId } = request.params as { id: string };
+      const { orgId, id: templateId } = request.params as { orgId: string; id: string };
+
+      const accountId = await accountService.getAccountIdByOrgId(orgId);
 
       // Verify template exists and belongs to account
       const template = await prismaRead.template.findUnique({
@@ -833,8 +812,9 @@ export class TemplateController {
 
   async getTemplateAnalytics(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const accountId = request.headers['x-account-id'] as string;
-      const { id: templateId } = request.params as { id: string };
+      const { orgId, id: templateId } = request.params as { orgId: string; id: string };
+
+      const accountId = await accountService.getAccountIdByOrgId(orgId);
 
       // Verify template exists and belongs to account
       const template = await prismaRead.template.findUnique({
@@ -929,17 +909,15 @@ export class TemplateController {
 
   async listMyTemplates(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const accountId = request.headers['x-account-id'] as string;
+      const { orgId } = request.params as { orgId: string };
       const userId = (request as any).user?.id;
       const { limit, offset } = request.query as { limit?: string; offset?: string };
-
-      if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'No account access');
-      }
 
       if (!userId) {
         return ApiResponseHelper.unauthorized(reply, 'User information not found');
       }
+
+      const accountId = await accountService.getAccountIdByOrgId(orgId);
 
       // Get user's templates
       const where: any = {
@@ -1011,17 +989,14 @@ export class TemplateController {
 
   async publishTemplate(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const accountId = request.headers['x-account-id'] as string;
+      const { orgId, id: templateId } = request.params as { orgId: string; id: string };
       const userId = (request as any).user?.id;
-      const { id: templateId } = request.params as { id: string };
-
-      if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'No account access');
-      }
 
       if (!userId) {
         return ApiResponseHelper.unauthorized(reply, 'User information not found');
       }
+
+      const accountId = await accountService.getAccountIdByOrgId(orgId);
 
       // Verify template exists and belongs to user
       const template = await prismaRead.template.findUnique({
@@ -1252,17 +1227,14 @@ export class TemplateController {
 
   async unpublishTemplate(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const accountId = request.headers['x-account-id'] as string;
+      const { orgId, id: templateId } = request.params as { orgId: string; id: string };
       const userId = (request as any).user?.id;
-      const { id: templateId } = request.params as { id: string };
-
-      if (!accountId) {
-        return ApiResponseHelper.unauthorized(reply, 'No account access');
-      }
 
       if (!userId) {
         return ApiResponseHelper.unauthorized(reply, 'User information not found');
       }
+
+      const accountId = await accountService.getAccountIdByOrgId(orgId);
 
       // Verify template exists and belongs to user
       const template = await prismaRead.template.findUnique({
@@ -1317,6 +1289,50 @@ export class TemplateController {
       } else {
         ApiResponseHelper.badRequest(reply, errorMessage);
       }
+    }
+  }
+
+  async duplicateTemplate(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { orgId, id: templateId } = request.params as { orgId: string; id: string };
+      const userId = (request as any).user?.id;
+      const body = request.body as { newCode?: string } | undefined;
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User information not found');
+      }
+
+      const duplicate = await templateService.duplicateTemplate(orgId, templateId, userId, body?.newCode);
+
+      logger.info(
+        {
+          originalId: templateId,
+          duplicateId: duplicate.id,
+          code: duplicate.code,
+          correlationId: request.id,
+        },
+        'Template duplicated'
+      );
+
+      ApiResponseHelper.created(reply, 'Template duplicated successfully', {
+        id: duplicate.id,
+        code: duplicate.code,
+        channel: duplicate.channel,
+        active: duplicate.active,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to duplicate template');
+
+      if (errorMessage.includes('not found')) {
+        return ApiResponseHelper.notFound(reply, errorMessage);
+      }
+
+      if (errorMessage.includes('already exists')) {
+        return ApiResponseHelper.duplicate(reply, errorMessage);
+      }
+
+      ApiResponseHelper.badRequest(reply, errorMessage);
     }
   }
 }

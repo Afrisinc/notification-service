@@ -1,0 +1,29 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: BILLING & PAYG
+// Ledger of every credit movement (top-ups + deductions)
+////////////////////////////////////////////////////////////
+
+model CreditTransaction {
+  id                  String   @id @default(uuid())
+  account_id          String
+  credit_balance_id   String
+  type                String   // topup | deduction | bonus | refund
+  amount              Float    // positive = credit, negative = debit (USD)
+  balance_after       Float    // running balance after this transaction
+  description         String?
+  channel             String?  // EMAIL | SMS | PUSH | IN_APP — for deductions
+  notification_id     String?  // linked notification record, if applicable
+  payment_ref         String?  // external payment / mock reference
+  bonus_percent       Int?     // bonus % applied on top-up (0 | 5 | 10 | 15)
+  created_at          DateTime @default(now())
+
+  // Relations
+  account       Account       @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  creditBalance CreditBalance @relation(fields: [credit_balance_id], references: [id], onDelete: Cascade)
+
+  @@index([account_id])
+  @@index([credit_balance_id])
+  @@index([type])
+  @@index([created_at])
+  @@map("credit_transactions")
+}

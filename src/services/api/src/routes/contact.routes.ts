@@ -10,6 +10,7 @@ import {
   exportContacts,
 } from '../controllers/contact.controller';
 import { validateBaseToken } from '../middlewares/auth.middleware';
+import { planGuards } from '../guards/plan-guard';
 import {
   ListContactsSchema,
   CreateContactSchema,
@@ -52,9 +53,7 @@ export async function registerContactRoutes(app: FastifyInstance) {
     exportContacts
   );
 
-  // Create Contact (Supports both authenticated and public access with contact form support)
-  // For authenticated: send x-account-id header
-  // For public/contact form: auto-resolves account from app, supports source=contact_form for auto-reply
+  // Create Contact
   app.post(
     '/apps/:appId/contacts',
     {
@@ -68,6 +67,7 @@ export async function registerContactRoutes(app: FastifyInstance) {
     '/apps/:appId/contacts/import',
     {
       onRequest: [validateBaseToken],
+      preHandler: [planGuards.checkEntityLimit('contacts')],
       schema: BulkImportContactsSchema,
     },
     bulkImportContacts

@@ -19,9 +19,12 @@ model Account {
   apiKeys           ApiKey[]
   notifications     Notification[]
   userPreferences   UserPreference[]
-  subscription      Subscription?
-  usageRecords      UsageRecord[]
-  limitOverrides    LimitOverride[]
+  subscription             Subscription?
+  usageRecords             UsageRecord[]
+  limitOverrides           LimitOverride[]
+  creditBalance            CreditBalance?
+  creditTransactions       CreditTransaction[]
+  limitNotificationLogs    LimitNotificationLog[]
 
   @@index([owner_user_id])
   @@index([organization_id])

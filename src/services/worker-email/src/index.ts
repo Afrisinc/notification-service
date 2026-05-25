@@ -1,142 +1,217 @@
 import pino from 'pino';
-import { connect } from 'amqplib';
+import amqp from 'amqplib';
 import { getConfig } from '@shared/config';
 import { verifyDbConnections, closeDbConnections } from '@shared/database';
+import { setupQueueWithDLQ, dlqConfigs, sendToDLQ } from '@shared/utils/dlq';
+import { queueRetryConfigs, getQueueRetryDelay, shouldRetryQueueMessage } from '@shared/utils/retry';
 import { EmailProcessor } from './processor';
 
-const logger = pino();
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  formatters: {
+    level: (label) => ({ level: label }),
+  },
+});
+
+const DLQ_CONFIG = dlqConfigs.email;
+const RETRY_CONFIG = queueRetryConfigs.email;
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function startEmailWorker() {
   let connection: any = null;
-  let channel: any = null;
+  let channel: amqp.Channel | null = null;
+  let isShuttingDown = false;
+
+  async function gracefulShutdown(signal: string) {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    logger.info({ signal }, 'Graceful shutdown initiated');
+
+    try {
+      if (channel) {
+        await channel.close();
+        logger.info('Channel closed');
+      }
+
+      if (connection) {
+        await connection.close();
+        logger.info('Connection closed');
+      }
+
+      await closeDbConnections();
+      logger.info('Database connections closed');
+      logger.info('Email worker shut down successfully');
+      process.exit(0);
+    } catch (error) {
+      logger.error({ error }, 'Error during shutdown');
+      process.exit(1);
+    }
+  }
 
   try {
     const config = getConfig();
     const rabbitmqUrl = config.RABBITMQ_URL || 'amqp://admin:password@localhost:5672';
-    const exchangeName = 'notifications';
-    const routingKey = 'send_message.email';
-    const queueName = 'notifications.email';
 
-    // Connect to database
     logger.info('Verifying database connection...');
     const dbConnected = await verifyDbConnections();
     if (!dbConnected) {
       logger.error('Failed to connect to database');
       process.exit(1);
     }
-    logger.info('✅ Database connection verified');
+    logger.info('Database connection verified');
 
-    logger.info({ url: rabbitmqUrl }, 'Connecting to RabbitMQ...');
+    logger.info('Connecting to RabbitMQ...');
+    connection = await amqp.connect(rabbitmqUrl);
+    const ch = await connection.createChannel();
+    channel = ch;
 
-    // Connect to RabbitMQ
-    connection = await connect(rabbitmqUrl);
-    channel = await connection.createChannel();
-
-    // Assert exchange
-    await channel.assertExchange(exchangeName, 'direct', {
-      durable: true,
+    connection.on('error', (err: Error) => {
+      logger.error({ error: err.message }, 'RabbitMQ connection error');
     });
 
-    // Assert queue
-    await channel.assertQueue(queueName, {
-      durable: true,
+    connection.on('close', () => {
+      if (!isShuttingDown) {
+        logger.error('RabbitMQ connection closed unexpectedly');
+        process.exit(1);
+      }
     });
 
-    // Bind queue to exchange
-    await channel.bindQueue(queueName, exchangeName, routingKey);
+    await setupQueueWithDLQ(ch, DLQ_CONFIG, logger);
+    await ch.prefetch(1);
 
-    // Set prefetch to 1 for fair distribution
-    await channel.prefetch(1);
+    logger.info(
+      {
+        queue: DLQ_CONFIG.mainQueue,
+        dlq: DLQ_CONFIG.dlqQueue,
+        exchange: DLQ_CONFIG.mainExchange,
+      },
+      'Email worker connected to RabbitMQ with DLQ support'
+    );
 
-    logger.info({ queueName, exchange: exchangeName, routingKey }, '✅ Email worker connected to RabbitMQ');
-
-    // Initialize processor
     const processor = new EmailProcessor(logger);
 
-    // Consume messages
-    await channel.consume(queueName, async (msg: any) => {
-      if (!msg) {
+    await ch.consume(DLQ_CONFIG.mainQueue, async (msg: amqp.ConsumeMessage | null) => {
+      if (!msg || isShuttingDown) {
         return;
       }
 
+      const startTime = Date.now();
+      const headers = msg.properties?.headers || {};
+      const retryCount = (headers['x-retry-count'] as number) || 0;
+
+      let emailData: any;
+      let notificationId: string = 'unknown';
+
       try {
         const content = JSON.parse(msg.content.toString());
-        const emailData = content.msg;
+        emailData = content.msg || content;
+        notificationId = emailData.notificationId || emailData.id || 'unknown';
 
         logger.info(
-          { notificationId: emailData.notificationId, recipient: emailData.recipient },
-          '🔄 Processing email from queue'
+          {
+            notificationId,
+            recipient: emailData.recipient || emailData.to,
+            retryCount,
+          },
+          'Processing email from queue'
         );
 
         await processor.process(emailData);
 
-        // Acknowledge message
         channel!.ack(msg);
 
-        logger.info({ notificationId: emailData.notificationId }, '✅ Email job completed and acknowledged');
+        const duration = Date.now() - startTime;
+        logger.info(
+          {
+            notificationId,
+            duration,
+            retryCount,
+          },
+          'Email processed successfully'
+        );
       } catch (error) {
-        logger.error({ error, message: msg.content.toString() }, '❌ Failed to process email job');
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const duration = Date.now() - startTime;
 
-        // Reject and requeue message (up to 3 times)
-        const retryCount = (msg.properties?.headers?.['x-retry-count'] as number) || 0;
+        logger.error(
+          {
+            notificationId,
+            error: errorMessage,
+            retryCount,
+            duration,
+          },
+          'Failed to process email'
+        );
 
-        if (retryCount < 3) {
-          // Acknowledge the original message so it doesn't get stuck in an infinite loop
-          channel!.ack(msg);
+        channel!.ack(msg);
 
-          // Republish with incremented retry count
+        if (shouldRetryQueueMessage(RETRY_CONFIG, retryCount)) {
+          const delay = getQueueRetryDelay(RETRY_CONFIG, retryCount);
           const nextRetryCount = retryCount + 1;
-          channel!.publish(exchangeName, routingKey, msg.content, {
+
+          logger.info(
+            {
+              notificationId,
+              nextRetryCount,
+              maxRetries: RETRY_CONFIG.maxRetries,
+              delayMs: delay,
+            },
+            'Scheduling retry with backoff'
+          );
+
+          await sleep(delay);
+
+          channel!.publish(DLQ_CONFIG.mainExchange, DLQ_CONFIG.mainRoutingKey, msg.content, {
+            persistent: true,
             headers: {
-              ...msg.properties?.headers,
+              ...headers,
               'x-retry-count': nextRetryCount,
+              'x-last-error': errorMessage,
+              'x-last-retry-at': new Date().toISOString(),
             },
           });
-          logger.info({ retryCount: nextRetryCount }, 'Message requeued with incremented retry count');
         } else {
-          // Discard after 3 retries by acknowledging it
-          channel!.ack(msg);
-          logger.error('Max retries exceeded, message discarded');
+          logger.error(
+            {
+              notificationId,
+              retryCount,
+              maxRetries: RETRY_CONFIG.maxRetries,
+            },
+            'Max retries exceeded, sending to DLQ'
+          );
+
+          await sendToDLQ(
+            channel!,
+            DLQ_CONFIG.dlxExchange,
+            DLQ_CONFIG.dlqRoutingKey,
+            msg.content,
+            headers,
+            error instanceof Error ? error : new Error(String(error)),
+            logger
+          );
         }
       }
     });
 
-    logger.info('📧 Email worker is listening for messages...');
+    logger.info('Email worker is listening for messages...');
 
-    // Graceful shutdown
-    process.on('SIGTERM', async () => {
-      logger.info('SIGTERM received, shutting down gracefully...');
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-      if (channel) {
-        await channel.close();
-      }
-
-      if (connection) {
-        await connection.close();
-      }
-
-      await closeDbConnections();
-      logger.info('✅ Email worker shut down successfully');
-      process.exit(0);
+    process.on('uncaughtException', (error) => {
+      logger.error({ error: error.message, stack: error.stack }, 'Uncaught exception');
+      gracefulShutdown('uncaughtException');
     });
 
-    process.on('SIGINT', async () => {
-      logger.info('SIGINT received, shutting down gracefully...');
-
-      if (channel) {
-        await channel.close();
-      }
-
-      if (connection) {
-        await connection.close();
-      }
-
-      await closeDbConnections();
-      logger.info('✅ Email worker shut down successfully');
-      process.exit(0);
+    process.on('unhandledRejection', (reason) => {
+      logger.error({ reason }, 'Unhandled rejection');
     });
   } catch (error) {
-    logger.error(error, 'Failed to start email worker');
+    logger.error({ error }, 'Failed to start email worker');
     process.exit(1);
   }
 }

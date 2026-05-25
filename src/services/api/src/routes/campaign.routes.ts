@@ -12,6 +12,7 @@ import {
   getCampaignsSummaryStats,
 } from '../controllers/campaign.controller';
 import { validateBaseToken } from '../middlewares/auth.middleware';
+import { planGuards } from '../guards/plan-guard';
 import {
   ListCampaignsSchema,
   CreateCampaignSchema,
@@ -50,7 +51,7 @@ export async function registerCampaignRoutes(app: FastifyInstance) {
   app.post(
     '/apps/:appId/campaigns',
     {
-      onRequest: [validateBaseToken],
+      preHandler: [planGuards.checkEntityLimit('campaigns')],
       schema: CreateCampaignSchema,
     },
     createCampaign
@@ -91,6 +92,7 @@ export async function registerCampaignRoutes(app: FastifyInstance) {
     '/apps/:appId/campaigns/:campaignId/duplicate',
     {
       onRequest: [validateBaseToken],
+      preHandler: [planGuards.checkEntityLimit('campaigns')],
       schema: DuplicateCampaignSchema,
     },
     duplicateCampaign

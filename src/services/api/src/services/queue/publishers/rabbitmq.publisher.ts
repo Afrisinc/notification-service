@@ -14,6 +14,7 @@
 import { connect } from 'amqplib';
 import { logger } from '../../../config/logger';
 import { IQueuePublisher, QueueMessage } from '../publisher.interface';
+import { dlqConfigs, setupQueueWithDLQ } from '@shared/utils/dlq';
 
 export class RabbitMQPublisher implements IQueuePublisher {
   private connection: any = null;
@@ -42,22 +43,9 @@ export class RabbitMQPublisher implements IQueuePublisher {
         throw new Error('Failed to create RabbitMQ channel');
       }
 
-      // Assert exchange
-      await this.channel.assertExchange(this.exchangeName, 'direct', {
-        durable: true,
-      });
-
-      // Assert email queue and bind with email routing key
-      await this.channel.assertQueue(this.emailQueue, {
-        durable: true,
-      });
-      await this.channel.bindQueue(this.emailQueue, this.exchangeName, this.emailRoutingKey);
-
-      // Assert SMS queue and bind with SMS routing key
-      await this.channel.assertQueue(this.smsQueue, {
-        durable: true,
-      });
-      await this.channel.bindQueue(this.smsQueue, this.exchangeName, this.smsRoutingKey);
+      // Setup queues with DLQ (must match worker configuration)
+      await setupQueueWithDLQ(this.channel, dlqConfigs.email, logger);
+      await setupQueueWithDLQ(this.channel, dlqConfigs.sms, logger);
 
       // Set prefetch to 1 to ensure fair distribution
       await this.channel.prefetch(1);

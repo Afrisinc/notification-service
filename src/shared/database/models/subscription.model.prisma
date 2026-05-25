@@ -4,18 +4,21 @@
 ////////////////////////////////////////////////////////////
 
 model Subscription {
-  id                String    @id @default(uuid())
-  account_id        String    @unique
-  plan_id           String
-  status            String    // trialing | active | canceled | past_due
-  billing_cycle     String    // monthly | yearly
+  id                   String    @id @default(uuid())
+  account_id           String    @unique
+  plan_id              String
+  status               String    // trialing | active | canceled | past_due
+  billing_cycle        String    // monthly | yearly
   current_period_start DateTime
-  current_period_end DateTime
-  provider          String    // stripe | paypal | manual
-  provider_id       String?   // external provider subscription ID
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  canceled_at       DateTime?
+  current_period_end   DateTime
+  provider             String    // stripe | paypal | manual
+  provider_id          String?   // External provider subscription ID
+  payment_method_id    String?   // Stripe payment method ID (pm_xxx)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  canceled_at          DateTime?
+  trial_ends_at        DateTime? // Trial expiration date (14 days from signup)
+  trial_reminder_sent  Boolean   @default(false) // Track if reminder was sent
 
   // Relations
   account           Account @relation(fields: [account_id], references: [id], onDelete: Cascade)
@@ -25,5 +28,6 @@ model Subscription {
   @@index([account_id])
   @@index([plan_id])
   @@index([provider_id])
+  @@index([trial_ends_at])
   @@map("subscriptions")
 }

@@ -89,13 +89,12 @@ export const ChangePlanSchema = {
   tags: ['Subscriptions'],
   body: {
     type: 'object',
-    required: ['planId'],
     properties: {
-      planId: {
-        type: 'string',
-        description: 'ID of the plan to upgrade/downgrade to',
-      },
+      planId: { type: 'string', description: 'UUID of the plan' },
+      planName: { type: 'string', description: 'Plan name: FREE, STARTER, SCALE, ENTERPRISE, PAYG' },
+      billingCycle: { type: 'string', enum: ['monthly', 'yearly'] },
     },
+    additionalProperties: false,
   },
   response: {
     200: {

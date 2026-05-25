@@ -114,4 +114,14 @@ export class AppRepository {
       },
     });
   }
+
+  async getAccountIdByAppId(appId: string): Promise<string | null> {
+    const app = await prismaRead.app.findUnique({
+      where: { id: appId },
+      select: { account_id: true },
+    });
+    return app?.account_id || null;
+  }
 }
+
+export const appRepository = new AppRepository();

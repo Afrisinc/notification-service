@@ -86,9 +86,10 @@ export class DKIMService {
 
       try {
         await this.executeRemoteCommand(`sudo chown -R opendkim:opendkim ${domainDir}`);
-        await this.executeRemoteCommand(`sudo chmod -R 770 ${domainDir}`);
+        await this.executeRemoteCommand(`sudo chmod 700 ${domainDir}`);
+        await this.executeRemoteCommand(`sudo chmod 600 ${privateKeyPath}`);
       } catch (chownError) {
-        logger.warn({ domain }, 'Could not change directory ownership');
+        logger.warn({ domain, error: chownError }, 'Could not set DKIM key permissions');
       }
 
       logger.info({ domain, selector }, 'DKIM key pair generated via SSH');

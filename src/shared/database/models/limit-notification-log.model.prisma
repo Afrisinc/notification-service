@@ -1,0 +1,21 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: NOTIFICATIONS & ALERTS
+// Persisted throttle log for account limit alert emails.
+// Replaces in-memory Map so throttle survives restarts.
+////////////////////////////////////////////////////////////
+
+model LimitNotificationLog {
+  id          String   @id @default(uuid())
+  account_id  String
+  limit_type  String   // emails_per_month | sms_per_month | etc.
+  status      String   // approaching | exceeded
+  sent_at     DateTime @default(now())
+
+  // Relations
+  account Account @relation(fields: [account_id], references: [id], onDelete: Cascade)
+
+  @@index([account_id])
+  @@index([sent_at])
+  @@index([account_id, limit_type, status])
+  @@map("limit_notification_logs")
+}

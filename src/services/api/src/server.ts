@@ -4,6 +4,7 @@ import { createFastifyApp } from './app';
 import { logger } from './config/logger';
 import { initializeNotifyService, getQueuePublisher } from './services/notify.service';
 import { initAssetsClient } from './utils/assets-client';
+import { initializeJobs, stopAllJobs } from './jobs';
 
 async function startServer() {
   let fastify: any = null;
@@ -41,6 +42,9 @@ async function startServer() {
       logger.warn({ error: error instanceof Error ? error.message : error }, 'Proceeding without Assets integration');
     }
 
+    // Initialize scheduled jobs (trial reminders, etc.)
+    initializeJobs();
+
     logger.info('===================================================');
     logger.info('[SERVER] Starting Fastify API server...');
     logger.info('===================================================');
@@ -56,6 +60,9 @@ async function startServer() {
     // Handle graceful shutdown
     const gracefulShutdown = async () => {
       logger.info('Shutting down gracefully...');
+
+      // Stop all scheduled jobs
+      stopAllJobs();
 
       // Disconnect queue publisher if available
       try {

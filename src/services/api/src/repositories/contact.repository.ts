@@ -304,6 +304,97 @@ export class ContactRepository {
       {} as Record<string, number>
     );
   }
+
+  /**
+   * Get campaign recipients based on targeting criteria
+   * Returns contacts that are active and subscribed
+   */
+  async findCampaignRecipients(
+    appId: string,
+    recipientType: string,
+    options: {
+      tags?: string[];
+      segment?: string;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ) {
+    const where: any = {
+      app_id: appId,
+      status: 'active',
+      subscribed: true,
+    };
+
+    // Apply targeting filter based on recipient_type
+    switch (recipientType) {
+      case 'tags':
+        if (options.tags && options.tags.length > 0) {
+          where.tags = { hasSome: options.tags };
+        }
+        break;
+      case 'segment':
+        // Segment support - for now segments are tag-based
+        // In future, this could be expanded to support more complex segment criteria
+        if (options.segment) {
+          where.tags = { has: options.segment };
+        }
+        break;
+      case 'all':
+      default:
+        // No additional filtering - get all subscribed contacts
+        break;
+    }
+
+    const contacts = await prismaRead.contact.findMany({
+      where,
+      select: {
+        id: true,
+        email: true,
+        first_name: true,
+        last_name: true,
+        phone: true,
+        attributes: true,
+      },
+      orderBy: { createdAt: 'asc' },
+      skip: options.offset,
+      take: options.limit,
+    });
+
+    return contacts;
+  }
+
+  /**
+   * Count campaign recipients based on targeting criteria
+   */
+  async countCampaignRecipients(
+    appId: string,
+    recipientType: string,
+    options: { tags?: string[]; segment?: string } = {}
+  ) {
+    const where: any = {
+      app_id: appId,
+      status: 'active',
+      subscribed: true,
+    };
+
+    switch (recipientType) {
+      case 'tags':
+        if (options.tags && options.tags.length > 0) {
+          where.tags = { hasSome: options.tags };
+        }
+        break;
+      case 'segment':
+        if (options.segment) {
+          where.tags = { has: options.segment };
+        }
+        break;
+      case 'all':
+      default:
+        break;
+    }
+
+    return prismaRead.contact.count({ where });
+  }
 }
 
 export const contactRepository = new ContactRepository();

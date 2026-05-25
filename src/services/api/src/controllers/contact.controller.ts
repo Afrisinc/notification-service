@@ -2,12 +2,17 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { contactService } from '../services/contact.service';
 import { UsageTrackingService } from '../services/usage-tracking.service';
 import { NotifyService } from '../services/notify.service';
+import { PaygService } from '../services/payg.service';
+import { PlanEnforcementMiddleware } from '../middleware/plan-enforcement.middleware';
 import { ApiResponseHelper } from '../utils';
 import { prismaRead } from '@shared/database';
+import { AccountService } from '../services/account.service';
+import { CreateContactDto, UpdateContactDto, ListContactsQuery } from '../types/contact.types';
 import pino from 'pino';
 
 const logger = pino();
 const notifyService = new NotifyService();
+const accountService = new AccountService();
 
 const getErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : 'Unknown error';
@@ -15,20 +20,9 @@ const getErrorMessage = (error: unknown): string => {
 
 export async function listContacts(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const accountId = req.headers['x-account-id'] as string;
     const { appId } = req.params as { appId: string };
-    const query = req.query as {
-      page?: string;
-      limit?: string;
-      search?: string;
-      status?: string;
-      tags?: string;
-      subscribed?: string;
-    };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
+    const query = req.query as ListContactsQuery;
+    await accountService.getAccountIdByAppId(appId); // Validates app exists
 
     const subscribed = query.subscribed ? query.subscribed === 'true' : undefined;
 
@@ -52,36 +46,23 @@ export async function listContacts(req: FastifyRequest, reply: FastifyReply) {
 export async function createContact(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { appId } = req.params as { appId: string };
-    const body = req.body as {
-      email: string;
-      firstName?: string;
-      lastName?: string;
-      phone?: string;
-      company?: string;
-      subject?: string;
-      message?: string;
-      status?: string;
-      subscribed?: boolean;
-      tags?: string[];
-      attributes?: Record<string, any>;
-      source?: string;
-    };
+    const body = req.body as CreateContactDto;
 
     if (!body.email) {
       return ApiResponseHelper.badRequest(reply, 'Email is required');
     }
 
-    // Get account ID from header (authenticated) or app context (public)
-    let accountId = req.headers['x-account-id'] as string;
-    if (!accountId) {
-      const app = await prismaRead.app.findUnique({
-        where: { id: appId },
-        select: { account_id: true },
-      });
-      if (!app) {
-        return ApiResponseHelper.notFound(reply, 'App not found');
-      }
-      accountId = app.account_id;
+    const accountId = await accountService.getAccountIdByAppId(appId);
+
+    // Check contact limit before creation
+    const limitCheck = await PlanEnforcementMiddleware.checkEntityLimit(accountId, 'contacts');
+    if (!limitCheck.allowed) {
+      return ApiResponseHelper.error(
+        reply,
+        `Cannot create more contacts. Plan limit reached: ${limitCheck.limit}. Please upgrade your plan.`,
+        4020,
+        403
+      );
     }
 
     // Add contact_form tag if source is contact_form
@@ -131,23 +112,62 @@ export async function createContact(req: FastifyRequest, reply: FastifyReply) {
         });
 
         if (template) {
-          // Send auto-reply notification asynchronously (non-blocking)
-          notifyService
-            .sendNotification(accountId, appId, {
-              channel: 'EMAIL',
-              recipient: body.email,
-              templateId: template.id,
-              app_id: appId,
-              payload: {
-                firstName: body.firstName || 'Valued Customer',
-                companyName: 'Our Team',
-              },
-            })
-            .catch((err) => {
-              logger.error({ error: err, contactId: contact.id }, 'Failed to send contact form auto-reply');
-            });
+          // Check PAYG balance before sending
+          const isPayg = await PlanEnforcementMiddleware.isPaygAccount(accountId);
+          if (isPayg) {
+            const balanceCheck = await PaygService.checkSufficientBalance(accountId, 'EMAIL', 1);
+            if (!balanceCheck.sufficient) {
+              logger.warn(
+                { accountId, contactId: contact.id, balance: balanceCheck.available },
+                'Skipping contact form auto-reply: insufficient PAYG balance'
+              );
+            } else {
+              // Send auto-reply and deduct credits
+              notifyService
+                .sendNotification(accountId, appId, {
+                  channel: 'EMAIL',
+                  recipient: body.email,
+                  templateId: template.id,
+                  app_id: appId,
+                  payload: {
+                    firstName: body.firstName || 'Valued Customer',
+                    companyName: 'Our Team',
+                  },
+                })
+                .then(async (notification) => {
+                  await PaygService.deductCredits({
+                    accountId,
+                    channel: 'EMAIL',
+                    quantity: 1,
+                    notificationId: notification.id,
+                  });
+                  logger.info({ accountId, notificationId: notification.id }, 'PAYG auto-reply sent and credited');
+                })
+                .catch((err) => {
+                  logger.error({ error: err, contactId: contact.id }, 'Failed to send contact form auto-reply');
+                });
+            }
+          } else {
+            // Non-PAYG: send auto-reply and record usage
+            notifyService
+              .sendNotification(accountId, appId, {
+                channel: 'EMAIL',
+                recipient: body.email,
+                templateId: template.id,
+                app_id: appId,
+                payload: {
+                  firstName: body.firstName || 'Valued Customer',
+                  companyName: 'Our Team',
+                },
+              })
+              .then(async () => {
+                await UsageTrackingService.recordUsage(accountId, appId, 'emails_per_month', 1);
+              })
+              .catch((err) => {
+                logger.error({ error: err, contactId: contact.id }, 'Failed to send contact form auto-reply');
+              });
+          }
         } else {
-          // Send simple text-based auto-reply if template doesn't exist
           logger.info({ contactId: contact.id }, 'Contact form template not found, skipping auto-reply');
         }
       } catch (err) {
@@ -172,12 +192,8 @@ export async function createContact(req: FastifyRequest, reply: FastifyReply) {
 
 export async function getContact(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const accountId = req.headers['x-account-id'] as string;
     const { appId, contactId } = req.params as { appId: string; contactId: string };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
+    await accountService.getAccountIdByAppId(appId); // Validates app exists
 
     const contact = await contactService.getContact(appId, contactId);
 
@@ -194,21 +210,9 @@ export async function getContact(req: FastifyRequest, reply: FastifyReply) {
 
 export async function updateContact(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const accountId = req.headers['x-account-id'] as string;
     const { appId, contactId } = req.params as { appId: string; contactId: string };
-    const body = req.body as {
-      firstName?: string;
-      lastName?: string;
-      phone?: string;
-      status?: string;
-      subscribed?: boolean;
-      tags?: string[];
-      attributes?: Record<string, any>;
-    };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
+    const body = req.body as UpdateContactDto;
+    await accountService.getAccountIdByAppId(appId); // Validates app exists
 
     const contact = await contactService.updateContact(appId, contactId, {
       first_name: body.firstName,
@@ -233,12 +237,8 @@ export async function updateContact(req: FastifyRequest, reply: FastifyReply) {
 
 export async function deleteContact(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const accountId = req.headers['x-account-id'] as string;
     const { appId, contactId } = req.params as { appId: string; contactId: string };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
+    await accountService.getAccountIdByAppId(appId); // Validates app exists
 
     const result = await contactService.deleteContact(appId, contactId);
 
@@ -255,7 +255,6 @@ export async function deleteContact(req: FastifyRequest, reply: FastifyReply) {
 
 export async function bulkImportContacts(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const accountId = req.headers['x-account-id'] as string;
     const { appId } = req.params as { appId: string };
     const body = req.body as {
       contacts: Array<{
@@ -271,10 +270,7 @@ export async function bulkImportContacts(req: FastifyRequest, reply: FastifyRepl
       tags?: string[];
       updateIfExists?: boolean;
     };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
+    const accountId = await accountService.getAccountIdByAppId(appId);
 
     if (!body.contacts || !Array.isArray(body.contacts)) {
       return ApiResponseHelper.badRequest(reply, 'Contacts array is required');
@@ -315,17 +311,13 @@ export async function bulkImportContacts(req: FastifyRequest, reply: FastifyRepl
 
 export async function searchContacts(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const accountId = req.headers['x-account-id'] as string;
     const { appId } = req.params as { appId: string };
     const query = req.query as {
       q?: string;
       fields?: string;
       limit?: string;
     };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
+    await accountService.getAccountIdByAppId(appId); // Validates app exists
 
     if (!query.q) {
       return ApiResponseHelper.badRequest(reply, 'Search query (q) is required');
@@ -346,7 +338,6 @@ export async function searchContacts(req: FastifyRequest, reply: FastifyReply) {
 
 export async function exportContacts(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const accountId = req.headers['x-account-id'] as string;
     const { appId } = req.params as { appId: string };
     const query = req.query as {
       format?: string;
@@ -354,10 +345,7 @@ export async function exportContacts(req: FastifyRequest, reply: FastifyReply) {
       tags?: string;
       fields?: string;
     };
-
-    if (!accountId) {
-      return ApiResponseHelper.unauthorized(reply, 'Account information not found');
-    }
+    await accountService.getAccountIdByAppId(appId); // Validates app exists
 
     const format = query.format || 'csv';
     const contacts = await contactService.getContactsForExport(appId, {

@@ -6,6 +6,7 @@
 enum CampaignStatus {
   draft
   scheduled
+  sending
   completed
   cancelled
 }
@@ -15,7 +16,37 @@ model Campaign {
   app_id                String
   name                  String
   channel               Channel
-  template_id           String
+  template_id           String?          // Optional: use template OR direct content
+
+  // ═══════════════════════════════════════════════════════════
+  // DIRECT CONTENT MODE - Channel-specific fields
+  // Only one set of fields should be used based on channel
+  // ═══════════════════════════════════════════════════════════
+
+  // EMAIL channel content
+  subject               String?          // Email subject line
+  html_content          String?          // Email HTML body
+
+  // SMS channel content
+  text_content          String?          // SMS text message (max ~160 chars per segment)
+
+  // PUSH channel content
+  push_title            String?          // Push notification title
+  push_body             String?          // Push notification body
+  push_image_url        String?          // Optional image URL for rich push
+  push_action_url       String?          // URL to open when push is tapped
+  push_data             Json?            // Custom data payload for push
+
+  // IN_APP channel content
+  inapp_title           String?          // In-app notification title
+  inapp_body            String?          // In-app notification body
+  inapp_image_url       String?          // Optional image URL
+  inapp_action_url      String?          // Action URL when clicked
+  inapp_action_text     String?          // Call-to-action button text
+
+  // ═══════════════════════════════════════════════════════════
+  // RECIPIENT TARGETING
+  // ═══════════════════════════════════════════════════════════
   recipient_type        String           @default("all") // all, tags, segment, custom
   recipient_count       Int              @default(0)
   recipient_tags        String[]         @default([])
@@ -39,7 +70,7 @@ model Campaign {
 
   // Relations
   app                   App              @relation(fields: [app_id], references: [id], onDelete: Cascade)
-  template              Template         @relation(fields: [template_id], references: [id], onDelete: Restrict)
+  template              Template?        @relation(fields: [template_id], references: [id], onDelete: Restrict)
   createdByUser         User?            @relation("CreatedByCampaign", fields: [created_by_user_id], references: [id], onDelete: SetNull)
 
   @@unique([app_id, name])

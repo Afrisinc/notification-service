@@ -6,6 +6,7 @@ import {
 } from '../controllers/notification-logs.controller';
 import { validateBaseToken } from '../middlewares/auth.middleware';
 import { asyncWrapper } from '../middlewares/async_wrapper.middleware';
+import { planGuards } from '../guards/plan-guard';
 import {
   ListAppNotificationLogsSchema,
   GetAppNotificationLogSchema,
@@ -23,11 +24,12 @@ export async function registerNotificationLogsRoutes(app: FastifyInstance) {
     asyncWrapper(listAppNotificationLogs)
   );
 
-  // Export Notification Logs (before :notificationId route)
+  // Export Notification Logs (requires advanced_analytics feature)
   app.get(
     '/organizations/:orgId/apps/:appId/notifications/export',
     {
       onRequest: [validateBaseToken],
+      preHandler: [planGuards.requireFeature('advanced_analytics')],
       schema: ExportNotificationLogsSchema,
     },
     asyncWrapper(exportNotificationLogs)

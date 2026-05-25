@@ -36,6 +36,20 @@ export const env = cleanEnv(process.env, {
   WELCOME_EMAIL_TEMPLATE_ID: str({ default: 'system-welcome-email' }),
   INVITE_MEMBER_TEMPLATE_ID: str({ default: 'system-invite-member' }),
 
+  // Admin Alerts & System Notifications
+  ADMIN_EMAILS: str({ default: '' }),
+  SYSTEM_ALERT_TEMPLATE_ID: str({ default: '' }),
+  USAGE_APPROACHING_LIMIT_TEMPLATE_ID: str({ default: '' }),
+  USAGE_LIMIT_EXCEEDED_TEMPLATE_ID: str({ default: '' }),
+  ALERT_WEBHOOK_URL: str({ default: '' }),
+
+  // Trial & Billing Notifications
+  TRIAL_REMINDER_TEMPLATE_ID: str({ default: 'system-trial-reminder' }),
+  TRIAL_EXPIRED_TEMPLATE_ID: str({ default: 'system-trial-expired' }),
+  BILLING_CONFIRMATION_TEMPLATE_ID: str({ default: 'system-billing-confirmation' }),
+  PAYMENT_FAILED_TEMPLATE_ID: str({ default: 'system-payment-failed' }),
+  TRIAL_REMINDER_DAYS_BEFORE: str({ default: '3' }),
+
   // SMTP Configuration (optional)
   SMTP_HOST: str({ default: 'localhost' }),
   SMTP_PORT: port({ default: 587 }),
@@ -55,4 +69,7 @@ export const env = cleanEnv(process.env, {
   // Assets Service (Marketplace file uploads)
   ASSETS_API_URL: str({ default: 'http://localhost:8080' }),
   ASSETS_API_KEY: str({ default: 'dev-api-key' }),
+
+  // DLQ Alert Threshold
+  DLQ_ALERT_THRESHOLD: str({ default: '100' }),
 });
