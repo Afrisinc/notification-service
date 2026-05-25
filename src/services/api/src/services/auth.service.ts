@@ -462,12 +462,24 @@ export class AuthService {
 
     // Get organizations where user is a member
     const memberOrganizations = await organizationRepo.getUserMemberOrganizations(userId);
+    const allowedOrgIds = new Set(memberOrganizations.map((m) => m.organization_id));
+
+    const filteredAccounts = accounts.filter((account) => {
+      const orgId = account.organization_id;
+      return orgId && allowedOrgIds.has(orgId);
+    });
+
+    const roleMap = new Map();
+
+    memberOrganizations.forEach((member) => {
+      roleMap.set(member.organization_id, member.role);
+    });
 
     // Group by organization
     const organizationsMap = new Map();
 
     // Process owned organizations
-    accounts.forEach((account) => {
+    filteredAccounts.forEach((account) => {
       const orgId = account.organization_id || 'personal';
       if (!organizationsMap.has(orgId)) {
         organizationsMap.set(orgId, {
@@ -477,7 +489,7 @@ export class AuthService {
           slug: account.organization?.slug || 'personal',
           plan: account.subscription?.plan?.name?.toLowerCase() || 'free',
           createdAt: account.organization?.createdAt || account.createdAt,
-          userRole: 'OWNER',
+          userRole: roleMap.get(orgId) || 'OWNER',
           apps: [],
         });
       }
