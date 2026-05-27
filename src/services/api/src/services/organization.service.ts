@@ -484,7 +484,12 @@ export class OrganizationService {
           },
         },
       });
-
+      await prismaWrite.account.deleteMany({
+        where: {
+          owner_user_id: memberId,
+          organization_id: orgId,
+        },
+      });
       logger.info({ orgId, memberId }, 'Member removed from organization');
     } catch (error) {
       logger.error({ error, orgId, memberId }, 'Failed to remove organization member');
