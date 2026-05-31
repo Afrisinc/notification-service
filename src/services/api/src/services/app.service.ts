@@ -12,10 +12,11 @@ import {
   normalizeEditorType,
 } from '../utils/template-parser';
 import { prismaRead, prismaWrite } from '@shared/database';
+import { OrganizationRepository } from '../repositories/identity-repositories/organization.repository';
 
 const appRepo = new AppRepository();
 const templateRepo = new TemplateRepository();
-
+const organizationRepo = new OrganizationRepository();
 /**
  * Verify app belongs to the organization
  * Handles legacy apps where organization_id might be null by checking account's organization
@@ -910,9 +911,12 @@ export class AppService {
       throw new Error('Template not found');
     }
 
-    // Verify user owns this template (created_by_user_id matches)
-    if (template.created_by_user_id !== userId) {
-      throw new Error('Only the template creator can delete it');
+    // Verify user owns this template or user is an admin (created_by_user_id matches)
+    const isAdmin = organizationRepo
+      .getMember(organizationId, userId)
+      .then((member) => member?.role === 'ADMIN' || member?.role === 'OWNER');
+    if (template.created_by_user_id !== userId && !isAdmin) {
+      throw new Error('Only the template creator, Organization Owner or an admin can delete it');
     }
 
     // Get the app template installation
