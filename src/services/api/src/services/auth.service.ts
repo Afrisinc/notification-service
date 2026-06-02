@@ -370,6 +370,28 @@ export class AuthService {
     // Mark email as verified
     await userRepo.updateUser(userId, { email_verified: true });
 
+    // Send Welcome email
+    try {
+      const notifyService = new NotifyService();
+      await notifyService.sendNotification(env.SYSTEM_ACCOUNT_ID, env.SYSTEM_APP_ID, {
+        channel: NOTIFICATION_CHANNELS.EMAIL as 'EMAIL',
+        recipient: user.email,
+        templateId: env.WELCOME_EMAIL_TEMPLATE_ID,
+        app_id: env.SYSTEM_APP_ID,
+        payload: {
+          firstName: user.firstName,
+          companyName: env.COMPANY_NAME,
+          supportEmail: env.SUPPORT_EMAIL,
+        },
+        priority: 'HIGH',
+      });
+
+      logger.info({ userId: user.id, email: user.email }, 'Welcome email published');
+    } catch (emailError) {
+      const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
+      logger.warn({ error: errorMessage, userId: user.id }, 'Failed to publish welcome email');
+    }
+
     return {
       message: 'Email verified successfully',
       user_id: user.id,
