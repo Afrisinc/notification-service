@@ -8,6 +8,7 @@ import { prismaWrite, prismaRead } from '@shared/database';
 import { recordLoginFailure } from '../utils/securityRecorder';
 import type { LoginUserRequest, SignupPayload } from '../../../../types/auth';
 import { AccountService } from './account.service';
+import { TrialSubscriptionService } from './trial-subscription.service';
 import { NOTIFICATION_CHANNELS } from '../config/constants';
 import { logger } from '../config/logger';
 import { NotifyService } from './notify.service';
@@ -127,12 +128,38 @@ export class AuthService {
 
     // Create subscription with selected plan
     if (result.account) {
-      await accountService.createSubscriptionByPlanId(
-        result.account.id,
-        data.planId,
-        data.billingCycle,
-        data.paymentMethodId
-      );
+      const isPaidPlanForSub = plan.name.toUpperCase() !== 'FREE';
+
+      if (isPaidPlanForSub && data.paymentMethodId && data.customerId) {
+        // Link the pre-created Stripe customer to the new account
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (prismaWrite.account as any).update({
+          where: { id: result.account.id },
+          data: { stripe_customer_id: data.customerId },
+        });
+
+        // Activate Stripe trial subscription — Stripe owns auto-charge lifecycle
+        await TrialSubscriptionService.activateSubscription(
+          result.account.id,
+          data.planId,
+          data.billingCycle ?? 'monthly',
+          data.paymentMethodId,
+          data.customerId
+        );
+
+        logger.info(
+          { accountId: result.account.id, planId: data.planId, customerId: data.customerId },
+          'Trial subscription activated at registration'
+        );
+      } else {
+        // Free plan — create subscription record without Stripe
+        await accountService.createSubscriptionByPlanId(
+          result.account.id,
+          data.planId,
+          data.billingCycle,
+          data.paymentMethodId
+        );
+      }
     }
 
     // Publish email verification message to notify service

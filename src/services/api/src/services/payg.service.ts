@@ -2,6 +2,7 @@ import { logger } from '../config/logger';
 import { getConfig } from '@shared/config';
 import { prismaRead, prismaWrite } from '@shared/database';
 import { PaygRepository } from '../repositories/payg.repository';
+import { getPaymentClient, isPaymentClientInitialized } from '../utils/payment-client';
 import type {
   PaygRates,
   TopUpTier,
@@ -111,8 +112,81 @@ export class PaygService {
   }
 
   /**
-   * Top up credits.
-   * Applies bonus tier automatically. Mocks payment processing.
+   * Initialise a Stripe payment intent for a PAYG top-up.
+   * Returns the client secret so the UI can confirm payment via Stripe.js.
+   * Balance is NOT credited here — that happens in creditFromPayment()
+   * after afrisinc-pay fires the internal payment-event webhook.
+   */
+  static async initTopUp(
+    accountId: string,
+    amount: number,
+    customerEmail: string
+  ): Promise<{ clientSecret: string; orderId: string; paymentIntentId: string }> {
+    if (amount < MIN_TOPUP_AMOUNT) {
+      throw new Error(`Minimum top-up amount is $${MIN_TOPUP_AMOUNT}`);
+    }
+
+    if (!isPaymentClientInitialized()) {
+      throw new Error('Payment service not configured');
+    }
+
+    const orderId = `topup_${accountId}_${Date.now()}`;
+    const amountCents = Math.round(amount * 100);
+
+    const intent = await getPaymentClient().createPaymentIntent({
+      amount: amountCents,
+      currency: 'usd',
+      orderId,
+      customerEmail,
+      metadata: { accountId, topUpAmount: amount.toString() },
+    });
+
+    logger.info({ accountId, amount, orderId, intentId: intent.id }, 'PAYG top-up intent created');
+
+    return { clientSecret: intent.clientSecret, orderId, paymentIntentId: intent.id };
+  }
+
+  /**
+   * Credit PAYG balance after afrisinc-pay confirms payment via webhook.
+   * Called by the internal /api/internal/payment-event endpoint.
+   */
+  static async creditFromPayment(params: {
+    accountId: string;
+    amountCents: number;
+    paymentRef: string;
+  }): Promise<TopUpResult> {
+    const amount = params.amountCents / 100;
+    const balance = await PaygRepository.getOrCreateBalance(params.accountId);
+    const bonusPercent = getBonusPercent(amount);
+    const bonusAmount = parseFloat(((amount * bonusPercent) / 100).toFixed(6));
+
+    const result = await PaygRepository.atomicTopUp(
+      params.accountId,
+      balance.id,
+      balance.balance,
+      amount,
+      bonusAmount,
+      params.paymentRef,
+      bonusPercent
+    );
+
+    logger.info(
+      { accountId: params.accountId, amount, bonus: bonusAmount, newBalance: result.newBalance },
+      'PAYG balance credited from payment webhook'
+    );
+
+    return {
+      transaction: mapTransaction(result.topUpTx as Parameters<typeof mapTransaction>[0]),
+      bonusTransaction: result.bonusTx ? mapTransaction(result.bonusTx as Parameters<typeof mapTransaction>[0]) : null,
+      newBalance: result.newBalance,
+      bonusPercent,
+      bonusAmount,
+    };
+  }
+
+  /**
+   * Top up credits (legacy mock path — used for testing only).
+   * @deprecated Use initTopUp() + creditFromPayment() for real payments.
    */
   static async topUp(accountId: string, req: TopUpRequest): Promise<TopUpResult> {
     if (req.amount < MIN_TOPUP_AMOUNT) {
