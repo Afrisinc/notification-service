@@ -171,3 +171,32 @@ export async function getCategories(req: FastifyRequest, reply: FastifyReply) {
     return ApiResponseHelper.badRequest(reply, errorMessage);
   }
 }
+
+/**
+ * Endpoint 7: Init payment for a paid marketplace template
+ * POST /marketplace/templates/:templateId/payment/init
+ * Body: { appId, customerEmail }
+ */
+export async function initTemplatePayment(req: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { templateId } = req.params as { templateId: string };
+    const { appId, customerEmail } = req.body as { appId: string; customerEmail: string };
+    const accountId = (req.headers['x-account-id'] as string) || '';
+
+    if (!accountId) return ApiResponseHelper.unauthorized(reply, 'Missing x-account-id');
+    if (!appId) return ApiResponseHelper.badRequest(reply, 'appId is required');
+    if (!customerEmail) return ApiResponseHelper.badRequest(reply, 'customerEmail is required');
+
+    const { MarketplacePaymentService } = await import('../services/marketplace-payment.service');
+    const result = await MarketplacePaymentService.initPayment(accountId, templateId, appId, customerEmail);
+
+    return ApiResponseHelper.success(reply, 'Payment intent created', result);
+  } catch (err: unknown) {
+    const errorMessage = getErrorMessage(err);
+    logger.error({ error: errorMessage }, 'Failed to init template payment');
+    const status = (err as any)?.statusCode;
+    if (status === 404) return ApiResponseHelper.notFound(reply, errorMessage);
+    if (status === 422) return ApiResponseHelper.badRequest(reply, errorMessage);
+    return ApiResponseHelper.badRequest(reply, errorMessage);
+  }
+}

@@ -31,8 +31,18 @@ export async function registerPaygRoutes(fastify: FastifyInstance) {
   );
 
   /**
+   * POST /api/payg/topup/init
+   * Protected — create Stripe payment intent, returns clientSecret for Stripe.js
+   */
+  fastify.post(
+    '/payg/topup/init',
+    { onRequest: [validateBaseToken], schema: { hide: false } },
+    asyncWrapper(paygController.initTopUp.bind(paygController))
+  );
+
+  /**
    * POST /api/payg/topup
-   * Protected — add credits (mocked payment, real processor plugged in later)
+   * Protected — add credits (legacy mock path, kept for testing)
    */
   fastify.post(
     '/payg/topup',

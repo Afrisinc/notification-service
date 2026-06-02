@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { SubscriptionService } from '../services/subscription.service';
+import { SubscriptionPaymentService } from '../services/subscription-payment.service';
 import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { UsageTrackingService } from '../services/usage-tracking.service';
 import { ApiResponseHelper } from '../utils/api-response';
@@ -368,6 +369,50 @@ export class SubscriptionController {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to get recommendations');
 
+      return ApiResponseHelper.badRequest(reply, errorMessage);
+    }
+  }
+
+  /**
+   * POST /api/subscriptions/payment/init
+   * Create a Stripe Payment Intent for a plan upgrade.
+   * Returns clientSecret for Stripe.js to confirm on the client.
+   */
+  async initSubscriptionPayment(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const accountId = request.headers['x-account-id'] as string;
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'Account ID required');
+      }
+
+      const { planId, billingCycle, customerEmail } = request.body as {
+        planId: string;
+        billingCycle: 'monthly' | 'yearly';
+        customerEmail: string;
+      };
+
+      if (!planId || !billingCycle || !customerEmail) {
+        return ApiResponseHelper.badRequest(reply, 'planId, billingCycle, and customerEmail are required');
+      }
+
+      const result = await SubscriptionPaymentService.initPayment(
+        accountId,
+        planId,
+        billingCycle,
+        customerEmail,
+      );
+
+      logger.info({ accountId, planId, billingCycle, correlationId: request.id }, 'Subscription payment init');
+
+      return ApiResponseHelper.success(reply, 'Payment intent created', result);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const statusCode = (error as any)?.statusCode;
+
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to init subscription payment');
+
+      if (statusCode === 404) return ApiResponseHelper.notFound(reply, errorMessage);
+      if (statusCode === 422) return ApiResponseHelper.badRequest(reply, errorMessage);
       return ApiResponseHelper.badRequest(reply, errorMessage);
     }
   }

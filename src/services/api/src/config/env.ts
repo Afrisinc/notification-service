@@ -72,4 +72,9 @@ export const env = cleanEnv(process.env, {
 
   // DLQ Alert Threshold
   DLQ_ALERT_THRESHOLD: str({ default: '100' }),
+
+  // Payment Service
+  PAYMENT_SERVICE_URL: url({ default: 'http://localhost:3400' }),
+  PAYMENT_API_KEY: str({ default: '' }),
+  AFRISINC_PAY_WEBHOOK_SECRET: str({ default: '' }),
 });

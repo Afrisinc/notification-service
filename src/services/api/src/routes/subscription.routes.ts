@@ -57,6 +57,18 @@ export async function registerSubscriptionRoutes(fastify: FastifyInstance) {
     asyncWrapper(subscriptionController.resumeSubscription.bind(subscriptionController))
   );
 
+  /**
+   * POST /api/subscriptions/payment/init
+   * Initiates a Stripe Payment Intent for a plan upgrade.
+   * Body: { planId, billingCycle, customerEmail }
+   * Returns: { clientSecret, paymentIntentId, orderId, amountCents, planName }
+   */
+  fastify.post(
+    '/subscriptions/payment/init',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(subscriptionController.initSubscriptionPayment.bind(subscriptionController))
+  );
+
   // ========================
   // Dashboard Endpoints
   // ========================

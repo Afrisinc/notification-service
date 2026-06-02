@@ -50,6 +50,29 @@ export const paygController = {
   },
 
   /**
+   * POST /api/payg/topup/init
+   * Creates a Stripe payment intent and returns the client secret.
+   * The UI must confirm the payment via Stripe.js.
+   */
+  async initTopUp(req: FastifyRequest, reply: FastifyReply) {
+    try {
+      const accountId = req.headers['x-account-id'] as string;
+      if (!accountId) return ApiResponseHelper.unauthorized(reply, 'Account ID required');
+
+      const body = req.body as { amount: number; customerEmail: string };
+      if (!body.customerEmail) return ApiResponseHelper.error(reply, 'customerEmail is required', 4001, 400);
+
+      const result = await PaygService.initTopUp(accountId, body.amount, body.customerEmail);
+      return ApiResponseHelper.success(reply, 'Payment intent created', result);
+    } catch (err) {
+      logger.error({ err }, 'initTopUp failed');
+      const msg = getErrorMessage(err);
+      const status = msg.includes('Minimum') || msg.includes('required') ? 400 : 500;
+      return ApiResponseHelper.error(reply, msg, 4000, status);
+    }
+  },
+
+  /**
    * GET /api/payg/transactions
    */
   async getTransactions(req: FastifyRequest, reply: FastifyReply) {
