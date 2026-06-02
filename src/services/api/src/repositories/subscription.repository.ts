@@ -83,11 +83,7 @@ export class SubscriptionRepository {
    * Creates the subscription row if it doesn't exist yet (new accounts),
    * or updates the plan + billing cycle if one already exists.
    */
-  static async activateFromPayment(
-    accountId: string,
-    planId: string,
-    billingCycle: 'monthly' | 'yearly',
-  ) {
+  static async activateFromPayment(accountId: string, planId: string, billingCycle: 'monthly' | 'yearly') {
     try {
       const now = new Date();
       const periodEnd = new Date(now);

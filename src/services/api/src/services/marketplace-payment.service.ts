@@ -14,12 +14,7 @@ export class MarketplacePaymentService {
    * @param appId       Destination app to install into after payment
    * @param customerEmail  For Stripe receipt
    */
-  static async initPayment(
-    accountId: string,
-    templateId: string,
-    appId: string,
-    customerEmail: string,
-  ) {
+  static async initPayment(accountId: string, templateId: string, appId: string, customerEmail: string) {
     const template = await prismaRead.template.findFirst({
       where: {
         id: templateId,
@@ -36,10 +31,7 @@ export class MarketplacePaymentService {
     const priceUSD = Number(template.price ?? 0);
 
     if (priceUSD <= 0) {
-      throw Object.assign(
-        new Error('This is a free template — no payment required'),
-        { statusCode: 422 },
-      );
+      throw Object.assign(new Error('This is a free template — no payment required'), { statusCode: 422 });
     }
 
     const amountCents = Math.round(priceUSD * 100);
@@ -58,10 +50,7 @@ export class MarketplacePaymentService {
       },
     });
 
-    logger.info(
-      { accountId, templateId, appId, amountCents, orderId },
-      'Template payment intent created',
-    );
+    logger.info({ accountId, templateId, appId, amountCents, orderId }, 'Template payment intent created');
 
     return {
       clientSecret: intent.clientSecret,

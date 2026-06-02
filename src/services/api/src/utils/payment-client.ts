@@ -31,13 +31,7 @@ export interface PaymentIntent {
 /**
  * Payment intent status
  */
-export type PaymentIntentStatus =
-  | 'pending'
-  | 'processing'
-  | 'succeeded'
-  | 'failed'
-  | 'canceled'
-  | 'requires_action';
+export type PaymentIntentStatus = 'pending' | 'processing' | 'succeeded' | 'failed' | 'canceled' | 'requires_action';
 
 /**
  * Payment confirmation request
@@ -128,6 +122,39 @@ export interface PaymentErrorResponse {
     message: string;
     param?: string;
   };
+}
+
+/**
+ * SetupIntent result returned by afrisinc-pay POST /subscriptions/setup-intent
+ */
+export interface SetupIntentResult {
+  customerId: string; // Stripe cus_xxx
+  clientSecret: string; // Passed to stripe.confirmCardSetup() on the frontend
+  setupIntentId: string; // seti_xxx
+}
+
+/**
+ * Request body for POST /subscriptions/create (afrisinc-pay)
+ */
+export interface CreateStripeSubscriptionRequest {
+  customerId: string; // Stripe cus_xxx from createSetupIntent
+  paymentMethodId: string; // pm_xxx returned by stripe.confirmCardSetup()
+  amountCents: number; // Plan price in cents (e.g. 4900 = $49/mo)
+  currency: string; // ISO code, e.g. 'usd'
+  trialDays: number; // 14 for standard trial, 0 for immediate charge
+  metadata: Record<string, string>; // accountId, planId, billingCycle, planName
+}
+
+/**
+ * Stripe Subscription result from afrisinc-pay
+ */
+export interface StripeSubscriptionResult {
+  subscriptionId: string; // Stripe sub_xxx
+  status: string; // 'trialing' | 'active' | 'past_due'
+  currentPeriodStart: number; // Unix timestamp
+  currentPeriodEnd: number; // Unix timestamp
+  trialEnd: number | null; // Unix timestamp or null
+  defaultPaymentMethod: string; // pm_xxx
 }
 
 /**
@@ -464,10 +491,7 @@ export class PaymentClient {
   /**
    * Execute request with circuit breaker and retry logic
    */
-  private async executeWithResilience<T>(
-    request: () => Promise<{ data: T }>,
-    operationName: string
-  ): Promise<T> {
+  private async executeWithResilience<T>(request: () => Promise<{ data: T }>, operationName: string): Promise<T> {
     const execute = async (): Promise<T> => {
       return this.executeWithRetry(request, operationName);
     };
@@ -482,10 +506,7 @@ export class PaymentClient {
   /**
    * Execute request with automatic retry logic
    */
-  private async executeWithRetry<T>(
-    request: () => Promise<{ data: T }>,
-    operationName: string
-  ): Promise<T> {
+  private async executeWithRetry<T>(request: () => Promise<{ data: T }>, operationName: string): Promise<T> {
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
@@ -570,6 +591,42 @@ export class PaymentClient {
     }
   }
 
+  // ── SetupIntent + Stripe Subscription ─────────────────────────────────────
+
+  /**
+   * Create a Stripe Customer (idempotent by email) and a SetupIntent.
+   * Returns a clientSecret the frontend passes to stripe.confirmCardSetup().
+   * usage='off_session' marks the card for future automatic charges.
+   */
+  async createSetupIntent(email: string, name?: string): Promise<SetupIntentResult> {
+    if (!email?.trim()) {
+      throw new PaymentClientError('email is required', 'INVALID_PARAM', 400, 'email');
+    }
+    return this.executeWithResilience<SetupIntentResult>(
+      () => this.client.post<SetupIntentResult>('/subscriptions/setup-intent', { email, name }),
+      'create setup intent'
+    );
+  }
+
+  /**
+   * Create a Stripe Subscription with an optional trial period.
+   * Must be called after the frontend confirms the card via confirmCardSetup().
+   * Stripe owns the auto-charge lifecycle from this point.
+   */
+  async createStripeSubscription(params: CreateStripeSubscriptionRequest): Promise<StripeSubscriptionResult> {
+    if (!params.customerId || !params.paymentMethodId || !params.amountCents || !params.currency) {
+      throw new PaymentClientError(
+        'customerId, paymentMethodId, amountCents, and currency are required',
+        'INVALID_PARAM',
+        400
+      );
+    }
+    return this.executeWithResilience<StripeSubscriptionResult>(
+      () => this.client.post<StripeSubscriptionResult>('/subscriptions/create', params),
+      'create stripe subscription'
+    );
+  }
+
   /**
    * Sleep helper for retry delays
    */
@@ -635,9 +692,7 @@ export function initPaymentClient(config: PaymentClientConfig): PaymentClient {
  */
 export function getPaymentClient(): PaymentClient {
   if (!singletonInstance) {
-    throw new Error(
-      'PaymentClient not initialized. Call initPaymentClient(config) during application bootstrap.'
-    );
+    throw new Error('PaymentClient not initialized. Call initPaymentClient(config) during application bootstrap.');
   }
   return singletonInstance;
 }

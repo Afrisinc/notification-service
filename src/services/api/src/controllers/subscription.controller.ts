@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { SubscriptionService } from '../services/subscription.service';
 import { SubscriptionPaymentService } from '../services/subscription-payment.service';
+import { TrialSubscriptionService } from '../services/trial-subscription.service';
 import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { UsageTrackingService } from '../services/usage-tracking.service';
 import { ApiResponseHelper } from '../utils/api-response';
@@ -395,12 +396,7 @@ export class SubscriptionController {
         return ApiResponseHelper.badRequest(reply, 'planId, billingCycle, and customerEmail are required');
       }
 
-      const result = await SubscriptionPaymentService.initPayment(
-        accountId,
-        planId,
-        billingCycle,
-        customerEmail,
-      );
+      const result = await SubscriptionPaymentService.initPayment(accountId, planId, billingCycle, customerEmail);
 
       logger.info({ accountId, planId, billingCycle, correlationId: request.id }, 'Subscription payment init');
 
@@ -413,6 +409,119 @@ export class SubscriptionController {
 
       if (statusCode === 404) return ApiResponseHelper.notFound(reply, errorMessage);
       if (statusCode === 422) return ApiResponseHelper.badRequest(reply, errorMessage);
+      return ApiResponseHelper.badRequest(reply, errorMessage);
+    }
+  }
+
+  // ── Trial SetupIntent flow ──────────────────────────────────────────────────
+
+  /**
+   * POST /api/subscriptions/setup-intent
+   * Step 1 of the trial subscription flow.
+   *
+   * Creates (or retrieves) a Stripe Customer for this account and returns a
+   * SetupIntent clientSecret. The frontend calls stripe.confirmCardSetup(clientSecret)
+   * to save the card for future off-session charges.
+   *
+   * Body: { email: string; name?: string }
+   * Returns: { customerId, clientSecret, setupIntentId }
+   */
+  async createSetupIntent(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const accountId = request.headers['x-account-id'] as string;
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'Account ID required');
+      }
+
+      const { email, name } = request.body as { email: string; name?: string };
+      if (!email?.trim()) {
+        return ApiResponseHelper.badRequest(reply, 'email is required');
+      }
+
+      const result = await TrialSubscriptionService.createSetupIntent(accountId, email, name);
+
+      logger.info({ accountId, customerId: result.customerId, correlationId: request.id }, 'SetupIntent created');
+
+      return ApiResponseHelper.success(reply, 'Setup intent created', result);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to create setup intent');
+      return ApiResponseHelper.badRequest(reply, errorMessage);
+    }
+  }
+
+  /**
+   * POST /api/subscriptions/activate
+   * Step 2 of the trial subscription flow.
+   *
+   * Called after stripe.confirmCardSetup() succeeds on the frontend.
+   * Creates the Stripe Subscription with a 14-day trial. Stripe owns
+   * auto-charge, dunning, and lifecycle events from this point.
+   *
+   * Body: { planId, billingCycle, paymentMethodId, customerId }
+   */
+  async activateTrialSubscription(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const accountId = request.headers['x-account-id'] as string;
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'Account ID required');
+      }
+
+      const { planId, billingCycle, paymentMethodId, customerId } = request.body as {
+        planId: string;
+        billingCycle: 'monthly' | 'annual';
+        paymentMethodId: string; // pm_xxx from confirmCardSetup
+        customerId: string; // cus_xxx from createSetupIntent
+      };
+
+      if (!planId || !billingCycle || !paymentMethodId || !customerId) {
+        return ApiResponseHelper.badRequest(
+          reply,
+          'planId, billingCycle, paymentMethodId, and customerId are required'
+        );
+      }
+
+      await TrialSubscriptionService.activateSubscription(accountId, planId, billingCycle, paymentMethodId, customerId);
+
+      logger.info({ accountId, planId, billingCycle, correlationId: request.id }, 'Trial subscription activated');
+
+      return ApiResponseHelper.success(reply, 'Trial subscription activated');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const statusCode = (error as any)?.statusCode;
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to activate trial subscription');
+      if (statusCode === 404) return ApiResponseHelper.notFound(reply, errorMessage);
+      if (statusCode === 422) return ApiResponseHelper.badRequest(reply, errorMessage);
+      return ApiResponseHelper.badRequest(reply, errorMessage);
+    }
+  }
+
+  /**
+   * POST /api/subscriptions/setup-intent/anonymous  (PUBLIC — no auth)
+   * Used during the signup flow before the account exists.
+   * Creates a Stripe Customer + SetupIntent so the user can save their card
+   * via confirmCardSetup(). The customerId is passed back through the signup
+   * payload so the backend can link it to the newly-created account.
+   *
+   * Body: { email: string; name?: string }
+   * Returns: { customerId, clientSecret, setupIntentId }
+   */
+  async createAnonymousSetupIntent(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { email, name } = request.body as { email: string; name?: string };
+
+      if (!email?.trim()) {
+        return ApiResponseHelper.badRequest(reply, 'email is required');
+      }
+
+      const result = await TrialSubscriptionService.createAnonymousSetupIntent(email, name);
+
+      logger.info({ setupIntentId: result.setupIntentId, correlationId: request.id }, 'Anonymous setup intent created');
+
+      return ApiResponseHelper.success(reply, 'Setup intent created', result);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to create anonymous setup intent');
       return ApiResponseHelper.badRequest(reply, errorMessage);
     }
   }

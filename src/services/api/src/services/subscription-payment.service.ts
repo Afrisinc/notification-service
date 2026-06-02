@@ -25,7 +25,7 @@ export class SubscriptionPaymentService {
     accountId: string,
     planId: string,
     billingCycle: 'monthly' | 'yearly',
-    customerEmail: string,
+    customerEmail: string
   ): Promise<SubscriptionPaymentInitResult> {
     const plan = await SubscriptionRepository.getPlanById(planId);
     if (!plan) {
@@ -36,16 +36,12 @@ export class SubscriptionPaymentService {
     const priceMonthly = Number(plan.price_monthly);
     const priceYearly = Number(plan.price_yearly);
 
-    const amountUSD =
-      billingCycle === 'yearly' ? priceYearly * 12 : priceMonthly;
+    const amountUSD = billingCycle === 'yearly' ? priceYearly * 12 : priceMonthly;
 
     const amountCents = Math.round(amountUSD * 100);
 
     if (amountCents <= 0) {
-      throw Object.assign(
-        new Error('Free plans do not require payment'),
-        { statusCode: 422 },
-      );
+      throw Object.assign(new Error('Free plans do not require payment'), { statusCode: 422 });
     }
 
     const orderId = `sub_${accountId}_${planId}_${billingCycle}_${Date.now()}`;
@@ -63,10 +59,7 @@ export class SubscriptionPaymentService {
       },
     });
 
-    logger.info(
-      { accountId, planId, billingCycle, amountCents, orderId },
-      'Subscription payment intent created',
-    );
+    logger.info({ accountId, planId, billingCycle, amountCents, orderId }, 'Subscription payment intent created');
 
     return {
       clientSecret: intent.clientSecret,

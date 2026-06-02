@@ -48,6 +48,8 @@ export const env = cleanEnv(process.env, {
   TRIAL_EXPIRED_TEMPLATE_ID: str({ default: 'system-trial-expired' }),
   BILLING_CONFIRMATION_TEMPLATE_ID: str({ default: 'system-billing-confirmation' }),
   PAYMENT_FAILED_TEMPLATE_ID: str({ default: 'system-payment-failed' }),
+  SUBSCRIPTION_CANCELLED_TEMPLATE_ID: str({ default: 'system-subscription-cancelled' }),
+  PLAN_CHANGED_TEMPLATE_ID: str({ default: 'system-plan-changed' }),
   TRIAL_REMINDER_DAYS_BEFORE: str({ default: '3' }),
 
   // SMTP Configuration (optional)

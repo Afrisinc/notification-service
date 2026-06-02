@@ -59,7 +59,7 @@ export async function registerSubscriptionRoutes(fastify: FastifyInstance) {
 
   /**
    * POST /api/subscriptions/payment/init
-   * Initiates a Stripe Payment Intent for a plan upgrade.
+   * Initiates a Stripe Payment Intent for a plan upgrade (existing paid users).
    * Body: { planId, billingCycle, customerEmail }
    * Returns: { clientSecret, paymentIntentId, orderId, amountCents, planName }
    */
@@ -67,6 +67,45 @@ export async function registerSubscriptionRoutes(fastify: FastifyInstance) {
     '/subscriptions/payment/init',
     { onRequest: [validateBaseToken] },
     asyncWrapper(subscriptionController.initSubscriptionPayment.bind(subscriptionController))
+  );
+
+  // ── Trial Subscription Flow (SetupIntent) ───────────────────────────────────
+
+  /**
+   * POST /api/subscriptions/setup-intent
+   * Step 1 (authenticated): Create Stripe Customer + SetupIntent for an
+   * existing account (e.g. org creation, plan upgrade).
+   * Body: { email: string; name?: string }
+   * Returns: { customerId, clientSecret, setupIntentId }
+   */
+  fastify.post(
+    '/subscriptions/setup-intent',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(subscriptionController.createSetupIntent.bind(subscriptionController))
+  );
+
+  /**
+   * POST /api/subscriptions/setup-intent/anonymous
+   * Step 1 (public, no auth): Create Stripe Customer + SetupIntent during
+   * the signup flow — before the account exists.
+   * Body: { email: string; name?: string }
+   * Returns: { customerId, clientSecret, setupIntentId }
+   */
+  fastify.post(
+    '/subscriptions/setup-intent/anonymous',
+    // No onRequest — public endpoint for pre-signup card saving
+    asyncWrapper(subscriptionController.createAnonymousSetupIntent.bind(subscriptionController))
+  );
+
+  /**
+   * POST /api/subscriptions/activate
+   * Step 2: Create Stripe Subscription after frontend confirms card.
+   * Body: { planId, billingCycle, paymentMethodId, customerId }
+   */
+  fastify.post(
+    '/subscriptions/activate',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(subscriptionController.activateTrialSubscription.bind(subscriptionController))
   );
 
   // ========================
