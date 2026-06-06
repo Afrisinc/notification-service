@@ -112,5 +112,5 @@ jobs:
             cd $APP_PATH
             echo "Pulling latest image..."
             docker compose pull
-            docker compose up -d --remove-orphans
+            docker compose up -d
             docker image prune -af
