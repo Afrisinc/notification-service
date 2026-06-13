@@ -14,7 +14,7 @@ const clientItem = {
     joined: { type: 'string' },
     channels: { type: 'array', items: { type: 'string' } },
     organizationName: { type: 'string' },
-    organizationType: { type: 'string' },
+    organizationType: { type: 'string', enum: ['INDIVIDUAL', 'ORGANIZATION'] },
   },
 };
 

@@ -13,5 +13,5 @@ export interface ClientDTO {
   joined: string;
   channels: string[];
   organizationName: string;
-  organizationType: string;
+  organizationType: 'INDIVIDUAL' | 'ORGANIZATION';
 }

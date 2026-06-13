@@ -43,7 +43,6 @@ export class ClientsRepository {
           organization: {
             select: {
               name: true,
-              type: true,
             },
           },
           subscription: {
