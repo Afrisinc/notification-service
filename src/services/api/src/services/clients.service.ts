@@ -43,6 +43,8 @@ export class ClientsService {
                 })
               : 'Unknown',
             channels,
+            organizationName: account.organization?.name || 'N/A',
+            organizationType: account.organization?.type || 'N/A',
           };
         })
       );

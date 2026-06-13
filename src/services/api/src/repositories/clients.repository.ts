@@ -28,8 +28,8 @@ export class ClientsRepository {
       };
     }
 
-    // Execute query and count in parallel
-    const [accounts, total] = await Promise.all([
+    // Execute query and count in transaction
+    const [accounts, total] = await prismaRead.$transaction([
       prismaRead.account.findMany({
         where,
         include: {
@@ -38,6 +38,12 @@ export class ClientsRepository {
               firstName: true,
               lastName: true,
               email: true,
+            },
+          },
+          organization: {
+            select: {
+              name: true,
+              type: true,
             },
           },
           subscription: {

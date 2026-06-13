@@ -12,4 +12,6 @@ export interface ClientDTO {
   status: 'active' | 'suspended' | 'trial';
   joined: string;
   channels: string[];
+  organizationName: string;
+  organizationType: string;
 }
