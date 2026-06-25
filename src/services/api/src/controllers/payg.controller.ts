@@ -126,4 +126,90 @@ export const paygController = {
       return ApiResponseHelper.error(reply, getErrorMessage(err), 5000, 500);
     }
   },
+
+  // ─── Mobile Money Methods ─────────────────────────────────────────────────────
+
+  /**
+   * POST /api/payg/mobile/topup
+   * Initiate mobile money payment (PAYG top-up or subscription)
+   */
+  async initMobileTopUp(req: FastifyRequest, reply: FastifyReply) {
+    try {
+      const accountId = req.headers['x-account-id'] as string;
+      if (!accountId) return ApiResponseHelper.unauthorized(reply, 'Account ID required');
+
+      const body = req.body as {
+        amount: number;
+        phoneNumber: string;
+        customerName?: string;
+        paymentType?: 'payg_topup' | 'subscription';
+        planId?: string;
+        billingCycle?: 'monthly' | 'yearly';
+      };
+
+      if (!body.phoneNumber) {
+        return ApiResponseHelper.error(reply, 'phoneNumber is required', 4001, 400);
+      }
+
+      // Validate subscription-specific fields
+      if (body.paymentType === 'subscription' && !body.planId) {
+        return ApiResponseHelper.error(reply, 'planId is required for subscription payments', 4001, 400);
+      }
+
+      const result = await PaygService.initMobileTopUp(accountId, body.amount, body.phoneNumber, body.customerName, {
+        paymentType: body.paymentType ?? 'payg_topup',
+        planId: body.planId,
+        billingCycle: body.billingCycle ?? 'monthly',
+      });
+
+      return ApiResponseHelper.created(reply, result.message, result);
+    } catch (err) {
+      logger.error({ err }, 'initMobileTopUp failed');
+      const msg = getErrorMessage(err);
+      const status = msg.includes('Minimum') || msg.includes('required') || msg.includes('not found') ? 400 : 500;
+      return ApiResponseHelper.error(reply, msg, 4000, status);
+    }
+  },
+
+  /**
+   * GET /api/payg/mobile/:paymentId
+   * Get mobile payment status by ID
+   */
+  async getMobilePayment(req: FastifyRequest, reply: FastifyReply) {
+    try {
+      const accountId = req.headers['x-account-id'] as string;
+      if (!accountId) return ApiResponseHelper.unauthorized(reply, 'Account ID required');
+
+      const { paymentId } = req.params as { paymentId: string };
+
+      const payment = await PaygService.getMobilePayment(paymentId);
+      return ApiResponseHelper.success(reply, 'Mobile payment retrieved', payment);
+    } catch (err) {
+      logger.error({ err }, 'getMobilePayment failed');
+      const msg = getErrorMessage(err);
+      const status = msg.includes('not found') ? 404 : 500;
+      return ApiResponseHelper.error(reply, msg, 4004, status);
+    }
+  },
+
+  /**
+   * GET /api/payg/mobile/ref/:ref
+   * Get mobile payment status by Paypack reference
+   */
+  async getMobilePaymentByRef(req: FastifyRequest, reply: FastifyReply) {
+    try {
+      const accountId = req.headers['x-account-id'] as string;
+      if (!accountId) return ApiResponseHelper.unauthorized(reply, 'Account ID required');
+
+      const { ref } = req.params as { ref: string };
+
+      const payment = await PaygService.getMobilePaymentByRef(ref);
+      return ApiResponseHelper.success(reply, 'Mobile payment retrieved', payment);
+    } catch (err) {
+      logger.error({ err }, 'getMobilePaymentByRef failed');
+      const msg = getErrorMessage(err);
+      const status = msg.includes('not found') ? 404 : 500;
+      return ApiResponseHelper.error(reply, msg, 4004, status);
+    }
+  },
 };

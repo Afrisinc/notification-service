@@ -209,8 +209,6 @@ export class SubscriptionController {
         return ApiResponseHelper.unauthorized(reply, 'Account ID required');
       }
 
-      const subscription = await SubscriptionService.getSubscriptionDetails(accountId);
-
       // Calculate period
       const now = new Date();
       const start = startDate ? new Date(startDate) : new Date(now.getFullYear(), now.getMonth(), 1);

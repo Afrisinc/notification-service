@@ -27,6 +27,23 @@ export interface PaymentEventData {
 }
 
 /**
+ * Mobile money payment event data structure
+ */
+export interface MobilePaymentEventData {
+  paymentId: string;
+  ref: string;
+  orderId: string;
+  amount: number;
+  currency: string;
+  phoneNumber: string;
+  type: 'CASHIN' | 'CASHOUT';
+  status: 'SUCCESSFUL' | 'FAILED';
+  fee?: number;
+  provider?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
  * Subscription event data structure
  */
 export interface SubscriptionEventData {
@@ -69,6 +86,11 @@ export class PaymentWebhookService {
     // Subscription lifecycle events
     if (event.startsWith('subscription.')) {
       return this.processSubscriptionEvent(event, data);
+    }
+
+    // Mobile money payment events
+    if (event.startsWith('mobile.')) {
+      return this.processMobilePaymentEvent(event, data as unknown as MobilePaymentEventData);
     }
 
     // One-off payment events
@@ -391,5 +413,134 @@ export class PaymentWebhookService {
       logger.error({ error, accountId, paymentId: data.paymentId }, 'Failed to credit PAYG balance');
       return { success: false, error: 'Failed to credit balance' };
     }
+  }
+
+  // ─── Mobile Money Payment Events ──────────────────────────────────────────────
+
+  /**
+   * Process mobile money payment events
+   */
+  private static async processMobilePaymentEvent(
+    event: string,
+    data: MobilePaymentEventData
+  ): Promise<WebhookProcessResult> {
+    switch (event) {
+      case 'mobile.payment_succeeded':
+        return this.handleMobilePaymentSucceeded(data);
+
+      case 'mobile.payment_failed':
+        return this.handleMobilePaymentFailed(data);
+
+      default:
+        logger.debug({ event }, 'Skipping unhandled mobile payment event');
+        return { success: true, skipped: true };
+    }
+  }
+
+  /**
+   * Handle mobile.payment_succeeded event
+   * Routes to appropriate handler based on payment type (PAYG or subscription)
+   */
+  private static async handleMobilePaymentSucceeded(data: MobilePaymentEventData): Promise<WebhookProcessResult> {
+    const accountId = data.metadata?.['accountId'] as string | undefined;
+    const paymentType = data.metadata?.['type'] as string | undefined;
+
+    if (!accountId) {
+      logger.warn({ ref: data.ref, orderId: data.orderId }, 'Mobile payment missing accountId in metadata');
+      return { success: false, error: 'Missing accountId in metadata' };
+    }
+
+    // Route based on payment type
+    switch (paymentType) {
+      case 'payg_topup':
+        return this.handleMobilePaygTopUp(data, accountId);
+
+      case 'subscription':
+        return this.handleMobileSubscriptionPayment(data, accountId);
+
+      default:
+        logger.debug({ ref: data.ref, paymentType }, 'Skipping unhandled mobile payment type');
+        return { success: true, skipped: true };
+    }
+  }
+
+  /**
+   * Handle mobile PAYG top-up payment
+   */
+  private static async handleMobilePaygTopUp(
+    data: MobilePaymentEventData,
+    accountId: string
+  ): Promise<WebhookProcessResult> {
+    try {
+      await PaygService.creditFromMobilePayment({
+        accountId,
+        amountRwf: data.amount,
+        paymentRef: data.ref,
+      });
+
+      logger.info(
+        { accountId, ref: data.ref, amount: data.amount, currency: data.currency },
+        'PAYG balance credited from mobile money payment'
+      );
+
+      return { success: true };
+    } catch (error) {
+      logger.error({ error, accountId, ref: data.ref }, 'Failed to credit PAYG balance from mobile payment');
+      return { success: false, error: 'Failed to credit balance' };
+    }
+  }
+
+  /**
+   * Handle mobile subscription payment
+   * Activates subscription plan after successful mobile money payment
+   */
+  private static async handleMobileSubscriptionPayment(
+    data: MobilePaymentEventData,
+    accountId: string
+  ): Promise<WebhookProcessResult> {
+    const planId = data.metadata?.['planId'] as string | undefined;
+    const billingCycle = (data.metadata?.['billingCycle'] as string | undefined) ?? 'monthly';
+
+    if (!planId) {
+      logger.warn({ ref: data.ref, accountId }, 'Mobile subscription payment missing planId');
+      return { success: false, error: 'Missing planId in metadata' };
+    }
+
+    try {
+      await SubscriptionRepository.activateFromPayment(accountId, planId, billingCycle as 'monthly' | 'yearly');
+
+      logger.info(
+        { accountId, planId, billingCycle, ref: data.ref, amount: data.amount },
+        'Subscription activated from mobile money payment'
+      );
+
+      // Send subscription activation notification (fire-and-forget)
+      SubscriptionNotificationService.sendBillingConfirmation(accountId).catch((err) =>
+        logger.error({ err, accountId }, 'Failed to send subscription activation notification')
+      );
+
+      return { success: true };
+    } catch (error) {
+      logger.error({ error, accountId, planId, ref: data.ref }, 'Failed to activate subscription from mobile payment');
+      return { success: false, error: 'Failed to activate subscription' };
+    }
+  }
+
+  /**
+   * Handle mobile.payment_failed event
+   * Mobile money payment failed - log and notify if needed
+   */
+  private static async handleMobilePaymentFailed(data: MobilePaymentEventData): Promise<WebhookProcessResult> {
+    const accountId = data.metadata?.['accountId'] as string | undefined;
+
+    logger.warn(
+      { accountId, ref: data.ref, orderId: data.orderId, phoneNumber: data.phoneNumber },
+      'Mobile money payment failed'
+    );
+
+    // Could send a notification to the user here if needed
+    // For now, just acknowledge the event
+
+    return { success: true };
   }
 }

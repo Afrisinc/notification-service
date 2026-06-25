@@ -177,3 +177,131 @@ export const CheckBalanceSchema = {
     },
   },
 };
+
+// ─── Mobile Money Schemas ─────────────────────────────────────────────────────
+
+const mobilePaymentItem = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    ref: { type: 'string', description: 'Paypack transaction reference' },
+    orderId: { type: 'string' },
+    amount: { type: 'number' },
+    currency: { type: 'string' },
+    phoneNumber: { type: 'string' },
+    type: { type: 'string', enum: ['CASHIN', 'CASHOUT'] },
+    status: { type: 'string', enum: ['PENDING', 'PROCESSING', 'SUCCESSFUL', 'FAILED'] },
+    fee: { type: 'number' },
+    provider: { type: 'string', nullable: true },
+    createdAt: { type: 'string' },
+  },
+};
+
+export const MobileTopUpInitSchema = {
+  description: 'Initiate mobile money payment (PAYG top-up or subscription)',
+  tags: ['PAYG', 'Mobile Money'],
+  security: [{ bearerAuth: [] }],
+  body: {
+    type: 'object',
+    required: ['amount', 'phoneNumber'],
+    properties: {
+      amount: {
+        type: 'number',
+        minimum: 100,
+        description: 'Amount in RWF (minimum 100 RWF)',
+      },
+      phoneNumber: {
+        type: 'string',
+        minLength: 9,
+        maxLength: 15,
+        description: 'Mobile money phone number (e.g., 0781234567 or 250781234567)',
+      },
+      customerName: {
+        type: 'string',
+        maxLength: 255,
+        description: 'Customer name for reference',
+      },
+      paymentType: {
+        type: 'string',
+        enum: ['payg_topup', 'subscription'],
+        default: 'payg_topup',
+        description: 'Type of payment: payg_topup (default) or subscription',
+      },
+      planId: {
+        type: 'string',
+        description: 'Plan ID (required if paymentType is subscription)',
+      },
+      billingCycle: {
+        type: 'string',
+        enum: ['monthly', 'yearly'],
+        default: 'monthly',
+        description: 'Billing cycle (only for subscription payments)',
+      },
+    },
+  },
+  response: {
+    201: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+        data: {
+          type: 'object',
+          properties: {
+            payment: mobilePaymentItem,
+            message: { type: 'string', description: 'Instructions for the user' },
+          },
+        },
+      },
+    },
+  },
+};
+
+export const GetMobilePaymentSchema = {
+  description: 'Get mobile payment status by ID',
+  tags: ['PAYG', 'Mobile Money'],
+  security: [{ bearerAuth: [] }],
+  params: {
+    type: 'object',
+    required: ['paymentId'],
+    properties: {
+      paymentId: { type: 'string', description: 'Mobile payment ID' },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+        data: mobilePaymentItem,
+      },
+    },
+  },
+};
+
+export const GetMobilePaymentByRefSchema = {
+  description: 'Get mobile payment status by Paypack reference',
+  tags: ['PAYG', 'Mobile Money'],
+  security: [{ bearerAuth: [] }],
+  params: {
+    type: 'object',
+    required: ['ref'],
+    properties: {
+      ref: { type: 'string', description: 'Paypack transaction reference' },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+        data: mobilePaymentItem,
+      },
+    },
+  },
+};

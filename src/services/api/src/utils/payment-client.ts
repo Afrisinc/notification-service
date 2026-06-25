@@ -124,6 +124,48 @@ export interface PaymentErrorResponse {
   };
 }
 
+// ─── Mobile Money Types ───────────────────────────────────────────────────────
+
+/**
+ * Mobile money cashin request (collect payment from customer)
+ */
+export interface MobileCashinRequest {
+  orderId: string;
+  amount: number;
+  phoneNumber: string;
+  customerName?: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Mobile money payment result
+ */
+export interface MobilePaymentResult {
+  id: string;
+  ref: string;
+  orderId: string;
+  amount: number;
+  currency: string;
+  phoneNumber: string;
+  type: 'CASHIN' | 'CASHOUT';
+  status: 'PENDING' | 'PROCESSING' | 'SUCCESSFUL' | 'FAILED';
+  fee: number;
+  provider?: string;
+  createdAt: string;
+}
+
+/**
+ * Mobile money account info
+ */
+export interface MobileAccountInfo {
+  balance: number;
+  currency: string;
+  merchantName: string;
+  inRate: number;
+  outRate: number;
+}
+
 /**
  * SetupIntent result returned by afrisinc-pay POST /subscriptions/setup-intent
  */
@@ -624,6 +666,69 @@ export class PaymentClient {
     return this.executeWithResilience<StripeSubscriptionResult>(
       () => this.client.post<StripeSubscriptionResult>('/subscriptions/create', params),
       'create stripe subscription'
+    );
+  }
+
+  // ── Mobile Money Methods ─────────────────────────────────────────────────────
+
+  /**
+   * Initiate mobile money cashin (collect payment from customer)
+   * Used for PAYG top-ups via MTN/Airtel Mobile Money
+   */
+  async mobileCashin(request: MobileCashinRequest): Promise<MobilePaymentResult> {
+    if (!request.orderId?.trim()) {
+      throw new PaymentClientError('orderId is required', 'INVALID_PARAM', 400, 'orderId');
+    }
+    if (!request.amount || request.amount <= 0) {
+      throw new PaymentClientError('amount must be positive', 'INVALID_PARAM', 400, 'amount');
+    }
+    if (!request.phoneNumber?.trim()) {
+      throw new PaymentClientError('phoneNumber is required', 'INVALID_PARAM', 400, 'phoneNumber');
+    }
+
+    logger.debug({ orderId: request.orderId, amount: request.amount }, '[PaymentClient] Initiating mobile cashin');
+
+    return this.executeWithResilience<MobilePaymentResult>(
+      () => this.client.post<MobilePaymentResult>('/mobile/cashin', request),
+      'mobile cashin'
+    );
+  }
+
+  /**
+   * Get mobile payment by ID
+   */
+  async getMobilePayment(paymentId: string): Promise<MobilePaymentResult> {
+    if (!paymentId?.trim()) {
+      throw new PaymentClientError('paymentId is required', 'INVALID_PARAM', 400, 'paymentId');
+    }
+
+    return this.executeWithResilience<MobilePaymentResult>(
+      () => this.client.get<MobilePaymentResult>(`/mobile/${paymentId}`),
+      `get mobile payment: ${paymentId}`
+    );
+  }
+
+  /**
+   * Get mobile payment by Paypack reference
+   */
+  async getMobilePaymentByRef(ref: string): Promise<MobilePaymentResult> {
+    if (!ref?.trim()) {
+      throw new PaymentClientError('ref is required', 'INVALID_PARAM', 400, 'ref');
+    }
+
+    return this.executeWithResilience<MobilePaymentResult>(
+      () => this.client.get<MobilePaymentResult>(`/mobile/ref/${ref}`),
+      `get mobile payment by ref: ${ref}`
+    );
+  }
+
+  /**
+   * Get mobile money account info (balance, rates)
+   */
+  async getMobileAccountInfo(): Promise<MobileAccountInfo> {
+    return this.executeWithResilience<MobileAccountInfo>(
+      () => this.client.get<MobileAccountInfo>('/mobile/account/info'),
+      'get mobile account info'
     );
   }
 

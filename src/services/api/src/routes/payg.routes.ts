@@ -8,6 +8,9 @@ import {
   GetTransactionsSchema,
   GetRatesSchema,
   CheckBalanceSchema,
+  MobileTopUpInitSchema,
+  GetMobilePaymentSchema,
+  GetMobilePaymentByRefSchema,
 } from '../schemas/routes/payg.schema';
 
 /**
@@ -68,5 +71,37 @@ export async function registerPaygRoutes(fastify: FastifyInstance) {
     '/payg/check-balance',
     { onRequest: [validateBaseToken], schema: CheckBalanceSchema },
     asyncWrapper(paygController.checkBalance.bind(paygController))
+  );
+
+  // ─── Mobile Money Routes ─────────────────────────────────────────────────────
+
+  /**
+   * POST /api/payg/mobile/topup
+   * Protected — initiate mobile money top-up (MTN/Airtel)
+   */
+  fastify.post(
+    '/payg/mobile/topup',
+    { onRequest: [validateBaseToken], schema: MobileTopUpInitSchema },
+    asyncWrapper(paygController.initMobileTopUp.bind(paygController))
+  );
+
+  /**
+   * GET /api/payg/mobile/:paymentId
+   * Protected — get mobile payment status by ID
+   */
+  fastify.get(
+    '/payg/mobile/:paymentId',
+    { onRequest: [validateBaseToken], schema: GetMobilePaymentSchema },
+    asyncWrapper(paygController.getMobilePayment.bind(paygController))
+  );
+
+  /**
+   * GET /api/payg/mobile/ref/:ref
+   * Protected — get mobile payment status by Paypack reference
+   */
+  fastify.get(
+    '/payg/mobile/ref/:ref',
+    { onRequest: [validateBaseToken], schema: GetMobilePaymentByRefSchema },
+    asyncWrapper(paygController.getMobilePaymentByRef.bind(paygController))
   );
 }
