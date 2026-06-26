@@ -41,6 +41,30 @@ async function verifyAppBelongsToOrganization(app: any, organizationId: string):
   return false;
 }
 
+/**
+ * Verify app belongs to the organization
+ * Handles legacy apps where organization_id might be null by checking account's organization
+ */
+async function verifyAppBelongsToOrganization(app: any, organizationId: string): Promise<boolean> {
+  // Direct match
+  if (app.organization_id === organizationId) {
+    return true;
+  }
+
+  // If app has a different organization_id set, it doesn't belong
+  if (app.organization_id && app.organization_id !== organizationId) {
+    return false;
+  }
+
+  // Legacy app - check if account belongs to the organization
+  if (!app.organization_id) {
+    const account = await appRepo.findAccountById(app.account_id);
+    return account?.organization_id === organizationId;
+  }
+
+  return false;
+}
+
 export interface CreateAppRequest {
   name: string;
   environment: 'production' | 'staging' | 'development';
