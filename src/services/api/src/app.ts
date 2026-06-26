@@ -8,6 +8,9 @@ import {
 } from './plugins';
 import { registerMetricsPlugin } from './plugins/metrics';
 import { registerRateLimitPlugin } from './middlewares/rate-limit.middleware';
+import { env } from './config/env';
+import { initPaymentClient } from './utils/payment-client';
+
 export async function createFastifyApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: true,
@@ -57,6 +60,13 @@ export async function createFastifyApp(): Promise<FastifyInstance> {
 
     throw error;
   });
+
+  if (env.PAYMENT_API_KEY) {
+    initPaymentClient({
+      baseURL: env.PAYMENT_SERVICE_URL,
+      apiKey: env.PAYMENT_API_KEY,
+    });
+  }
 
   return fastify;
 }

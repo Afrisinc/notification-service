@@ -12,8 +12,8 @@ model Subscription {
   current_period_start DateTime
   current_period_end   DateTime
   provider             String    // stripe | paypal | manual
-  provider_id          String?   // External provider subscription ID
-  payment_method_id    String?   // Stripe payment method ID (pm_xxx)
+  provider_id          String?   // Stripe sub_xxx — set after Stripe Subscription is created
+  payment_method_id    String?   // Stripe pm_xxx — default payment method on the subscription
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
   canceled_at          DateTime?
