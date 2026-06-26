@@ -8,6 +8,7 @@ import { prismaWrite, prismaRead } from '@shared/database';
 import { recordLoginFailure } from '../utils/securityRecorder';
 import type { LoginUserRequest, SignupPayload } from '../../../../types/auth';
 import { AccountService } from './account.service';
+import { TrialSubscriptionService } from './trial-subscription.service';
 import { NOTIFICATION_CHANNELS } from '../config/constants';
 import { logger } from '../config/logger';
 import { NotifyService } from './notify.service';
@@ -127,12 +128,38 @@ export class AuthService {
 
     // Create subscription with selected plan
     if (result.account) {
-      await accountService.createSubscriptionByPlanId(
-        result.account.id,
-        data.planId,
-        data.billingCycle,
-        data.paymentMethodId
-      );
+      const isPaidPlanForSub = plan.name.toUpperCase() !== 'FREE';
+
+      if (isPaidPlanForSub && data.paymentMethodId && data.customerId) {
+        // Link the pre-created Stripe customer to the new account
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (prismaWrite.account as any).update({
+          where: { id: result.account.id },
+          data: { stripe_customer_id: data.customerId },
+        });
+
+        // Activate Stripe trial subscription — Stripe owns auto-charge lifecycle
+        await TrialSubscriptionService.activateSubscription(
+          result.account.id,
+          data.planId,
+          data.billingCycle ?? 'monthly',
+          data.paymentMethodId,
+          data.customerId
+        );
+
+        logger.info(
+          { accountId: result.account.id, planId: data.planId, customerId: data.customerId },
+          'Trial subscription activated at registration'
+        );
+      } else {
+        // Free plan — create subscription record without Stripe
+        await accountService.createSubscriptionByPlanId(
+          result.account.id,
+          data.planId,
+          data.billingCycle,
+          data.paymentMethodId
+        );
+      }
     }
 
     // Publish email verification message to notify service
@@ -370,6 +397,28 @@ export class AuthService {
     // Mark email as verified
     await userRepo.updateUser(userId, { email_verified: true });
 
+    // Send Welcome email
+    try {
+      const notifyService = new NotifyService();
+      await notifyService.sendNotification(env.SYSTEM_ACCOUNT_ID, env.SYSTEM_APP_ID, {
+        channel: NOTIFICATION_CHANNELS.EMAIL as 'EMAIL',
+        recipient: user.email,
+        templateId: env.WELCOME_EMAIL_TEMPLATE_ID,
+        app_id: env.SYSTEM_APP_ID,
+        payload: {
+          firstName: user.firstName,
+          companyName: env.COMPANY_NAME,
+          supportEmail: env.SUPPORT_EMAIL,
+        },
+        priority: 'HIGH',
+      });
+
+      logger.info({ userId: user.id, email: user.email }, 'Welcome email published');
+    } catch (emailError) {
+      const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
+      logger.warn({ error: errorMessage, userId: user.id }, 'Failed to publish welcome email');
+    }
+
     return {
       message: 'Email verified successfully',
       user_id: user.id,
@@ -462,12 +511,24 @@ export class AuthService {
 
     // Get organizations where user is a member
     const memberOrganizations = await organizationRepo.getUserMemberOrganizations(userId);
+    const allowedOrgIds = new Set(memberOrganizations.map((m) => m.organization_id));
+
+    const filteredAccounts = accounts.filter((account) => {
+      const orgId = account.organization_id;
+      return orgId && allowedOrgIds.has(orgId);
+    });
+
+    const roleMap = new Map();
+
+    memberOrganizations.forEach((member) => {
+      roleMap.set(member.organization_id, member.role);
+    });
 
     // Group by organization
     const organizationsMap = new Map();
 
     // Process owned organizations
-    accounts.forEach((account) => {
+    filteredAccounts.forEach((account) => {
       const orgId = account.organization_id || 'personal';
       if (!organizationsMap.has(orgId)) {
         organizationsMap.set(orgId, {
@@ -477,7 +538,7 @@ export class AuthService {
           slug: account.organization?.slug || 'personal',
           plan: account.subscription?.plan?.name?.toLowerCase() || 'free',
           createdAt: account.organization?.createdAt || account.createdAt,
-          userRole: 'OWNER',
+          userRole: roleMap.get(orgId) || 'OWNER',
           apps: [],
         });
       }

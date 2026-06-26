@@ -4,12 +4,13 @@
 ////////////////////////////////////////////////////////////
 
 model Account {
-  id                String    @id @default(uuid())
-  type              AccountType
-  owner_user_id     String
-  organization_id   String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                  String    @id @default(uuid())
+  type                AccountType
+  owner_user_id       String
+  organization_id     String?
+  stripe_customer_id  String?   @unique // Stripe cus_xxx — set on first paid subscription
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   // Relations
   owner             User @relation(fields: [owner_user_id], references: [id], onDelete: Cascade)
@@ -28,5 +29,6 @@ model Account {
 
   @@index([owner_user_id])
   @@index([organization_id])
+  @@index([stripe_customer_id])
   @@map("accounts")
 }

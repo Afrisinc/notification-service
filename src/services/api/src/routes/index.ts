@@ -24,6 +24,7 @@ import { registerSubscriptionRoutes } from './subscription.routes';
 import { registerPlanManagementRoutes } from './plan-management.routes';
 import { registerAppEmailProviderRoutes } from './app-email-provider.routes';
 import { registerPaygRoutes } from './payg.routes';
+import { clientsRoutes } from './clients.routes';
 
 //  Register all API v1 routes
 export async function v1Routes(fastify: FastifyInstance) {
@@ -103,5 +104,8 @@ export async function v1Routes(fastify: FastifyInstance) {
   });
   await fastify.register(platformRoutes, {
     prefix: '/admin/internal',
+  });
+  await fastify.register(clientsRoutes, {
+    prefix: '/api/v1',
   });
 }

@@ -61,7 +61,7 @@ export class SubscriptionRepository {
   }
 
   /**
-   * Change plan
+   * Change plan (requires existing subscription row)
    */
   static async changePlan(accountId: string, planId: string) {
     try {
@@ -74,6 +74,49 @@ export class SubscriptionRepository {
       });
     } catch (error) {
       logger.error({ error, accountId, planId }, 'Failed to change plan');
+      throw error;
+    }
+  }
+
+  /**
+   * Activate or upgrade a subscription from a confirmed payment.
+   * Creates the subscription row if it doesn't exist yet (new accounts),
+   * or updates the plan + billing cycle if one already exists.
+   */
+  static async activateFromPayment(accountId: string, planId: string, billingCycle: 'monthly' | 'yearly') {
+    try {
+      const now = new Date();
+      const periodEnd = new Date(now);
+      if (billingCycle === 'yearly') {
+        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+      } else {
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
+      }
+
+      return prismaWrite.subscription.upsert({
+        where: { account_id: accountId },
+        update: {
+          plan_id: planId,
+          billing_cycle: billingCycle,
+          status: 'active',
+          current_period_start: now,
+          current_period_end: periodEnd,
+        },
+        create: {
+          account_id: accountId,
+          plan_id: planId,
+          billing_cycle: billingCycle,
+          status: 'active',
+          provider: 'stripe',
+          current_period_start: now,
+          current_period_end: periodEnd,
+        },
+        include: {
+          plan: { include: { limits: true } },
+        },
+      });
+    } catch (error) {
+      logger.error({ error, accountId, planId, billingCycle }, 'Failed to activate subscription from payment');
       throw error;
     }
   }

@@ -22,7 +22,8 @@ export class PlanEnforcementMiddleware {
         include: { plan: { include: { limits: true } } },
       });
 
-      if (!subscription || subscription.status !== 'active') return false;
+      const validStatuses = ['active', 'trialing'];
+      if (!subscription || !validStatuses.includes(subscription.status)) return false;
 
       const limit = subscription.plan.limits.find((l) => l.metric === feature);
       if (!limit) return false;
