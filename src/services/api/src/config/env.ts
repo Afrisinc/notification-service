@@ -4,7 +4,7 @@
  * Uses sensible defaults for optional variables
  */
 
-import { cleanEnv, str, port, url, bool } from 'envalid';
+import { cleanEnv, str, port, url } from 'envalid';
 
 // Validate and export environment variables with defaults
 export const env = cleanEnv(process.env, {

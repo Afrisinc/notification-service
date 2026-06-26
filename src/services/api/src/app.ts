@@ -10,6 +10,7 @@ import { registerMetricsPlugin } from './plugins/metrics';
 import { registerRateLimitPlugin } from './middlewares/rate-limit.middleware';
 import { env } from './config/env';
 import { initPaymentClient } from './utils/payment-client';
+
 export async function createFastifyApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: true,

@@ -18,7 +18,7 @@ export async function apiKeyRoutes(app: FastifyInstance) {
     {
       schema: CreateApiKeySchema,
       onRequest: [validateBaseToken],
-      preHandler: [planGuards.checkEntityLimit('api_keys')],
+      preHandler: [planGuards.requireFeature('api_access'), planGuards.checkEntityLimit('api_keys')],
     },
     controller.createApiKey.bind(controller)
   );
