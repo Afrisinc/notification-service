@@ -2,6 +2,7 @@ import { logger } from '../config/logger';
 import { prismaWrite, prismaRead } from '@shared/database';
 import { IQueuePublisher, QueuePublisherFactory, QueuePublisherConfig } from './queue';
 import { Template } from '../types/template';
+import { calculateSmsSegments } from '../utils/smsSegments';
 import {
   Notification,
   SendNotificationRequest,
@@ -93,6 +94,23 @@ export class NotifyService {
       );
     }
 
+    // Calculate SMS segments for billing/analytics if channel is SMS
+    const payloadWithSegments = { ...request.payload };
+    if (request.channel === 'SMS' && renderedContent) {
+      try {
+        const segmentInfo = calculateSmsSegments(renderedContent);
+        payloadWithSegments.smsSegments = {
+          segments: segmentInfo.segments,
+          encoding: segmentInfo.encoding,
+          length: segmentInfo.length,
+          charsPerSegment: segmentInfo.charsPerSegment,
+          charsRemaining: segmentInfo.charsRemainingInLastSegment,
+        };
+      } catch (e) {
+        logger.debug({ error: e }, 'SMS segment calculation skipped');
+      }
+    }
+
     // Create notification record in database
     const notification = await prismaWrite.notification.create({
       data: {
@@ -104,7 +122,7 @@ export class NotifyService {
         templateId: request.templateId,
         status: 'PENDING',
         priority: request.priority || 'NORMAL',
-        payload: request.payload,
+        payload: payloadWithSegments,
         sentAt: new Date(), // Set sentAt timestamp for log filtering
       },
     });

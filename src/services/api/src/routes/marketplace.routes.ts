@@ -6,6 +6,7 @@ import {
   rateTemplate,
   getUserRating,
   getCategories,
+  initTemplatePayment,
 } from '../controllers/marketplace.controller';
 import { validateBaseToken } from '../middlewares/auth.middleware';
 
@@ -152,5 +153,32 @@ export async function registerMarketplaceRoutes(app: FastifyInstance) {
       },
     },
     getCategories
+  );
+
+  // Init payment for a paid template
+  app.post(
+    '/marketplace/templates/:templateId/payment/init',
+    {
+      onRequest: [validateBaseToken],
+      schema: {
+        tags: ['Marketplace'],
+        summary: 'Init template purchase',
+        description: 'Create a Stripe Payment Intent for a paid marketplace template',
+        params: {
+          type: 'object',
+          properties: { templateId: { type: 'string' } },
+          required: ['templateId'],
+        },
+        body: {
+          type: 'object',
+          properties: {
+            appId: { type: 'string' },
+            customerEmail: { type: 'string' },
+          },
+          required: ['appId', 'customerEmail'],
+        },
+      },
+    },
+    initTemplatePayment
   );
 }

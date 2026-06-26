@@ -2,6 +2,8 @@ import { logger } from '../config/logger';
 import { getConfig } from '@shared/config';
 import { prismaRead, prismaWrite } from '@shared/database';
 import { PaygRepository } from '../repositories/payg.repository';
+import { SubscriptionRepository } from '../repositories/subscription.repository';
+import { getPaymentClient, isPaymentClientInitialized, MobilePaymentResult } from '../utils/payment-client';
 import type {
   PaygRates,
   TopUpTier,
@@ -111,8 +113,81 @@ export class PaygService {
   }
 
   /**
-   * Top up credits.
-   * Applies bonus tier automatically. Mocks payment processing.
+   * Initialise a Stripe payment intent for a PAYG top-up.
+   * Returns the client secret so the UI can confirm payment via Stripe.js.
+   * Balance is NOT credited here — that happens in creditFromPayment()
+   * after afrisinc-pay fires the internal payment-event webhook.
+   */
+  static async initTopUp(
+    accountId: string,
+    amount: number,
+    customerEmail: string
+  ): Promise<{ clientSecret: string; orderId: string; paymentIntentId: string }> {
+    if (amount < MIN_TOPUP_AMOUNT) {
+      throw new Error(`Minimum top-up amount is $${MIN_TOPUP_AMOUNT}`);
+    }
+
+    if (!isPaymentClientInitialized()) {
+      throw new Error('Payment service not configured');
+    }
+
+    const orderId = `topup_${accountId}_${Date.now()}`;
+    const amountCents = Math.round(amount * 100);
+
+    const intent = await getPaymentClient().createPaymentIntent({
+      amount: amountCents,
+      currency: 'usd',
+      orderId,
+      customerEmail,
+      metadata: { accountId, topUpAmount: amount.toString() },
+    });
+
+    logger.info({ accountId, amount, orderId, intentId: intent.id }, 'PAYG top-up intent created');
+
+    return { clientSecret: intent.clientSecret, orderId, paymentIntentId: intent.id };
+  }
+
+  /**
+   * Credit PAYG balance after afrisinc-pay confirms payment via webhook.
+   * Called by the internal /api/internal/payment-event endpoint.
+   */
+  static async creditFromPayment(params: {
+    accountId: string;
+    amountCents: number;
+    paymentRef: string;
+  }): Promise<TopUpResult> {
+    const amount = params.amountCents / 100;
+    const balance = await PaygRepository.getOrCreateBalance(params.accountId);
+    const bonusPercent = getBonusPercent(amount);
+    const bonusAmount = parseFloat(((amount * bonusPercent) / 100).toFixed(6));
+
+    const result = await PaygRepository.atomicTopUp(
+      params.accountId,
+      balance.id,
+      balance.balance,
+      amount,
+      bonusAmount,
+      params.paymentRef,
+      bonusPercent
+    );
+
+    logger.info(
+      { accountId: params.accountId, amount, bonus: bonusAmount, newBalance: result.newBalance },
+      'PAYG balance credited from payment webhook'
+    );
+
+    return {
+      transaction: mapTransaction(result.topUpTx as Parameters<typeof mapTransaction>[0]),
+      bonusTransaction: result.bonusTx ? mapTransaction(result.bonusTx as Parameters<typeof mapTransaction>[0]) : null,
+      newBalance: result.newBalance,
+      bonusPercent,
+      bonusAmount,
+    };
+  }
+
+  /**
+   * Top up credits (legacy mock path — used for testing only).
+   * @deprecated Use initTopUp() + creditFromPayment() for real payments.
    */
   static async topUp(accountId: string, req: TopUpRequest): Promise<TopUpResult> {
     if (req.amount < MIN_TOPUP_AMOUNT) {
@@ -335,5 +410,155 @@ export class PaygService {
     } catch (error) {
       logger.error({ error, accountId }, 'PAYG low-balance alert failed');
     }
+  }
+
+  // ─── Mobile Money Methods ─────────────────────────────────────────────────────
+
+  /**
+   * Initiate mobile money payment (PAYG top-up or subscription)
+   * User pays via MTN/Airtel Mobile Money, action is processed after webhook confirmation
+   */
+  static async initMobileTopUp(
+    accountId: string,
+    amount: number,
+    phoneNumber: string,
+    customerName?: string,
+    options?: {
+      paymentType?: 'payg_topup' | 'subscription';
+      planId?: string;
+      billingCycle?: 'monthly' | 'yearly';
+    }
+  ): Promise<{ payment: MobilePaymentResult; message: string }> {
+    if (amount < 100) {
+      throw new Error('Minimum mobile money payment is 100 RWF');
+    }
+
+    if (!isPaymentClientInitialized()) {
+      throw new Error('Payment service not configured');
+    }
+
+    const paymentType = options?.paymentType ?? 'payg_topup';
+    const isSubscription = paymentType === 'subscription';
+
+    // Build metadata and description based on payment type
+    let description: string;
+    let metadata: Record<string, unknown>;
+    let orderId: string;
+
+    if (isSubscription) {
+      if (!options?.planId) {
+        throw new Error('planId is required for subscription payments');
+      }
+
+      // Fetch plan details for description
+      const plan = await SubscriptionRepository.getPlanById(options.planId);
+      if (!plan) {
+        throw new Error('Plan not found');
+      }
+
+      const billingCycle = options.billingCycle ?? 'monthly';
+      orderId = `msub_${accountId}_${options.planId}_${billingCycle}_${Date.now()}`;
+      description = `${plan.name} plan subscription (${billingCycle})`;
+      metadata = {
+        accountId,
+        type: 'subscription',
+        planId: options.planId,
+        billingCycle,
+        planName: plan.name,
+      };
+    } else {
+      orderId = `momo_topup_${accountId}_${Date.now()}`;
+      description = 'PAYG credit top-up';
+      metadata = { accountId, type: 'payg_topup' };
+    }
+
+    const payment = await getPaymentClient().mobileCashin({
+      orderId,
+      amount,
+      phoneNumber,
+      customerName,
+      description,
+      metadata,
+    });
+
+    logger.info(
+      { accountId, amount, phoneNumber, ref: payment.ref, orderId, paymentType },
+      'Mobile money payment initiated'
+    );
+
+    const message = isSubscription
+      ? `Please confirm the payment of ${amount.toLocaleString()} RWF on your phone to activate your subscription`
+      : 'Please approve the payment on your phone. Credits will be added once payment is confirmed.';
+
+    return { payment, message };
+  }
+
+  /**
+   * Get mobile payment status by ID
+   */
+  static async getMobilePayment(paymentId: string): Promise<MobilePaymentResult> {
+    if (!isPaymentClientInitialized()) {
+      throw new Error('Payment service not configured');
+    }
+
+    return getPaymentClient().getMobilePayment(paymentId);
+  }
+
+  /**
+   * Get mobile payment status by Paypack reference
+   */
+  static async getMobilePaymentByRef(ref: string): Promise<MobilePaymentResult> {
+    if (!isPaymentClientInitialized()) {
+      throw new Error('Payment service not configured');
+    }
+
+    return getPaymentClient().getMobilePaymentByRef(ref);
+  }
+
+  /**
+   * Credit PAYG balance after mobile money payment confirmation (webhook)
+   * Called by the internal webhook handler when Paypack confirms payment
+   */
+  static async creditFromMobilePayment(params: {
+    accountId: string;
+    amountRwf: number;
+    paymentRef: string;
+  }): Promise<TopUpResult> {
+    // Convert RWF to USD (approximate rate, should be fetched from config/API)
+    const RWF_TO_USD_RATE = 0.00075; // ~1333 RWF = 1 USD
+    const amountUsd = Number.parseFloat((params.amountRwf * RWF_TO_USD_RATE).toFixed(2));
+
+    const balance = await PaygRepository.getOrCreateBalance(params.accountId);
+    const bonusPercent = getBonusPercent(amountUsd);
+    const bonusAmount = Number.parseFloat(((amountUsd * bonusPercent) / 100).toFixed(6));
+
+    const result = await PaygRepository.atomicTopUp(
+      params.accountId,
+      balance.id,
+      balance.balance,
+      amountUsd,
+      bonusAmount,
+      params.paymentRef,
+      bonusPercent
+    );
+
+    logger.info(
+      {
+        accountId: params.accountId,
+        amountRwf: params.amountRwf,
+        amountUsd,
+        bonus: bonusAmount,
+        newBalance: result.newBalance,
+      },
+      'PAYG balance credited from mobile money payment'
+    );
+
+    return {
+      transaction: mapTransaction(result.topUpTx as Parameters<typeof mapTransaction>[0]),
+      bonusTransaction: result.bonusTx ? mapTransaction(result.bonusTx as Parameters<typeof mapTransaction>[0]) : null,
+      newBalance: result.newBalance,
+      bonusPercent,
+      bonusAmount,
+    };
   }
 }

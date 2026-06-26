@@ -30,6 +30,7 @@ export class OrganizationController {
         planId: string;
         billingCycle?: 'monthly' | 'annual';
         paymentMethodId?: string;
+        customerId?: string;
       };
 
       if (!userId) {

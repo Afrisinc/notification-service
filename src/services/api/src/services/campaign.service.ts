@@ -2,6 +2,7 @@ import pino from 'pino';
 import { campaignRepository, CreateCampaignInput, UpdateCampaignInput } from '../repositories/campaign.repository';
 import { contactRepository } from '../repositories/contact.repository';
 import { notifyService } from './notify.service';
+import { calculateSmsSegments } from '../utils/smsSegments';
 import { prismaRead } from '@shared/database';
 import { Channel } from '@prisma/client';
 
@@ -482,6 +483,18 @@ export class CampaignService {
         break;
       case 'SMS':
         payload.message = campaign.text_content;
+        try {
+          const segmentInfo = calculateSmsSegments(campaign.text_content);
+          payload.smsSegments = {
+            segments: segmentInfo.segments,
+            encoding: segmentInfo.encoding,
+            length: segmentInfo.length,
+            charsPerSegment: segmentInfo.charsPerSegment,
+            charsRemaining: segmentInfo.charsRemainingInLastSegment,
+          };
+        } catch (e) {
+          logger.debug({ error: e }, 'SMS segment calculation skipped');
+        }
         break;
       case 'PUSH':
         payload.title = campaign.push_title;

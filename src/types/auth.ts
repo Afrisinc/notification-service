@@ -29,6 +29,7 @@ export interface SignupPayload {
   planId: string;
   billingCycle?: 'monthly' | 'annual';
   paymentMethodId?: string; // Stripe payment method ID (required for paid plans)
+  customerId?: string; // Stripe cus_xxx — created during signup SetupIntent flow
   displayName?: string;
   organizationName: string;
   jobTitle?: string;

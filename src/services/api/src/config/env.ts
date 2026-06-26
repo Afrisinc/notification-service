@@ -4,7 +4,7 @@
  * Uses sensible defaults for optional variables
  */
 
-import { cleanEnv, str, port, url, bool } from 'envalid';
+import { cleanEnv, str, port, url } from 'envalid';
 
 // Validate and export environment variables with defaults
 export const env = cleanEnv(process.env, {
@@ -48,6 +48,8 @@ export const env = cleanEnv(process.env, {
   TRIAL_EXPIRED_TEMPLATE_ID: str({ default: 'system-trial-expired' }),
   BILLING_CONFIRMATION_TEMPLATE_ID: str({ default: 'system-billing-confirmation' }),
   PAYMENT_FAILED_TEMPLATE_ID: str({ default: 'system-payment-failed' }),
+  SUBSCRIPTION_CANCELLED_TEMPLATE_ID: str({ default: 'system-subscription-cancelled' }),
+  PLAN_CHANGED_TEMPLATE_ID: str({ default: 'system-plan-changed' }),
   TRIAL_REMINDER_DAYS_BEFORE: str({ default: '3' }),
 
   // SMTP Configuration (optional)
@@ -72,4 +74,9 @@ export const env = cleanEnv(process.env, {
 
   // DLQ Alert Threshold
   DLQ_ALERT_THRESHOLD: str({ default: '100' }),
+
+  // Payment Service
+  PAYMENT_SERVICE_URL: url({ default: 'http://localhost:3400' }),
+  PAYMENT_API_KEY: str({ default: '' }),
+  AFRISINC_PAY_WEBHOOK_SECRET: str({ default: '' }),
 });

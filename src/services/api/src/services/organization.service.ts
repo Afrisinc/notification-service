@@ -5,6 +5,7 @@ import { NotifyService } from './notify.service';
 import { env } from '../config/env';
 import { accountRepository } from '../repositories/account.repository';
 import { AccountService } from './account.service';
+import { TrialSubscriptionService } from './trial-subscription.service';
 
 const logger = pino();
 const accountService = new AccountService();
@@ -25,6 +26,7 @@ export class OrganizationService {
       planId: string;
       billingCycle?: 'monthly' | 'annual';
       paymentMethodId?: string;
+      customerId?: string; // Stripe cus_xxx from SetupIntent flow
     },
     userId: string
   ) {
@@ -80,7 +82,29 @@ export class OrganizationService {
       });
 
       // Create subscription with selected plan
-      await accountService.createSubscriptionByPlanId(account.id, data.planId, data.billingCycle, data.paymentMethodId);
+      if (isPaidPlan && data.paymentMethodId && data.customerId) {
+        // Store Stripe customer on account
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (prismaWrite.account as any).update({
+          where: { id: account.id },
+          data: { stripe_customer_id: data.customerId },
+        });
+        // Activate trial subscription — Stripe owns auto-charge lifecycle
+        await TrialSubscriptionService.activateSubscription(
+          account.id,
+          data.planId,
+          data.billingCycle ?? 'monthly',
+          data.paymentMethodId,
+          data.customerId
+        );
+      } else {
+        await accountService.createSubscriptionByPlanId(
+          account.id,
+          data.planId,
+          data.billingCycle,
+          data.paymentMethodId
+        );
+      }
 
       logger.info(
         { orgId: org.id, accountId: account.id, planId: data.planId },
@@ -484,7 +508,12 @@ export class OrganizationService {
           },
         },
       });
-
+      await prismaWrite.account.deleteMany({
+        where: {
+          owner_user_id: memberId,
+          organization_id: orgId,
+        },
+      });
       logger.info({ orgId, memberId }, 'Member removed from organization');
     } catch (error) {
       logger.error({ error, orgId, memberId }, 'Failed to remove organization member');
