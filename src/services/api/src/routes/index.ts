@@ -25,6 +25,7 @@ import { registerPlanManagementRoutes } from './plan-management.routes';
 import { registerAppEmailProviderRoutes } from './app-email-provider.routes';
 import { registerPaygRoutes } from './payg.routes';
 import { clientsRoutes } from './clients.routes';
+import { registerSMSWebhookRoutes } from './sms-webhook.routes';
 
 //  Register all API v1 routes
 export async function v1Routes(fastify: FastifyInstance) {
@@ -107,5 +108,9 @@ export async function v1Routes(fastify: FastifyInstance) {
   });
   await fastify.register(clientsRoutes, {
     prefix: '/api/v1',
+  });
+
+  await fastify.register(registerSMSWebhookRoutes, {
+    prefix: '/webhooks/sms',
   });
 }
