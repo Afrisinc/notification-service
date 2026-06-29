@@ -16,7 +16,8 @@ export class NotificationLogsService {
       const dateFrom = filters.dateFrom || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const dateTo = filters.dateTo || new Date();
 
-      const { notifications, total } = await notificationLogsRepository.listAppLogs(appId, {
+      // Fetch notifications and status counts in parallel (status counts fetched within listAppLogs)
+      const { notifications, total, statusCounts } = await notificationLogsRepository.listAppLogs(appId, {
         ...filters,
         page,
         limit,
@@ -24,18 +25,11 @@ export class NotificationLogsService {
         dateTo,
       });
 
-      const counts = await notificationLogsRepository.getStatusCounts(appId, {
-        ...filters,
-        page,
-        limit,
-        dateFrom,
-        dateTo,
-      });
       const totalCount = total;
-      const deliveredCount = counts.DELIVERED || 0;
-      const failedCount = counts.FAILED || 0;
-      const pendingCount = counts.PENDING || 0;
-      const bouncedCount = counts.BOUNCED || 0;
+      const deliveredCount = statusCounts.DELIVERED || 0;
+      const failedCount = statusCounts.FAILED || 0;
+      const pendingCount = statusCounts.PENDING || 0;
+      const bouncedCount = statusCounts.BOUNCED || 0;
 
       const deliveryRate = totalCount > 0 ? Math.round((deliveredCount / totalCount) * 100) : 0;
       const failureRate = totalCount > 0 ? Math.round((failedCount / totalCount) * 100) : 0;
