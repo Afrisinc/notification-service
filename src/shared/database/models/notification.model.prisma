@@ -17,6 +17,7 @@ model Notification {
   retryCount   Int                  @default(0)
   scheduledAt  DateTime?
   sentAt       DateTime?
+  deliveredAt  DateTime?
   createdAt    DateTime             @default(now())
 
   // Relations

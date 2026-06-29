@@ -26,6 +26,7 @@ enum NotificationStatus {
   PENDING
   QUEUED
   SENT
+  DELIVERED
   FAILED
 }
 
