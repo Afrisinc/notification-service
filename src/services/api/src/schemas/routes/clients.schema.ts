@@ -1,20 +1,45 @@
 import { paginationMeta } from '../common/pagination';
 
-const clientItem = {
+const organizationItem = {
   type: 'object',
   properties: {
     id: { type: 'number' },
     name: { type: 'string' },
-    plan: { type: 'string', enum: ['FREE', 'STARTER', 'SCALE', 'ENTERPRISE', 'PAYG'] },
-    email: { type: 'string' },
+    plan: { type: 'string', enum: ['FREE', 'STARTER', 'SCALE', 'ENTERPRISE', 'PRO', 'PAYG'] },
+    role: { type: 'string', enum: ['owner', 'member', 'admin'] },
     sent: { type: 'string' },
-    deliveryRate: { type: 'string' },
     templates: { type: 'number' },
     status: { type: 'string', enum: ['active', 'suspended', 'trial'] },
     joined: { type: 'string' },
-    channels: { type: 'array', items: { type: 'string' } },
-    organizationName: { type: 'string' },
-    organizationType: { type: 'string', enum: ['INDIVIDUAL', 'ORGANIZATION'] },
+  },
+};
+
+const clientItem = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    email: { type: 'string' },
+    organizations: {
+      type: 'array',
+      items: organizationItem,
+    },
+    stats: {
+      type: 'object',
+      properties: {
+        totalOrganizations: { type: 'number' },
+        ownedOrganizations: { type: 'number' },
+        memberOrganizations: { type: 'number' },
+        aggregatedStats: {
+          type: 'object',
+          properties: {
+            sent: { type: 'string' },
+            templates: { type: 'number' },
+            deliveryRate: { type: 'string' },
+          },
+        },
+      },
+    },
   },
 };
 

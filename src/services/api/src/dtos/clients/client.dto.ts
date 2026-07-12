@@ -1,17 +1,33 @@
 /**
- * Data Transfer Object for a Client (Account)
+ * Data Transfer Object for Organization within a Client
  */
-export interface ClientDTO {
+export interface OrganizationAccountDTO {
   id: number;
   name: string;
-  plan: 'FREE' | 'STARTER' | 'SCALE' | 'ENTERPRISE' | 'PAYG';
-  email: string;
+  plan: 'FREE' | 'STARTER' | 'SCALE' | 'ENTERPRISE' | 'PRO' | 'PAYG';
+  role: 'owner' | 'member' | 'admin';
   sent: string;
-  deliveryRate: string;
   templates: number;
   status: 'active' | 'suspended' | 'trial';
   joined: string;
-  channels: string[];
-  organizationName: string;
-  organizationType: 'INDIVIDUAL' | 'ORGANIZATION';
+}
+
+/**
+ * Data Transfer Object for a Client (User with Organizations)
+ */
+export interface ClientDTO {
+  id: string;
+  name: string;
+  email: string;
+  organizations: OrganizationAccountDTO[];
+  stats: {
+    totalOrganizations: number;
+    ownedOrganizations: number;
+    memberOrganizations: number;
+    aggregatedStats: {
+      sent: string;
+      templates: number;
+      deliveryRate: string;
+    };
+  };
 }
