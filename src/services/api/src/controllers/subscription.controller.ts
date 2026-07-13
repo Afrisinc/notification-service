@@ -374,8 +374,8 @@ export class SubscriptionController {
 
   /**
    * POST /api/subscriptions/payment/init
-   * Create a Stripe Payment Intent for a plan upgrade.
-   * Returns clientSecret for Stripe.js to confirm on the client.
+   * Initiate card payment for subscription upgrade via ITEC PesaPal (afrisinc-pay).
+   * Returns checkoutUrl for customer to complete payment.
    */
   async initSubscriptionPayment(request: FastifyRequest, reply: FastifyReply) {
     try {
@@ -396,9 +396,12 @@ export class SubscriptionController {
 
       const result = await SubscriptionPaymentService.initPayment(accountId, planId, billingCycle, customerEmail);
 
-      logger.info({ accountId, planId, billingCycle, correlationId: request.id }, 'Subscription payment init');
+      logger.info(
+        { accountId, planId, billingCycle, pcode: result.pcode, correlationId: request.id },
+        'Card payment initiated'
+      );
 
-      return ApiResponseHelper.success(reply, 'Payment intent created', result);
+      return ApiResponseHelper.success(reply, 'Card payment initiated - redirect to checkoutUrl', result, 201);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const statusCode = (error as any)?.statusCode;
@@ -407,6 +410,116 @@ export class SubscriptionController {
 
       if (statusCode === 404) return ApiResponseHelper.notFound(reply, errorMessage);
       if (statusCode === 422) return ApiResponseHelper.badRequest(reply, errorMessage);
+      return ApiResponseHelper.badRequest(reply, errorMessage);
+    }
+  }
+
+  /**
+   * GET /api/subscriptions/payment/status/:pcode
+   * Check card payment status by PCODE (fallback if webhook fails)
+   * Useful for polling payment status when webhook delivery is delayed
+   */
+  /**
+   * Check payment status by reference (PCODE for card, ref for mobile)
+   * Auto-detects payment type and fetches status from appropriate provider
+   * Fallback endpoint for webhook failures
+   */
+  async checkCardPaymentStatus(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const accountId = request.headers['x-account-id'] as string;
+      if (!accountId) {
+        return ApiResponseHelper.unauthorized(reply, 'Account ID required');
+      }
+
+      const { pcode } = request.params as { pcode: string };
+      if (!pcode) {
+        return ApiResponseHelper.badRequest(reply, 'Payment reference is required');
+      }
+
+      // Dynamic import to avoid circular dependencies
+      const { getPaymentClient } = await import('../utils/payment-client');
+      const paymentClient = getPaymentClient();
+
+      let payment: any = null;
+      let paymentType = 'unknown';
+
+      // Try to fetch as card payment first (PCODE from ITEC PesaPal)
+      try {
+        payment = await paymentClient.getCardPaymentByPcode(pcode);
+        paymentType = 'card';
+        logger.debug({ accountId, ref: pcode, paymentType, correlationId: request.id }, 'Detected card payment');
+      } catch (cardError) {
+        logger.debug(
+          {
+            accountId,
+            ref: pcode,
+            error: cardError instanceof Error ? cardError.message : 'Unknown',
+            correlationId: request.id,
+          },
+          'Card payment lookup failed, trying mobile payment'
+        );
+
+        // Fallback: try to fetch as mobile payment (ref from Paypack/ITEC)
+        try {
+          payment = await paymentClient.getMobilePaymentByRef(pcode);
+          paymentType = 'mobile';
+          logger.debug({ accountId, ref: pcode, paymentType, correlationId: request.id }, 'Detected mobile payment');
+        } catch (mobileError) {
+          logger.warn(
+            {
+              accountId,
+              ref: pcode,
+              cardError: cardError instanceof Error ? cardError.message : 'Unknown',
+              mobileError: mobileError instanceof Error ? mobileError.message : 'Unknown',
+              correlationId: request.id,
+            },
+            'Payment not found as card or mobile'
+          );
+          return ApiResponseHelper.notFound(reply, 'Payment not found');
+        }
+      }
+
+      if (!payment) {
+        return ApiResponseHelper.notFound(reply, 'Payment not found');
+      }
+
+      // Build unified response that works for both card and mobile payments
+      const response: any = {
+        paymentType,
+        ref: payment.ref,
+        orderId: payment.orderId,
+        status: payment.status,
+        amount: payment.amount,
+        provider: payment.provider || 'unknown',
+        createdAt: payment.createdAt,
+      };
+
+      // Add card-specific fields if present
+      if (payment.pcode) {
+        response.pcode = payment.pcode;
+      }
+      if (payment.email) {
+        response.email = payment.email;
+      }
+
+      // Add mobile-specific fields if present
+      if (payment.phoneNumber) {
+        response.phoneNumber = payment.phoneNumber;
+      }
+      if (payment.currency) {
+        response.currency = payment.currency;
+      }
+
+      logger.info(
+        { accountId, ref: pcode, paymentType, status: payment.status, correlationId: request.id },
+        'Payment status retrieved'
+      );
+
+      return ApiResponseHelper.success(reply, 'Payment status retrieved', response);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to check payment status');
+
       return ApiResponseHelper.badRequest(reply, errorMessage);
     }
   }

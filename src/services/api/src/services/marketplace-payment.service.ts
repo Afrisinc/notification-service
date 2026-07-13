@@ -2,19 +2,32 @@ import { prismaRead } from '@shared/database';
 import { getPaymentClient } from '../utils/payment-client';
 import { logger } from '../config/logger';
 
+export interface MarketplacePaymentInitResult {
+  checkoutUrl: string;
+  pcode: string;
+  orderId: string;
+  amountUSD: number;
+  templateName: string;
+}
+
 export class MarketplacePaymentService {
   /**
-   * Create a Stripe Payment Intent for a paid marketplace template.
+   * Initiate card payment for template purchase via ITEC PesaPal (africnc-pay).
    *
-   * After Stripe confirms on the client, afrisinc-pay fires the merchant
-   * webhook → /internal/payment-event → installs the template to the app.
+   * Returns checkout URL for customer to complete payment.
+   * After payment is confirmed, africnc-pay fires webhook → installs the template to the app.
    *
    * @param accountId   Buyer's account ID
    * @param templateId  Marketplace template ID
    * @param appId       Destination app to install into after payment
-   * @param customerEmail  For Stripe receipt
+   * @param customerEmail  For PesaPal receipt
    */
-  static async initPayment(accountId: string, templateId: string, appId: string, customerEmail: string) {
+  static async initPayment(
+    accountId: string,
+    templateId: string,
+    appId: string,
+    customerEmail: string
+  ): Promise<MarketplacePaymentInitResult> {
     const template = await prismaRead.template.findFirst({
       where: {
         id: templateId,
@@ -34,29 +47,31 @@ export class MarketplacePaymentService {
       throw Object.assign(new Error('This is a free template — no payment required'), { statusCode: 422 });
     }
 
-    const amountCents = Math.round(priceUSD * 100);
     const orderId = `tpl_${accountId}_${templateId}_${Date.now()}`;
 
-    const intent = await getPaymentClient().createPaymentIntent({
-      amount: amountCents,
-      currency: 'USD',
+    const cardPayment = await getPaymentClient().initiateCardPayment({
       orderId,
-      customerEmail,
+      amount: Math.round(priceUSD * 100), // Convert to cents for africnc-pay
+      email: customerEmail,
+      description: `Template purchase: ${template.code}`,
       metadata: {
         accountId,
-        paymentType: 'template',
+        paymentType: 'template_purchase',
         templateId,
         appId,
       },
     });
 
-    logger.info({ accountId, templateId, appId, amountCents, orderId }, 'Template payment intent created');
+    logger.info(
+      { accountId, templateId, appId, amountUSD: priceUSD, orderId, pcode: cardPayment.pcode },
+      'Template card payment initiated (ITEC PesaPal)'
+    );
 
     return {
-      clientSecret: intent.clientSecret,
-      paymentIntentId: intent.id,
+      checkoutUrl: cardPayment.checkoutUrl,
+      pcode: cardPayment.pcode,
       orderId,
-      amountCents,
+      amountUSD: priceUSD,
       templateName: template.code,
     };
   }

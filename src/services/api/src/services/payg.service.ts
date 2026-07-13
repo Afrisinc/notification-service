@@ -122,7 +122,7 @@ export class PaygService {
     accountId: string,
     amount: number,
     customerEmail: string
-  ): Promise<{ clientSecret: string; orderId: string; paymentIntentId: string }> {
+  ): Promise<{ checkoutUrl: string; pcode: string; orderId: string; amountUSD: number }> {
     if (amount < MIN_TOPUP_AMOUNT) {
       throw new Error(`Minimum top-up amount is $${MIN_TOPUP_AMOUNT}`);
     }
@@ -134,17 +134,29 @@ export class PaygService {
     const orderId = `topup_${accountId}_${Date.now()}`;
     const amountCents = Math.round(amount * 100);
 
-    const intent = await getPaymentClient().createPaymentIntent({
-      amount: amountCents,
-      currency: 'usd',
+    const cardPayment = await getPaymentClient().initiateCardPayment({
       orderId,
-      customerEmail,
-      metadata: { accountId, topUpAmount: amount.toString() },
+      amount: amountCents,
+      email: customerEmail,
+      description: `Top-up: $${amount}`,
+      metadata: {
+        accountId,
+        paymentType: 'payg_topup',
+        topUpAmount: amount.toString(),
+      },
     });
 
-    logger.info({ accountId, amount, orderId, intentId: intent.id }, 'PAYG top-up intent created');
+    logger.info(
+      { accountId, amount, orderId, pcode: cardPayment.pcode },
+      'PAYG top-up card payment initiated (ITEC PesaPal)'
+    );
 
-    return { clientSecret: intent.clientSecret, orderId, paymentIntentId: intent.id };
+    return {
+      checkoutUrl: cardPayment.checkoutUrl,
+      pcode: cardPayment.pcode,
+      orderId,
+      amountUSD: amount,
+    };
   }
 
   /**

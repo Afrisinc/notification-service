@@ -83,6 +83,11 @@ export class PaymentWebhookService {
 
     logger.debug({ event }, 'Processing webhook event');
 
+    // Card payment events (subscriptions via ITEC)
+    if (event.startsWith('card.')) {
+      return this.processCardPaymentEvent(event, data as unknown as PaymentEventData);
+    }
+
     // Subscription lifecycle events
     if (event.startsWith('subscription.')) {
       return this.processSubscriptionEvent(event, data);
@@ -308,6 +313,107 @@ export class PaymentWebhookService {
       logger.error({ error, accountId, subscriptionId }, 'Failed to sync subscription cancellation');
       return { success: false, error: 'Failed to cancel subscription' };
     }
+  }
+
+  // ─── Card Payment Events (ITEC PesaPal) ──────────────────────────────────────
+
+  /**
+   * Process card payment events from afrisinc-pay (ITEC PesaPal)
+   * Handles payment.succeeded and payment.failed for card payments
+   */
+  private static async processCardPaymentEvent(event: string, data: PaymentEventData): Promise<WebhookProcessResult> {
+    switch (event) {
+      case 'card.payment_succeeded':
+        return this.handleCardPaymentSucceeded(data);
+
+      case 'card.payment_failed':
+        return this.handleCardPaymentFailed(data);
+
+      default:
+        logger.debug({ event }, 'Skipping unhandled card payment event');
+        return { success: true, skipped: true };
+    }
+  }
+
+  /**
+   * Handle card.payment_succeeded event
+   * Activates subscription plan after card payment confirmation
+   */
+  private static async handleCardPaymentSucceeded(data: PaymentEventData): Promise<WebhookProcessResult> {
+    const accountId = data.metadata?.['accountId'] as string | undefined;
+
+    if (!accountId) {
+      logger.warn({ paymentId: data.paymentId }, 'Card payment missing accountId in metadata');
+      return { success: false, error: 'Missing accountId in metadata' };
+    }
+
+    const paymentType = data.metadata?.['paymentType'] as string | undefined;
+
+    // Route based on payment type
+    switch (paymentType) {
+      case 'subscription':
+        return this.handleCardSubscriptionPayment(data, accountId);
+
+      default:
+        logger.debug({ paymentId: data.paymentId, paymentType }, 'Skipping unhandled card payment type');
+        return { success: true, skipped: true };
+    }
+  }
+
+  /**
+   * Handle subscription payment via card (ITEC)
+   */
+  private static async handleCardSubscriptionPayment(
+    data: PaymentEventData,
+    accountId: string
+  ): Promise<WebhookProcessResult> {
+    const planId = data.metadata?.['planId'] as string | undefined;
+    const billingCycle = (data.metadata?.['billingCycle'] as string | undefined) ?? 'monthly';
+
+    if (!planId) {
+      logger.warn({ paymentId: data.paymentId }, 'Card subscription payment missing planId');
+      return { success: false, error: 'Missing planId in metadata' };
+    }
+
+    try {
+      await SubscriptionRepository.activateFromPayment(accountId, planId, billingCycle as 'monthly' | 'yearly');
+
+      logger.info(
+        { accountId, planId, billingCycle, paymentId: data.paymentId },
+        'Subscription activated from card payment (ITEC)'
+      );
+
+      // Send billing confirmation notification (fire-and-forget)
+      SubscriptionNotificationService.sendBillingConfirmation(accountId).catch((err) =>
+        logger.error({ err, accountId }, 'Failed to send billing confirmation')
+      );
+
+      return { success: true };
+    } catch (error) {
+      logger.error(
+        { error, accountId, planId, paymentId: data.paymentId },
+        'Failed to activate subscription from card payment'
+      );
+      return { success: false, error: 'Failed to activate plan' };
+    }
+  }
+
+  /**
+   * Handle card.payment_failed event
+   */
+  private static async handleCardPaymentFailed(data: PaymentEventData): Promise<WebhookProcessResult> {
+    const accountId = data.metadata?.['accountId'] as string | undefined;
+
+    if (accountId) {
+      logger.warn({ accountId, paymentId: data.paymentId, amount: data.amount }, 'Card payment failed');
+
+      // Send payment failed notification (fire-and-forget)
+      SubscriptionNotificationService.sendPaymentFailed(accountId).catch((err) =>
+        logger.error({ err, accountId }, 'Failed to send payment failed notification')
+      );
+    }
+
+    return { success: true };
   }
 
   /**

@@ -3,23 +3,24 @@ import { getPaymentClient } from '../utils/payment-client';
 import { logger } from '../config/logger';
 
 export interface SubscriptionPaymentInitResult {
-  clientSecret: string;
-  paymentIntentId: string;
+  checkoutUrl: string;
+  pcode: string;
   orderId: string;
-  amountCents: number;
+  amountUSD: number;
   planName: string;
+  validUntil: string;
 }
 
 export class SubscriptionPaymentService {
   /**
-   * Create a Stripe Payment Intent for a plan upgrade.
+   * Initiate card payment for subscription upgrade via ITEC PesaPal (africinc-pay).
    *
    * Pricing:
-   *  - monthly  → price_monthly (USD) × 100 cents
-   *  - yearly   → price_yearly (monthly-equivalent) × 12 × 100 cents
+   *  - monthly  → price_monthly (USD)
+   *  - yearly   → price_yearly (monthly-equivalent) × 12 (USD)
    *
-   * After Stripe confirms on the client, afrisinc-pay fires the merchant
-   * webhook → internal /payment-event → internal.routes.ts activates the plan.
+   * Returns checkout URL for customer to complete payment.
+   * After payment is confirmed, afrisinc-pay fires webhook → activates plan.
    */
   static async initPayment(
     accountId: string,
@@ -38,19 +39,17 @@ export class SubscriptionPaymentService {
 
     const amountUSD = billingCycle === 'yearly' ? priceYearly * 12 : priceMonthly;
 
-    const amountCents = Math.round(amountUSD * 100);
-
-    if (amountCents <= 0) {
+    if (amountUSD <= 0) {
       throw Object.assign(new Error('Free plans do not require payment'), { statusCode: 422 });
     }
 
     const orderId = `sub_${accountId}_${planId}_${billingCycle}_${Date.now()}`;
 
-    const intent = await getPaymentClient().createPaymentIntent({
-      amount: amountCents,
-      currency: 'USD',
+    const cardPayment = await getPaymentClient().initiateCardPayment({
       orderId,
-      customerEmail,
+      amount: Math.round(amountUSD * 100), // Convert to cents for africnc-pay
+      email: customerEmail,
+      description: `Subscription upgrade to ${plan.name} (${billingCycle})`,
       metadata: {
         accountId,
         paymentType: 'subscription',
@@ -59,14 +58,18 @@ export class SubscriptionPaymentService {
       },
     });
 
-    logger.info({ accountId, planId, billingCycle, amountCents, orderId }, 'Subscription payment intent created');
+    logger.info(
+      { accountId, planId, billingCycle, amountUSD, orderId, pcode: cardPayment.pcode },
+      'Subscription card payment initiated (ITEC PesaPal)'
+    );
 
     return {
-      clientSecret: intent.clientSecret,
-      paymentIntentId: intent.id,
+      checkoutUrl: cardPayment.checkoutUrl,
+      pcode: cardPayment.pcode,
       orderId,
-      amountCents,
+      amountUSD,
       planName: plan.name,
+      validUntil: cardPayment.validUntil,
     };
   }
 }

@@ -124,6 +124,35 @@ export interface PaymentErrorResponse {
   };
 }
 
+/**
+ * Card payment for subscriptions (via ITEC)
+ */
+export interface CardPaymentRequest {
+  orderId: string;
+  amount: number;
+  email: string;
+  customerName?: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Card payment result
+ */
+export interface CardPaymentResult {
+  id: string;
+  ref: string;
+  pcode: string;
+  checkoutUrl: string;
+  validUntil: string;
+  orderId: string;
+  amount: number;
+  email: string;
+  status: string;
+  provider: string;
+  createdAt: string;
+}
+
 // ─── Mobile Money Types ───────────────────────────────────────────────────────
 
 /**
@@ -729,6 +758,59 @@ export class PaymentClient {
     return this.executeWithResilience<MobileAccountInfo>(
       () => this.client.get<MobileAccountInfo>('/mobile/account/info'),
       'get mobile account info'
+    );
+  }
+
+  // ── Card Payments (via ITEC) ──────────────────────────────────────────────────
+
+  /**
+   * Initiate card payment via ITEC PesaPal
+   * Used for subscription payments and plan upgrades
+   */
+  async initiateCardPayment(request: CardPaymentRequest): Promise<CardPaymentResult> {
+    if (!request.orderId?.trim()) {
+      throw new PaymentClientError('orderId is required', 'INVALID_PARAM', 400, 'orderId');
+    }
+    if (!request.amount || request.amount <= 0) {
+      throw new PaymentClientError('amount must be positive', 'INVALID_PARAM', 400, 'amount');
+    }
+    if (!request.email?.trim()) {
+      throw new PaymentClientError('email is required', 'INVALID_PARAM', 400, 'email');
+    }
+
+    logger.debug({ orderId: request.orderId, amount: request.amount }, '[PaymentClient] Initiating card payment');
+
+    return this.executeWithResilience<CardPaymentResult>(
+      () => this.client.post<CardPaymentResult>('/card/pay', request),
+      'initiate card payment'
+    );
+  }
+
+  /**
+   * Get card payment by ID
+   */
+  async getCardPayment(paymentId: string): Promise<CardPaymentResult> {
+    if (!paymentId?.trim()) {
+      throw new PaymentClientError('paymentId is required', 'INVALID_PARAM', 400, 'paymentId');
+    }
+
+    return this.executeWithResilience<CardPaymentResult>(
+      () => this.client.get<CardPaymentResult>(`/card/${paymentId}`),
+      `get card payment: ${paymentId}`
+    );
+  }
+
+  /**
+   * Get card payment by PCODE
+   */
+  async getCardPaymentByPcode(pcode: string): Promise<CardPaymentResult> {
+    if (!pcode?.trim()) {
+      throw new PaymentClientError('pcode is required', 'INVALID_PARAM', 400, 'pcode');
+    }
+
+    return this.executeWithResilience<CardPaymentResult>(
+      () => this.client.get<CardPaymentResult>(`/card/code/${pcode}`),
+      `get card payment by pcode: ${pcode}`
     );
   }
 

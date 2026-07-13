@@ -59,14 +59,28 @@ export async function registerSubscriptionRoutes(fastify: FastifyInstance) {
 
   /**
    * POST /api/subscriptions/payment/init
-   * Initiates a Stripe Payment Intent for a plan upgrade (existing paid users).
+   * Initiates card payment for subscription upgrade via ITEC PesaPal.
    * Body: { planId, billingCycle, customerEmail }
-   * Returns: { clientSecret, paymentIntentId, orderId, amountCents, planName }
+   * Returns: { checkoutUrl, pcode, orderId, amountUSD, planName, validUntil }
    */
   fastify.post(
     '/subscriptions/payment/init',
     { onRequest: [validateBaseToken] },
     asyncWrapper(subscriptionController.initSubscriptionPayment.bind(subscriptionController))
+  );
+
+  /**
+   * GET /api/subscriptions/payment/status/:ref
+   * Check payment status by reference (PCODE for card, ref for mobile)
+   * Auto-detects payment type and polls status directly from afrisinc-pay
+   * Fallback endpoint if webhook delivery is delayed or fails
+   *
+   * Returns: { paymentType, ref, orderId, status, amount, provider, createdAt, ... }
+   */
+  fastify.get(
+    '/subscriptions/payment/status/:pcode',
+    { onRequest: [validateBaseToken] },
+    asyncWrapper(subscriptionController.checkCardPaymentStatus.bind(subscriptionController))
   );
 
   // ── Trial Subscription Flow (SetupIntent) ───────────────────────────────────
