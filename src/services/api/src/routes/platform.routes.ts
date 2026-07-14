@@ -8,6 +8,7 @@ import {
   GetAllUsersSchema,
   GetUserByIdSchema,
 } from '../schemas/routes/analytics.schema';
+import { GetCreditTransactionsSchema } from '../schemas/routes/admin-transactions.schema';
 
 const controller = new PlatformController();
 
@@ -51,5 +52,12 @@ export async function platformRoutes(app: FastifyInstance) {
     '/platform/users/:userId',
     { schema: { ...GetUserByIdSchema, hide: true } },
     controller.getUserById.bind(controller)
+  );
+
+  // GET /platform/credit-transactions - Get all credit transactions (admin only)
+  app.get(
+    '/platform/credit-transactions',
+    { schema: { ...GetCreditTransactionsSchema, hide: true } },
+    controller.getCreditTransactions.bind(controller)
   );
 }

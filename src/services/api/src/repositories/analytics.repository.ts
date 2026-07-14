@@ -345,6 +345,133 @@ export class AnalyticsRepository {
   }
 
   /**
+   * Get credit transactions across all accounts with comprehensive filtering
+   * Used by admin dashboard to track payment transactions for support purposes
+   */
+  async getCreditTransactions(options: {
+    page: number;
+    limit: number;
+    accountId?: string;
+    type?: string[];
+    channel?: string[];
+    dateFrom?: Date;
+    dateTo?: Date;
+    minAmount?: number;
+    maxAmount?: number;
+    search?: string;
+    sortBy: string;
+    sortOrder: 'asc' | 'desc';
+  }) {
+    try {
+      const skip = (options.page - 1) * options.limit;
+      const where = this.buildCreditTransactionWhereClause(options);
+      const orderBy: any = {};
+      orderBy[options.sortBy] = options.sortOrder;
+
+      const [transactions, total] = await prismaRead.$transaction([
+        prismaRead.creditTransaction.findMany({
+          where,
+          include: {
+            account: {
+              select: {
+                id: true,
+                type: true,
+                owner: {
+                  select: {
+                    id: true,
+                    email: true,
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+                organization: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy,
+          skip,
+          take: options.limit,
+        }),
+        prismaRead.creditTransaction.count({ where }),
+      ]);
+
+      // Aggregation separate to avoid Prisma transaction typing issues
+      const typeAgg = await prismaRead.creditTransaction.groupBy({
+        by: ['type'],
+        where,
+        _count: true,
+        _sum: { amount: true },
+      });
+
+      return { transactions, total, typeAgg };
+    } catch (error) {
+      logger.error({ error }, 'Failed to fetch credit transactions');
+      throw error;
+    }
+  }
+
+  private buildCreditTransactionWhereClause(options: {
+    accountId?: string;
+    type?: string[];
+    channel?: string[];
+    dateFrom?: Date;
+    dateTo?: Date;
+    minAmount?: number;
+    maxAmount?: number;
+    search?: string;
+  }): any {
+    const where: any = {};
+
+    if (options.accountId) {
+      where.account_id = options.accountId;
+    }
+
+    if (options.type?.length) {
+      where.type = { in: options.type };
+    }
+
+    if (options.channel?.length) {
+      where.channel = { in: options.channel };
+    }
+
+    if (options.dateFrom || options.dateTo) {
+      where.created_at = this.buildDateRange(options.dateFrom, options.dateTo);
+    }
+
+    if (options.minAmount !== undefined || options.maxAmount !== undefined) {
+      where.amount = this.buildAmountRange(options.minAmount, options.maxAmount);
+    }
+
+    if (options.search) {
+      where.OR = [
+        { payment_ref: { contains: options.search, mode: 'insensitive' } },
+        { account: { owner: { email: { contains: options.search, mode: 'insensitive' } } } },
+      ];
+    }
+
+    return where;
+  }
+
+  private buildDateRange(dateFrom?: Date, dateTo?: Date): any {
+    const range: any = {};
+    if (dateFrom) range.gte = dateFrom;
+    if (dateTo) range.lte = dateTo;
+    return range;
+  }
+
+  private buildAmountRange(minAmount?: number, maxAmount?: number): any {
+    const range: any = {};
+    if (minAmount !== undefined) range.gte = minAmount;
+    if (maxAmount !== undefined) range.lte = maxAmount;
+    return range;
+  }
+
+  /**
    * Aggregate dates into daily counts
    */
   private aggregateByDate(dates: Date[]): Array<{ date: string; count: number }> {

@@ -4,7 +4,7 @@ import { ApiResponseHelper } from '../utils';
 import { getErrorMessage } from '../utils/errorHandler';
 
 export class PlatformController {
-  private analyticsService: AnalyticsService;
+  private readonly analyticsService: AnalyticsService;
 
   constructor() {
     this.analyticsService = new AnalyticsService();
@@ -68,6 +68,52 @@ export class PlatformController {
       }
 
       return ApiResponseHelper.success(reply, 'User retrieved successfully', data);
+    } catch (err: unknown) {
+      return ApiResponseHelper.badRequest(reply, getErrorMessage(err));
+    }
+  }
+
+  async getCreditTransactions(req: FastifyRequest, reply: FastifyReply) {
+    try {
+      const query = req.query as {
+        page?: string;
+        limit?: string;
+        accountId?: string;
+        type?: string;
+        channel?: string;
+        dateFrom?: string;
+        dateTo?: string;
+        minAmount?: string;
+        maxAmount?: string;
+        search?: string;
+        sortBy?: string;
+        sortOrder?: string;
+      };
+
+      const page = query.page ? Math.max(1, Number.parseInt(query.page, 10)) : 1;
+      const limit = query.limit ? Math.min(100, Math.max(1, Number.parseInt(query.limit, 10))) : 50;
+
+      const result = await this.analyticsService.getCreditTransactions({
+        page,
+        limit,
+        accountId: query.accountId,
+        type: query.type,
+        channel: query.channel,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
+        minAmount: query.minAmount ? Number.parseFloat(query.minAmount) : undefined,
+        maxAmount: query.maxAmount ? Number.parseFloat(query.maxAmount) : undefined,
+        search: query.search,
+        sortBy: query.sortBy,
+        sortOrder: query.sortOrder,
+      });
+
+      return ApiResponseHelper.successList(
+        reply,
+        'Credit transactions retrieved successfully',
+        result.data,
+        result.meta
+      );
     } catch (err: unknown) {
       return ApiResponseHelper.badRequest(reply, getErrorMessage(err));
     }
