@@ -83,13 +83,15 @@ export class AccountService {
    * @param accountId Account ID
    * @param planId Plan ID (e.g., "plan_starter_123")
    * @param billingCycle Billing cycle (monthly | annual)
-   * @param paymentMethodId Stripe payment method ID (required for paid plans)
+   * @param paymentMethodId Stripe payment method ID or PesaPal pcode (required for paid plans)
+   * @param provider Payment provider ('stripe', 'pesapal', or auto-detected)
    */
   async createSubscriptionByPlanId(
     accountId: string,
     planId: string,
     billingCycle?: 'monthly' | 'annual',
-    paymentMethodId?: string
+    paymentMethodId?: string,
+    provider?: string
   ): Promise<any> {
     try {
       // Verify plan exists and get plan details
@@ -104,12 +106,21 @@ export class AccountService {
       // All paid plans (non-FREE) get a 14-day trial period
       const isTrialEligible = plan.name.toUpperCase() !== 'FREE';
 
+      // Auto-detect provider if not specified
+      let detectedProvider = provider;
+      if (!detectedProvider && paymentMethodId) {
+        // PesaPal payment codes start with 'order_' or similar patterns
+        detectedProvider =
+          paymentMethodId.includes('order_') || paymentMethodId.startsWith('ps_') ? 'pesapal' : 'stripe';
+      }
+
       return this.createSubscriptionWithPlan(
         accountId,
         planId,
         billingCycle || 'monthly',
         isTrialEligible,
-        paymentMethodId
+        paymentMethodId,
+        detectedProvider
       );
     } catch (error) {
       throw new Error(`Failed to create subscription: ${error instanceof Error ? error.message : String(error)}`);
@@ -122,14 +133,16 @@ export class AccountService {
    * @param planId Plan ID
    * @param billingCycle Billing cycle
    * @param withTrial Whether to start with a 14-day trial period
-   * @param paymentMethodId Stripe payment method ID
+   * @param paymentMethodId Stripe payment method ID or PesaPal pcode
+   * @param provider Payment provider ('stripe', 'pesapal', 'manual', etc.)
    */
   private async createSubscriptionWithPlan(
     accountId: string,
     planId: string,
     billingCycle: string,
     withTrial: boolean = false,
-    paymentMethodId?: string
+    paymentMethodId?: string,
+    provider?: string
   ): Promise<any> {
     const now = new Date();
     const TRIAL_DAYS = 14;
@@ -148,8 +161,8 @@ export class AccountService {
       periodEnd.setMonth(periodEnd.getMonth() + (billingCycle === 'annual' || billingCycle === 'yearly' ? 12 : 1));
     }
 
-    // Determine provider based on payment method
-    const provider = paymentMethodId ? 'stripe' : 'manual';
+    // Determine provider based on payment method or explicit provider parameter
+    const subscriptionProvider = provider || (paymentMethodId ? 'stripe' : 'manual');
 
     const subscription = await prismaWrite.subscription.create({
       data: {
@@ -159,7 +172,7 @@ export class AccountService {
         billing_cycle: billingCycle,
         current_period_start: now,
         current_period_end: periodEnd,
-        provider,
+        provider: subscriptionProvider,
         payment_method_id: paymentMethodId,
         trial_ends_at: trialEndsAt,
         trial_reminder_sent: false,
