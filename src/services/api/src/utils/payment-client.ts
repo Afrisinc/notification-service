@@ -153,6 +153,16 @@ export interface CardPaymentResult {
   createdAt: string;
 }
 
+/**
+ * AfriCNC Pay API response wrapper
+ */
+interface AfricncPayResponse<T> {
+  success: boolean;
+  resp_msg: string;
+  resp_code: number;
+  data: T;
+}
+
 // ─── Mobile Money Types ───────────────────────────────────────────────────────
 
 /**
@@ -703,6 +713,9 @@ export class PaymentClient {
   /**
    * Initiate mobile money cashin (collect payment from customer)
    * Used for PAYG top-ups via MTN/Airtel Mobile Money
+   *
+   * Note: AfriCNC Pay returns wrapped response { success, resp_msg, resp_code, data: MobilePaymentResult }
+   * This method unwraps and returns the actual MobilePaymentResult
    */
   async mobileCashin(request: MobileCashinRequest): Promise<MobilePaymentResult> {
     if (!request.orderId?.trim()) {
@@ -717,10 +730,12 @@ export class PaymentClient {
 
     logger.debug({ orderId: request.orderId, amount: request.amount }, '[PaymentClient] Initiating mobile cashin');
 
-    return this.executeWithResilience<MobilePaymentResult>(
-      () => this.client.post<MobilePaymentResult>('/mobile/cashin', request),
+    const wrapped = await this.executeWithResilience<AfricncPayResponse<MobilePaymentResult>>(
+      () => this.client.post<AfricncPayResponse<MobilePaymentResult>>('/mobile/cashin', request),
       'mobile cashin'
     );
+
+    return wrapped.data;
   }
 
   /**
@@ -731,24 +746,30 @@ export class PaymentClient {
       throw new PaymentClientError('paymentId is required', 'INVALID_PARAM', 400, 'paymentId');
     }
 
-    return this.executeWithResilience<MobilePaymentResult>(
-      () => this.client.get<MobilePaymentResult>(`/mobile/${paymentId}`),
+    const wrapped = await this.executeWithResilience<AfricncPayResponse<MobilePaymentResult>>(
+      () => this.client.get<AfricncPayResponse<MobilePaymentResult>>(`/mobile/${paymentId}`),
       `get mobile payment: ${paymentId}`
     );
+
+    return wrapped.data;
   }
 
   /**
    * Get mobile payment by Paypack reference
+   *
+   * Used for fallback polling when webhook delivery is delayed
    */
   async getMobilePaymentByRef(ref: string): Promise<MobilePaymentResult> {
     if (!ref?.trim()) {
       throw new PaymentClientError('ref is required', 'INVALID_PARAM', 400, 'ref');
     }
 
-    return this.executeWithResilience<MobilePaymentResult>(
-      () => this.client.get<MobilePaymentResult>(`/mobile/ref/${ref}`),
+    const wrapped = await this.executeWithResilience<AfricncPayResponse<MobilePaymentResult>>(
+      () => this.client.get<AfricncPayResponse<MobilePaymentResult>>(`/mobile/ref/${ref}`),
       `get mobile payment by ref: ${ref}`
     );
+
+    return wrapped.data;
   }
 
   /**
@@ -766,6 +787,9 @@ export class PaymentClient {
   /**
    * Initiate card payment via ITEC PesaPal
    * Used for subscription payments and plan upgrades
+   *
+   * Note: AfriCNC Pay returns wrapped response { success, resp_msg, resp_code, data: CardPaymentResult }
+   * This method unwraps and returns the actual CardPaymentResult
    */
   async initiateCardPayment(request: CardPaymentRequest): Promise<CardPaymentResult> {
     if (!request.orderId?.trim()) {
@@ -780,10 +804,13 @@ export class PaymentClient {
 
     logger.debug({ orderId: request.orderId, amount: request.amount }, '[PaymentClient] Initiating card payment');
 
-    return this.executeWithResilience<CardPaymentResult>(
-      () => this.client.post<CardPaymentResult>('/card/pay', request),
+    const wrapped = await this.executeWithResilience<AfricncPayResponse<CardPaymentResult>>(
+      () => this.client.post<AfricncPayResponse<CardPaymentResult>>('/card/pay', request),
       'initiate card payment'
     );
+
+    // Unwrap the response and return actual payment result
+    return wrapped.data;
   }
 
   /**
@@ -794,24 +821,30 @@ export class PaymentClient {
       throw new PaymentClientError('paymentId is required', 'INVALID_PARAM', 400, 'paymentId');
     }
 
-    return this.executeWithResilience<CardPaymentResult>(
-      () => this.client.get<CardPaymentResult>(`/card/${paymentId}`),
+    const wrapped = await this.executeWithResilience<AfricncPayResponse<CardPaymentResult>>(
+      () => this.client.get<AfricncPayResponse<CardPaymentResult>>(`/card/${paymentId}`),
       `get card payment: ${paymentId}`
     );
+
+    return wrapped.data;
   }
 
   /**
    * Get card payment by PCODE
+   *
+   * Used for fallback polling when webhook delivery is delayed
    */
   async getCardPaymentByPcode(pcode: string): Promise<CardPaymentResult> {
     if (!pcode?.trim()) {
       throw new PaymentClientError('pcode is required', 'INVALID_PARAM', 400, 'pcode');
     }
 
-    return this.executeWithResilience<CardPaymentResult>(
-      () => this.client.get<CardPaymentResult>(`/card/code/${pcode}`),
+    const wrapped = await this.executeWithResilience<AfricncPayResponse<CardPaymentResult>>(
+      () => this.client.get<AfricncPayResponse<CardPaymentResult>>(`/card/code/${pcode}`),
       `get card payment by pcode: ${pcode}`
     );
+
+    return wrapped.data;
   }
 
   /**
