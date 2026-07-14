@@ -4,6 +4,7 @@ import { prismaRead, prismaWrite } from '@shared/database';
 import { PaygRepository } from '../repositories/payg.repository';
 import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { getPaymentClient, isPaymentClientInitialized, MobilePaymentResult } from '../utils/payment-client';
+import { convertUsdToRwf } from '../utils/exchange-rate';
 import type {
   PaygRates,
   TopUpTier,
@@ -113,8 +114,8 @@ export class PaygService {
   }
 
   /**
-   * Initialise a Stripe payment intent for a PAYG top-up.
-   * Returns the client secret so the UI can confirm payment via Stripe.js.
+   * Initialise a card payment for a PAYG top-up via ITEC PesaPal.
+   * Converts USD amount to RWF before sending to payment provider.
    * Balance is NOT credited here — that happens in creditFromPayment()
    * after afrisinc-pay fires the internal payment-event webhook.
    */
@@ -132,23 +133,28 @@ export class PaygService {
     }
 
     const orderId = `topup_${accountId}_${Date.now()}`;
-    const amountCents = Math.round(amount * 100);
+
+    // Convert USD to RWF for PesaPal
+    const amountRwf = await convertUsdToRwf(amount);
+    const amountCents = Math.round(amountRwf * 100);
 
     const cardPayment = await getPaymentClient().initiateCardPayment({
       orderId,
       amount: amountCents,
       email: customerEmail,
-      description: `Top-up: $${amount}`,
+      currency: 'RWF', // PesaPal charges in RWF for Rwanda
+      description: `Top-up: $${amount} USD (≈${amountRwf} RWF)`,
       metadata: {
         accountId,
         paymentType: 'payg_topup',
-        topUpAmount: amount.toString(),
+        topUpAmountUSD: amount.toString(),
+        topUpAmountRWF: amountRwf.toString(),
       },
     });
 
     logger.info(
-      { accountId, amount, orderId, pcode: cardPayment.pcode },
-      'PAYG top-up card payment initiated (ITEC PesaPal)'
+      { accountId, amountUSD: amount, amountRWF: amountRwf, orderId, pcode: cardPayment.pcode },
+      'PAYG top-up card payment initiated (ITEC PesaPal) — converted USD to RWF'
     );
 
     return {

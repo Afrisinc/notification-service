@@ -178,6 +178,49 @@ export const CheckBalanceSchema = {
   },
 };
 
+// ─── Card Payment Schemas ─────────────────────────────────────────────────────
+
+export const TopUpInitSchema = {
+  description: 'Initiate card payment for PAYG top-up (PesaPal/ITEC). Amount in USD is converted to RWF internally.',
+  tags: ['PAYG', 'Card Payment'],
+  security: [{ bearerAuth: [] }],
+  body: {
+    type: 'object',
+    required: ['amount', 'customerEmail'],
+    properties: {
+      amount: {
+        type: 'number',
+        minimum: 5,
+        description: 'USD amount to top up (min $5). Automatically converted to RWF (~1450:1 rate).',
+      },
+      customerEmail: {
+        type: 'string',
+        format: 'email',
+        description: 'Customer email for PesaPal receipt and confirmation',
+      },
+    },
+  },
+  response: {
+    201: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+        data: {
+          type: 'object',
+          properties: {
+            checkoutUrl: { type: 'string', description: 'Redirect to PesaPal checkout' },
+            pcode: { type: 'string', description: 'Payment code for fallback polling if webhook fails' },
+            orderId: { type: 'string', description: 'Order ID (topup_accountId_timestamp)' },
+            amountUSD: { type: 'number', description: 'Original USD amount' },
+          },
+        },
+      },
+    },
+  },
+};
+
 // ─── Mobile Money Schemas ─────────────────────────────────────────────────────
 
 const mobilePaymentItem = {

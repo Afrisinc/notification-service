@@ -131,6 +131,7 @@ export interface CardPaymentRequest {
   orderId: string;
   amount: number;
   email: string;
+  currency?: string; // 'USD' or 'RWF' (default: 'USD')
   customerName?: string;
   description?: string;
   metadata?: Record<string, unknown>;
@@ -172,6 +173,7 @@ export interface MobileCashinRequest {
   orderId: string;
   amount: number;
   phoneNumber: string;
+  currency?: string; // 'RWF' for Rwanda (default: 'RWF')
   customerName?: string;
   description?: string;
   metadata?: Record<string, unknown>;
@@ -716,6 +718,8 @@ export class PaymentClient {
    *
    * Note: AfriCNC Pay returns wrapped response { success, resp_msg, resp_code, data: MobilePaymentResult }
    * This method unwraps and returns the actual MobilePaymentResult
+   *
+   * Currency: Mobile money in Rwanda is in RWF (defaults to 'RWF')
    */
   async mobileCashin(request: MobileCashinRequest): Promise<MobilePaymentResult> {
     if (!request.orderId?.trim()) {
@@ -728,10 +732,19 @@ export class PaymentClient {
       throw new PaymentClientError('phoneNumber is required', 'INVALID_PARAM', 400, 'phoneNumber');
     }
 
-    logger.debug({ orderId: request.orderId, amount: request.amount }, '[PaymentClient] Initiating mobile cashin');
+    logger.debug(
+      { orderId: request.orderId, amount: request.amount, currency: request.currency ?? 'RWF' },
+      '[PaymentClient] Initiating mobile cashin'
+    );
+
+    // Prepare payload with currency (defaults to RWF for mobile money)
+    const payload = {
+      ...request,
+      currency: request.currency ?? 'RWF',
+    };
 
     const wrapped = await this.executeWithResilience<AfricncPayResponse<MobilePaymentResult>>(
-      () => this.client.post<AfricncPayResponse<MobilePaymentResult>>('/mobile/cashin', request),
+      () => this.client.post<AfricncPayResponse<MobilePaymentResult>>('/mobile/cashin', payload),
       'mobile cashin'
     );
 
@@ -790,6 +803,9 @@ export class PaymentClient {
    *
    * Note: AfriCNC Pay returns wrapped response { success, resp_msg, resp_code, data: CardPaymentResult }
    * This method unwraps and returns the actual CardPaymentResult
+   *
+   * Currency: Pass 'USD' or 'RWF'. If not specified, defaults to 'USD'.
+   * The amount should be in the specified currency's minor units (cents).
    */
   async initiateCardPayment(request: CardPaymentRequest): Promise<CardPaymentResult> {
     if (!request.orderId?.trim()) {
@@ -802,10 +818,19 @@ export class PaymentClient {
       throw new PaymentClientError('email is required', 'INVALID_PARAM', 400, 'email');
     }
 
-    logger.debug({ orderId: request.orderId, amount: request.amount }, '[PaymentClient] Initiating card payment');
+    logger.debug(
+      { orderId: request.orderId, amount: request.amount, currency: request.currency ?? 'USD' },
+      '[PaymentClient] Initiating card payment'
+    );
+
+    // Prepare payload with currency (defaults to USD if not specified)
+    const payload = {
+      ...request,
+      currency: request.currency ?? 'USD',
+    };
 
     const wrapped = await this.executeWithResilience<AfricncPayResponse<CardPaymentResult>>(
-      () => this.client.post<AfricncPayResponse<CardPaymentResult>>('/card/pay', request),
+      () => this.client.post<AfricncPayResponse<CardPaymentResult>>('/card/pay', payload),
       'initiate card payment'
     );
 

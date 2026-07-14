@@ -8,6 +8,7 @@ import {
   GetTransactionsSchema,
   GetRatesSchema,
   CheckBalanceSchema,
+  TopUpInitSchema,
   MobileTopUpInitSchema,
   GetMobilePaymentSchema,
   GetMobilePaymentByRefSchema,
@@ -35,11 +36,11 @@ export async function registerPaygRoutes(fastify: FastifyInstance) {
 
   /**
    * POST /api/payg/topup/init
-   * Protected — create Stripe payment intent, returns clientSecret for Stripe.js
+   * Protected — initiate card payment for PAYG top-up (PesaPal/ITEC)
    */
   fastify.post(
     '/payg/topup/init',
-    { onRequest: [validateBaseToken], schema: { hide: false } },
+    { onRequest: [validateBaseToken], schema: TopUpInitSchema },
     asyncWrapper(paygController.initTopUp.bind(paygController))
   );
 

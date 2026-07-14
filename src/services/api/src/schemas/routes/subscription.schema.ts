@@ -158,3 +158,95 @@ export const ResumeSubscriptionSchema = {
     },
   },
 };
+
+// ─── Card Payment Schemas ─────────────────────────────────────────────────────
+
+const cardPaymentItem = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    ref: { type: 'string', description: 'Payment reference from ITEC PesaPal' },
+    pcode: { type: 'string', description: 'Payment code for fallback polling' },
+    checkoutUrl: { type: 'string', description: 'Redirect URL to PesaPal checkout' },
+    orderId: { type: 'string' },
+    amount: { type: 'number', description: 'Amount in RWF cents' },
+    currency: { type: 'string', description: 'Currency (RWF)' },
+    email: { type: 'string' },
+    status: { type: 'string', description: 'Payment status (PENDING, SUCCESSFUL, FAILED)' },
+    provider: { type: 'string', description: 'Payment provider (itec)' },
+    validUntil: { type: 'string', description: 'Checkout URL expiration timestamp' },
+    createdAt: { type: 'string' },
+  },
+};
+
+export const InitSubscriptionPaymentSchema = {
+  description:
+    'Initiate card payment for subscription upgrade (PesaPal/ITEC). Amounts in USD are converted to RWF internally.',
+  tags: ['Subscriptions', 'Card Payment'],
+  security: [{ bearerAuth: [] }],
+  body: {
+    type: 'object',
+    required: ['planId', 'billingCycle', 'customerEmail'],
+    properties: {
+      planId: {
+        type: 'string',
+        description: 'UUID of the subscription plan to upgrade to',
+      },
+      billingCycle: {
+        type: 'string',
+        enum: ['monthly', 'yearly'],
+        description: 'Billing cycle: monthly or yearly',
+      },
+      customerEmail: {
+        type: 'string',
+        format: 'email',
+        description: 'Customer email for PesaPal receipt and confirmation',
+      },
+    },
+  },
+  response: {
+    201: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+        data: {
+          type: 'object',
+          properties: {
+            checkoutUrl: { type: 'string', description: 'Redirect to PesaPal checkout' },
+            pcode: { type: 'string', description: 'Payment code for fallback polling if webhook fails' },
+            orderId: { type: 'string', description: 'Order ID (sub_accountId_planId_billingCycle_timestamp)' },
+            amountUSD: { type: 'number', description: 'Plan price in USD' },
+            planName: { type: 'string', description: 'Name of the subscription plan' },
+            validUntil: { type: 'string', description: 'Checkout URL expiration timestamp' },
+          },
+        },
+      },
+    },
+  },
+};
+
+export const CheckCardPaymentStatusSchema = {
+  description: 'Check card payment status by PCODE (fallback polling when webhook delivery is delayed)',
+  tags: ['Subscriptions', 'Card Payment'],
+  security: [{ bearerAuth: [] }],
+  params: {
+    type: 'object',
+    required: ['pcode'],
+    properties: {
+      pcode: { type: 'string', description: 'Payment code from card payment init response' },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+        data: cardPaymentItem,
+      },
+    },
+  },
+};

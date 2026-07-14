@@ -9,6 +9,8 @@ import {
   CancelSubscriptionSchema,
   PauseSubscriptionSchema,
   ResumeSubscriptionSchema,
+  InitSubscriptionPaymentSchema,
+  CheckCardPaymentStatusSchema,
 } from '../schemas/routes/subscription.schema';
 
 /**
@@ -65,21 +67,19 @@ export async function registerSubscriptionRoutes(fastify: FastifyInstance) {
    */
   fastify.post(
     '/subscriptions/payment/init',
-    { onRequest: [validateBaseToken] },
+    { onRequest: [validateBaseToken], schema: InitSubscriptionPaymentSchema },
     asyncWrapper(subscriptionController.initSubscriptionPayment.bind(subscriptionController))
   );
 
   /**
-   * GET /api/subscriptions/payment/status/:ref
+   * GET /api/subscriptions/payment/status/:pcode
    * Check payment status by reference (PCODE for card, ref for mobile)
    * Auto-detects payment type and polls status directly from afrisinc-pay
    * Fallback endpoint if webhook delivery is delayed or fails
-   *
-   * Returns: { paymentType, ref, orderId, status, amount, provider, createdAt, ... }
    */
   fastify.get(
     '/subscriptions/payment/status/:pcode',
-    { onRequest: [validateBaseToken] },
+    { onRequest: [validateBaseToken], schema: CheckCardPaymentStatusSchema },
     asyncWrapper(subscriptionController.checkCardPaymentStatus.bind(subscriptionController))
   );
 

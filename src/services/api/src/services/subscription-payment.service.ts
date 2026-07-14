@@ -1,6 +1,7 @@
 import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { getPaymentClient } from '../utils/payment-client';
 import { logger } from '../config/logger';
+import { convertUsdToRwf } from '../utils/exchange-rate';
 
 export interface SubscriptionPaymentInitResult {
   checkoutUrl: string;
@@ -19,6 +20,7 @@ export class SubscriptionPaymentService {
    *  - monthly  → price_monthly (USD)
    *  - yearly   → price_yearly (monthly-equivalent) × 12 (USD)
    *
+   * Converts USD amount to RWF before sending to payment provider.
    * Returns checkout URL for customer to complete payment.
    * After payment is confirmed, afrisinc-pay fires webhook → activates plan.
    */
@@ -45,22 +47,29 @@ export class SubscriptionPaymentService {
 
     const orderId = `sub_${accountId}_${planId}_${billingCycle}_${Date.now()}`;
 
+    // Convert USD to RWF for PesaPal
+    const amountRwf = await convertUsdToRwf(amountUSD);
+    const amountCents = Math.round(amountRwf * 100);
+
     const cardPayment = await getPaymentClient().initiateCardPayment({
       orderId,
-      amount: Math.round(amountUSD * 100), // Convert to cents for africnc-pay
+      amount: amountCents,
       email: customerEmail,
-      description: `Subscription upgrade to ${plan.name} (${billingCycle})`,
+      currency: 'RWF', // PesaPal charges in RWF for Rwanda
+      description: `Subscription upgrade to ${plan.name} (${billingCycle}): $${amountUSD} USD (≈${amountRwf} RWF)`,
       metadata: {
         accountId,
         paymentType: 'subscription',
         planId,
         billingCycle,
+        amountUSD: amountUSD.toString(),
+        amountRWF: amountRwf.toString(),
       },
     });
 
     logger.info(
-      { accountId, planId, billingCycle, amountUSD, orderId, pcode: cardPayment.pcode },
-      'Subscription card payment initiated (ITEC PesaPal)'
+      { accountId, planId, billingCycle, amountUSD, amountRWF: amountRwf, orderId, pcode: cardPayment.pcode },
+      'Subscription card payment initiated (ITEC PesaPal) — converted USD to RWF'
     );
 
     return {

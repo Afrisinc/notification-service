@@ -1,6 +1,7 @@
 import { prismaRead } from '@shared/database';
 import { getPaymentClient } from '../utils/payment-client';
 import { logger } from '../config/logger';
+import { convertUsdToRwf } from '../utils/exchange-rate';
 
 export interface MarketplacePaymentInitResult {
   checkoutUrl: string;
@@ -14,6 +15,7 @@ export class MarketplacePaymentService {
   /**
    * Initiate card payment for template purchase via ITEC PesaPal (africnc-pay).
    *
+   * Converts USD amount to RWF before sending to payment provider.
    * Returns checkout URL for customer to complete payment.
    * After payment is confirmed, africnc-pay fires webhook → installs the template to the app.
    *
@@ -49,22 +51,29 @@ export class MarketplacePaymentService {
 
     const orderId = `tpl_${accountId}_${templateId}_${Date.now()}`;
 
+    // Convert USD to RWF for PesaPal
+    const priceRwf = await convertUsdToRwf(priceUSD);
+    const amountCents = Math.round(priceRwf * 100);
+
     const cardPayment = await getPaymentClient().initiateCardPayment({
       orderId,
-      amount: Math.round(priceUSD * 100), // Convert to cents for africnc-pay
+      amount: amountCents,
       email: customerEmail,
-      description: `Template purchase: ${template.code}`,
+      currency: 'RWF', // PesaPal charges in RWF for Rwanda
+      description: `Template purchase: ${template.code} ($${priceUSD} USD ≈ ${priceRwf} RWF)`,
       metadata: {
         accountId,
         paymentType: 'template_purchase',
         templateId,
         appId,
+        amountUSD: priceUSD.toString(),
+        amountRWF: priceRwf.toString(),
       },
     });
 
     logger.info(
-      { accountId, templateId, appId, amountUSD: priceUSD, orderId, pcode: cardPayment.pcode },
-      'Template card payment initiated (ITEC PesaPal)'
+      { accountId, templateId, appId, amountUSD: priceUSD, amountRWF: priceRwf, orderId, pcode: cardPayment.pcode },
+      'Template card payment initiated (ITEC PesaPal) — converted USD to RWF'
     );
 
     return {
