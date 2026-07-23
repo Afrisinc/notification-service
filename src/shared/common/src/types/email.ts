@@ -1,8 +1,15 @@
+export interface EmailAttachment {
+  filename: string;
+  url?: string;
+  content?: string;
+  contentType: string;
+}
+
 export interface EmailNotification {
   id: string;
   tenantId: string;
   recipientId: string;
-  appId?: string; // Optional app ID for custom email config lookup
+  appId?: string;
   to: string;
   subject: string;
   body: string;
@@ -10,6 +17,7 @@ export interface EmailNotification {
   priority?: 'low' | 'normal' | 'high';
   metadata?: Record<string, unknown>;
   createdAt: Date;
+  attachments?: EmailAttachment[];
 }
 
 export interface EmailProvider {

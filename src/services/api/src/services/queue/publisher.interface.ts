@@ -6,6 +6,13 @@
  * allowing for multiple implementations (RabbitMQ, Redis, AWS SQS, etc.)
  */
 
+export interface QueueMessageAttachment {
+  filename: string;
+  url?: string;
+  content?: string;
+  contentType: string;
+}
+
 export interface QueueMessage {
   notificationId: string;
   tenantId: string; // Account ID (for backwards compatibility, called tenantId in message)
@@ -23,6 +30,8 @@ export interface QueueMessage {
   // Email sender information (resolved at publish time)
   fromEmail?: string;
   fromName?: string;
+  // Email attachments (URL or Base64)
+  attachments?: QueueMessageAttachment[];
 }
 
 export interface IQueuePublisher {

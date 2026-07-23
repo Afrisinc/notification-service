@@ -1,10 +1,69 @@
 import pino from 'pino';
 import { prismaRead, prismaWrite } from '@shared/database';
 import { getConfig } from '@shared/config';
+import { EmailAttachment } from '@shared/common';
 import { EmailProviderFactory } from './providers/strategy';
+
+interface QueueAttachment {
+  filename: string;
+  url?: string;
+  content?: string;
+  contentType: string;
+}
 
 export class EmailProcessor {
   constructor(private logger: pino.Logger) {}
+
+  private async resolveAttachments(attachments?: QueueAttachment[]): Promise<EmailAttachment[] | undefined> {
+    if (!attachments || attachments.length === 0) {
+      return undefined;
+    }
+
+    const resolved: EmailAttachment[] = [];
+
+    for (const attachment of attachments) {
+      try {
+        if (attachment.content) {
+          // Base64 content - use directly
+          resolved.push({
+            filename: attachment.filename,
+            content: attachment.content,
+            contentType: attachment.contentType,
+          });
+        } else if (attachment.url) {
+          // URL - fetch the file
+          const response = await fetch(attachment.url, {
+            method: 'GET',
+            headers: { 'User-Agent': 'NotificationService/1.0' },
+          });
+
+          if (!response.ok) {
+            this.logger.warn(
+              { url: attachment.url, status: response.status, filename: attachment.filename },
+              'Failed to fetch attachment from URL'
+            );
+            continue;
+          }
+
+          const buffer = await response.arrayBuffer();
+          const base64Content = Buffer.from(buffer).toString('base64');
+
+          resolved.push({
+            filename: attachment.filename,
+            content: base64Content,
+            contentType: attachment.contentType || response.headers.get('content-type') || 'application/octet-stream',
+          });
+        }
+      } catch (error) {
+        this.logger.warn(
+          { filename: attachment.filename, error: error instanceof Error ? error.message : String(error) },
+          'Failed to resolve attachment'
+        );
+      }
+    }
+
+    return resolved.length > 0 ? resolved : undefined;
+  }
 
   async process(email: any): Promise<void> {
     try {
@@ -67,12 +126,16 @@ export class EmailProcessor {
         }
       }
 
+      // Resolve attachments (fetch URLs or use Base64)
+      const resolvedAttachments = await this.resolveAttachments(email.attachments);
+
       const emailData = {
         ...email,
         id: emailId,
         to: emailTo,
         subject,
         body,
+        attachments: resolvedAttachments,
       };
 
       this.logger.debug(

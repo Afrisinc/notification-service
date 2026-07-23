@@ -18,7 +18,7 @@
     "--- BUILD ---": "",
     "build": "tsc --build",
     "build:watch": "tsc --build --watch",
-    "clean": "rimraf dist",
+    "clean": "rimraf node_modules dist",
     "--- DEVELOPMENT ---": "",
     "dev": "tsx watch src/services/api/src/server.ts",
     "dev:api": "tsx watch src/services/api/src/server.ts",
@@ -41,7 +41,8 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write src",
     "format:check": "prettier --check src",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "validate": "pnpm format && pnpm lint && pnpm type-check && pnpm build"
   },
   "dependencies": {
     "@fastify/cors": "^8.4.2",

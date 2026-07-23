@@ -60,13 +60,24 @@ export class SendGridProvider implements EmailProvider {
         fromName = 'Afrisinc';
       }
 
-      const msg = {
+      const msg: any = {
         to: email.to,
         from: fromName ? `${fromName} <${fromEmail}>` : fromEmail,
         subject: email.subject,
         text: email.body,
         html: email.html || email.body,
       };
+
+      // Add attachments if present
+      if (email.attachments && email.attachments.length > 0) {
+        msg.attachments = email.attachments.map((att) => ({
+          filename: att.filename,
+          content: att.content,
+          type: att.contentType,
+          disposition: 'attachment',
+        }));
+        this.logger.debug({ count: email.attachments.length }, 'Adding attachments to SendGrid email');
+      }
 
       this.logger.debug({ to: email.to, from: msg.from, appId: email.appId }, 'Sending email via SendGrid');
 

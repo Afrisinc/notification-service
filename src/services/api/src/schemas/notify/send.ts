@@ -15,6 +15,33 @@
  * Example templateId: 'ee62bf5a-f672-444c-93a0-8d1620e69731'
  */
 
+const attachmentSchema = {
+  type: 'object',
+  description: 'File attachment for email notifications',
+  required: ['filename'],
+  properties: {
+    filename: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 255,
+      description: 'Name of the file (e.g., invoice.pdf)',
+    },
+    url: {
+      type: 'string',
+      format: 'uri',
+      description: 'URL to fetch the file from (HTTPS required)',
+    },
+    content: {
+      type: 'string',
+      description: 'Base64 encoded file content',
+    },
+    contentType: {
+      type: 'string',
+      description: 'MIME type (e.g., application/pdf). Auto-detected if not provided',
+    },
+  },
+};
+
 export const sendNotificationRequestBody = {
   type: 'object',
   description:
@@ -52,6 +79,12 @@ export const sendNotificationRequestBody = {
       enum: ['LOW', 'NORMAL', 'HIGH', 'URGENT'],
       default: 'NORMAL',
       description: 'Notification priority level',
+    },
+    attachments: {
+      type: 'array',
+      maxItems: 10,
+      description: 'File attachments for EMAIL channel (max 10 files, 10MB total)',
+      items: attachmentSchema,
     },
   },
 };

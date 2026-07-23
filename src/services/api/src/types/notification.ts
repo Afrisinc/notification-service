@@ -2,13 +2,21 @@ export type Channel = 'EMAIL' | 'SMS' | 'IN_APP' | 'PUSH' | 'WHATSAPP';
 export type NotificationStatus = 'PENDING' | 'QUEUED' | 'SENT' | 'FAILED';
 export type Priority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
 
+export interface EmailAttachment {
+  filename: string;
+  url?: string;
+  content?: string;
+  contentType?: string;
+}
+
 export interface SendNotificationRequest {
   channel: Channel;
   recipient: string;
   templateId?: string;
-  app_id: string; // App/product ID - required for tracking notifications per app
-  payload: Record<string, any>; // If no templateId, must contain 'message' field
+  app_id: string;
+  payload: Record<string, any>;
   priority?: Priority;
+  attachments?: EmailAttachment[];
 }
 
 export interface Notification {

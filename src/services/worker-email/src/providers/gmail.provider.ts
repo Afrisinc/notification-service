@@ -135,13 +135,23 @@ export class GmailProvider implements EmailProvider {
       }
 
       // Prepare mail options
-      const mailOptions = {
+      const mailOptions: any = {
         from: emailProvider.gmail_email || 'noreply@gmail.com',
         to: email.to,
         subject: email.subject,
         text: email.body,
         html: email.html || email.body,
       };
+
+      // Add attachments if present
+      if (email.attachments && email.attachments.length > 0) {
+        mailOptions.attachments = email.attachments.map((att) => ({
+          filename: att.filename,
+          content: Buffer.from(att.content!, 'base64'),
+          contentType: att.contentType,
+        }));
+        this.logger.debug({ count: email.attachments.length }, 'Adding attachments to Gmail email');
+      }
 
       this.logger.debug(
         { to: email.to, from: emailProvider.gmail_email, appId: email.appId },

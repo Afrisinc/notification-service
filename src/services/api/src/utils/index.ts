@@ -4,3 +4,4 @@
  */
 
 export { ApiResponseHelper, ResponseCode } from './api-response';
+export * from './attachment';

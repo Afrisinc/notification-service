@@ -142,6 +142,16 @@ export class MainSMTPProvider implements EmailProvider {
         mailOptions.dkim = dkimConfig;
       }
 
+      // Add attachments if present
+      if (email.attachments && email.attachments.length > 0) {
+        mailOptions.attachments = email.attachments.map((att) => ({
+          filename: att.filename,
+          content: Buffer.from(att.content!, 'base64'),
+          contentType: att.contentType,
+        }));
+        this.logger.debug({ count: email.attachments.length }, 'Adding attachments to SMTP email');
+      }
+
       this.logger.debug(
         { to: email.to, from: fromEmail, appId: email.appId, hasDkim: !!dkimConfig },
         'Sending email via Main SMTP'

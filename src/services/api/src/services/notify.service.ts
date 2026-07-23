@@ -3,6 +3,8 @@ import { prismaWrite, prismaRead } from '@shared/database';
 import { IQueuePublisher, QueuePublisherFactory, QueuePublisherConfig } from './queue';
 import { Template } from '../types/template';
 import { calculateSmsSegments } from '../utils/smsSegments';
+import { validateAttachments, normalizeAttachments } from '../utils/attachment';
+import type { QueueMessageAttachment } from './queue/publisher.interface';
 import {
   Notification,
   SendNotificationRequest,
@@ -31,6 +33,17 @@ export class NotifyService {
     let template: Template | null = null;
     let renderedContent = '';
     let renderedSubject = '';
+
+    // Validate attachments for EMAIL channel
+    if (request.attachments && request.attachments.length > 0) {
+      if (request.channel !== 'EMAIL') {
+        throw new Error('Attachments are only supported for EMAIL channel');
+      }
+      const validation = validateAttachments(request.attachments);
+      if (!validation.valid) {
+        throw new Error(validation.error);
+      }
+    }
 
     // TEMPLATE MODE: if templateId provided
     if (request.templateId) {
@@ -143,11 +156,15 @@ export class NotifyService {
       // Continue without custom config - will use platform default in worker
     }
 
+    const normalizedAttachments = request.attachments
+      ? (normalizeAttachments(request.attachments) as QueueMessageAttachment[])
+      : undefined;
+
     // Publish to queue with rendered content
     await queuePublisher.publish({
       notificationId: notification.id,
-      tenantId: accountId, // Using tenantId field for backwards compatibility, contains account ID
-      appId: appId, // Include app ID for reference
+      tenantId: accountId,
+      appId: appId,
       channel: request.channel,
       recipient: request.recipient,
       templateId: request.templateId,
@@ -158,6 +175,7 @@ export class NotifyService {
       timestamp: new Date(),
       fromEmail: fromEmail,
       fromName: fromName,
+      attachments: normalizedAttachments,
     });
 
     // Update status to QUEUED
