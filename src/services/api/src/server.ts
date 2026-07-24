@@ -3,6 +3,10 @@ import { verifyDbConnections } from '@shared/database';
 import { createFastifyApp } from './app';
 import { logger } from './config/logger';
 import { initializeNotifyService, getQueuePublisher } from './services/notify.service';
+import {
+  startNotificationIntakeConsumer,
+  stopNotificationIntakeConsumer,
+} from './consumers/notification-intake.consumer';
 import { initAssetsClient } from './utils/assets-client';
 import { initializeJobs, stopAllJobs } from './jobs';
 
@@ -29,6 +33,12 @@ async function startServer() {
     logger.info('===================================================');
 
     await initializeNotifyService();
+
+    if (config.QUEUE_PROVIDER === 'rabbitmq') {
+      logger.info('[QUEUE] Starting notification intake consumer...');
+      await startNotificationIntakeConsumer();
+      logger.info('[OK] Notification intake consumer started');
+    }
 
     logger.info('===================================================');
     logger.info('[ASSETS] Initializing Assets Client...');
@@ -63,6 +73,14 @@ async function startServer() {
 
       // Stop all scheduled jobs
       stopAllJobs();
+
+      // Stop the notification intake consumer
+      try {
+        await stopNotificationIntakeConsumer();
+        logger.info('Notification intake consumer stopped');
+      } catch (error) {
+        logger.error(error, 'Error stopping notification intake consumer');
+      }
 
       // Disconnect queue publisher if available
       try {

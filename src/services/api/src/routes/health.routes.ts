@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
-import { checkDBHealth, checkRabbitHealth } from '@shared/utils';
+import { checkDBHealth } from '@shared/utils';
 import { livenessSchema, readinessSchema } from '../schemas/routes/health.schema';
-import { RabbitMQExchange } from '../utils/rabbitmq';
+import { resolveRabbitHealth } from '../utils/rabbit-health';
 
 export async function registerHealthRoutes(fastify: FastifyInstance) {
   fastify.get('/live', { schema: livenessSchema }, async (_req, reply) => {
@@ -9,17 +9,15 @@ export async function registerHealthRoutes(fastify: FastifyInstance) {
   });
 
   fastify.get('/ready', { schema: readinessSchema }, async (_req, reply) => {
-    const [dbResult, rabbitResult] = await Promise.all([
-      checkDBHealth(),
-      checkRabbitHealth(RabbitMQExchange.consumerChannel, RabbitMQExchange.publisherChannel),
-    ]);
+    const [dbResult, rabbitResult] = await Promise.all([checkDBHealth(), resolveRabbitHealth()]);
 
     const allUp = dbResult.statusCode === 200 && rabbitResult.statusCode === 200;
 
     reply.code(allUp ? 200 : 503).send({
       status: allUp ? 'healthy' : 'degraded',
-      ...dbResult,
-      ...rabbitResult,
+      statusCode: allUp ? 200 : 503,
+      db: dbResult.db,
+      rabbit: rabbitResult.rabbit,
     });
   });
 }

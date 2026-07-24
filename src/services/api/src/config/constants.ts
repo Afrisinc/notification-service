@@ -1,19 +1,3 @@
-export const RABBITMQ_CONSTANTS = {
-  NOTIFICATIONS: {
-    EXCHANGE_NAME: 'notifications',
-    ROUTING_KEY: 'send_message',
-  },
-};
-
-// Queue Configuration
-export const QUEUE_CONFIG = {
-  EXCHANGE_NAME: 'notifications',
-  QUEUE_NAME: 'notifications.email',
-  ROUTING_KEY: 'send_message',
-  DURABLE: true,
-};
-
-// Notification Channels
 export const NOTIFICATION_CHANNELS = {
   EMAIL: 'EMAIL',
   SMS: 'SMS',

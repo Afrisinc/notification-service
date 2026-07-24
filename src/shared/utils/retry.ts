@@ -1,4 +1,9 @@
+import { randomInt } from 'node:crypto';
 import pino from 'pino';
+
+function jitterUnit(): number {
+  return randomInt(-1_000_000, 1_000_001) / 1_000_000;
+}
 
 export interface RetryConfig {
   maxRetries: number;
@@ -29,7 +34,7 @@ export function calculateBackoffDelay(
 ): number {
   const exponentialDelay = baseDelayMs * Math.pow(backoffMultiplier, attempt - 1);
   const cappedDelay = Math.min(exponentialDelay, maxDelayMs);
-  const jitter = cappedDelay * jitterFactor * (Math.random() * 2 - 1);
+  const jitter = cappedDelay * jitterFactor * jitterUnit();
   return Math.max(0, Math.floor(cappedDelay + jitter));
 }
 
@@ -116,6 +121,10 @@ export interface QueueRetryConfig {
 }
 
 export const queueRetryConfigs = {
+  request: {
+    maxRetries: 3,
+    delays: [1000, 5000, 15000],
+  },
   email: {
     maxRetries: 5,
     delays: [1000, 5000, 15000, 60000, 300000],
@@ -123,6 +132,10 @@ export const queueRetryConfigs = {
   sms: {
     maxRetries: 3,
     delays: [2000, 10000, 60000],
+  },
+  inapp: {
+    maxRetries: 3,
+    delays: [1000, 5000, 15000],
   },
   webhook: {
     maxRetries: 5,
@@ -136,7 +149,7 @@ export function getQueueRetryDelay(config: QueueRetryConfig, attempt: number): n
   }
   const index = Math.min(attempt, config.delays.length - 1);
   const baseDelay = config.delays[index];
-  const jitter = baseDelay * 0.2 * (Math.random() * 2 - 1);
+  const jitter = baseDelay * 0.2 * jitterUnit();
   return Math.floor(baseDelay + jitter);
 }
 

@@ -49,6 +49,7 @@ const EnvSchema = z.object({
 
   // Queue Configuration
   QUEUE_NAME: z.string().default('notifications'),
+  QUEUE_PROVIDER: z.enum(['guest', 'rabbitmq']).default('rabbitmq'),
 
   // RabbitMQ Configuration
   RABBITMQ_URL: z.string().default('amqp://guest:guest@localhost:5672'),

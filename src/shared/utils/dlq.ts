@@ -1,5 +1,6 @@
 import type { Channel } from 'amqplib';
 import pino from 'pino';
+import { RABBIT_CONSTANTS } from '../queue/constants';
 
 export interface DLQConfig {
   mainExchange: string;
@@ -137,32 +138,43 @@ export async function reprocessFromDLQ(
   return { processed, failed };
 }
 
-export const dlqConfigs = {
+const { EXCHANGES, QUEUES, ROUTING_KEYS, MAX_RETRIES } = RABBIT_CONSTANTS;
+
+export const dlqConfigs: Record<'request' | 'email' | 'sms' | 'inapp', DLQConfig> = {
+  request: {
+    mainExchange: EXCHANGES.MAIN,
+    mainQueue: QUEUES.REQUEST.SEND,
+    mainRoutingKey: ROUTING_KEYS.REQUEST.SEND,
+    dlxExchange: EXCHANGES.DLX,
+    dlqQueue: QUEUES.REQUEST.DLQ,
+    dlqRoutingKey: ROUTING_KEYS.REQUEST.DLQ,
+    maxRetries: MAX_RETRIES.REQUEST,
+  },
   email: {
-    mainExchange: 'notifications',
-    mainQueue: 'notifications.email',
-    mainRoutingKey: 'send_message.email',
-    dlxExchange: 'notifications.dlx',
-    dlqQueue: 'notifications.email.dlq',
-    dlqRoutingKey: 'dlq.email',
-    maxRetries: 5,
+    mainExchange: EXCHANGES.MAIN,
+    mainQueue: QUEUES.EMAIL.SEND,
+    mainRoutingKey: ROUTING_KEYS.EMAIL.SEND,
+    dlxExchange: EXCHANGES.DLX,
+    dlqQueue: QUEUES.EMAIL.DLQ,
+    dlqRoutingKey: ROUTING_KEYS.EMAIL.DLQ,
+    maxRetries: MAX_RETRIES.EMAIL,
   },
   sms: {
-    mainExchange: 'notifications',
-    mainQueue: 'notifications.sms',
-    mainRoutingKey: 'send_message.sms',
-    dlxExchange: 'notifications.dlx',
-    dlqQueue: 'notifications.sms.dlq',
-    dlqRoutingKey: 'dlq.sms',
-    maxRetries: 3,
+    mainExchange: EXCHANGES.MAIN,
+    mainQueue: QUEUES.SMS.SEND,
+    mainRoutingKey: ROUTING_KEYS.SMS.SEND,
+    dlxExchange: EXCHANGES.DLX,
+    dlqQueue: QUEUES.SMS.DLQ,
+    dlqRoutingKey: ROUTING_KEYS.SMS.DLQ,
+    maxRetries: MAX_RETRIES.SMS,
   },
   inapp: {
-    mainExchange: 'notifications',
-    mainQueue: 'notifications.inapp',
-    mainRoutingKey: 'send_message.inapp',
-    dlxExchange: 'notifications.dlx',
-    dlqQueue: 'notifications.inapp.dlq',
-    dlqRoutingKey: 'dlq.inapp',
-    maxRetries: 3,
+    mainExchange: EXCHANGES.MAIN,
+    mainQueue: QUEUES.IN_APP.SEND,
+    mainRoutingKey: ROUTING_KEYS.IN_APP.SEND,
+    dlxExchange: EXCHANGES.DLX,
+    dlqQueue: QUEUES.IN_APP.DLQ,
+    dlqRoutingKey: ROUTING_KEYS.IN_APP.DLQ,
+    maxRetries: MAX_RETRIES.IN_APP,
   },
 };

@@ -5,3 +5,4 @@
 
 export { ApiResponseHelper, ResponseCode } from './api-response';
 export * from './attachment';
+export { resolveRabbitHealth, type RabbitHealth } from './rabbit-health';

@@ -9,6 +9,7 @@
  * - aws-sqs: AWS SQS (future implementation)
  */
 
+import { getConfig } from '@shared/config';
 import { logger } from '../../config/logger';
 import { IQueuePublisher } from './publisher.interface';
 import { GuestQueuePublisher } from './publishers/guest.publisher';
@@ -54,7 +55,7 @@ export class QueuePublisherFactory {
    * Get default configuration based on environment
    */
   static getDefaultConfig(): QueuePublisherConfig {
-    const provider = (process.env.QUEUE_PROVIDER as QueueProviderType) || 'guest';
+    const provider = getConfig().QUEUE_PROVIDER as QueueProviderType;
 
     return {
       provider,

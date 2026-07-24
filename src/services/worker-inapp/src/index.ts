@@ -4,14 +4,14 @@ import { verifyDbConnections, closeDbConnections } from '@shared/database';
 import { dlqConfigs } from '@shared/utils/dlq';
 import { queueRetryConfigs } from '@shared/utils/retry';
 import { RabbitConsumer } from '@shared/queue';
-import { SMSProcessor } from './processor';
+import { InAppProcessor } from './processor';
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
   formatters: { level: (label) => ({ level: label }) },
 });
 
-async function startSMSWorker() {
+async function startInAppWorker() {
   const config = getConfig();
 
   const dbConnected = await verifyDbConnections();
@@ -20,22 +20,22 @@ async function startSMSWorker() {
     process.exit(1);
   }
 
-  const processor = new SMSProcessor(logger);
+  const processor = new InAppProcessor(logger);
   const consumer = new RabbitConsumer({
     url: config.RABBITMQ_URL,
-    dlqConfig: dlqConfigs.sms,
-    retryConfig: queueRetryConfigs.sms,
+    dlqConfig: dlqConfigs.inapp,
+    retryConfig: queueRetryConfigs.inapp,
     logger,
   });
 
   await consumer.start((message) => processor.process(message));
-  logger.info('SMS worker is listening for messages');
+  logger.info('In-app worker is listening for messages');
 
   let shuttingDown = false;
   const shutdown = async (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
-    logger.info({ signal }, 'Shutting down SMS worker');
+    logger.info({ signal }, 'Shutting down in-app worker');
     try {
       await consumer.stop();
       await closeDbConnections();
@@ -50,7 +50,7 @@ async function startSMSWorker() {
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-startSMSWorker().catch((error) => {
-  logger.error({ error }, 'Failed to start SMS worker');
+startInAppWorker().catch((error) => {
+  logger.error({ error }, 'Failed to start in-app worker');
   process.exit(1);
 });
