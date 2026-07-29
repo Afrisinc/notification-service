@@ -33,7 +33,7 @@ const TOPUP_TIERS: TopUpTier[] = [
   { minAmount: 0, bonusPercent: 0 },
 ];
 
-const MIN_TOPUP_AMOUNT = 5; // USD
+const MIN_TOPUP_AMOUNT = 0.5; // USD
 
 // ─── Mock payment processor (replace with Stripe/Paystack later) ─────────────
 
