@@ -1,0 +1,70 @@
+/**
+ * Payment API Schemas
+ */
+
+const pendingTransaction = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    accountId: { type: 'string' },
+    type: { type: 'string', enum: ['topup', 'deduction', 'bonus', 'refund', 'subscription'] },
+    status: { type: 'string', enum: ['PENDING', 'COMPLETED', 'FAILED'] },
+    amount: { type: 'number' },
+    balanceAfter: { type: 'number' },
+    description: { type: ['string', 'null'] },
+    paymentRef: { type: ['string', 'null'] },
+    createdAt: { type: 'string' },
+  },
+};
+
+export const InitializePaymentSchema = {
+  description: 'Initialize a PAYG top-up or subscription payment (card or mobile money)',
+  tags: ['Payments'],
+  security: [{ bearerAuth: [] }],
+  body: {
+    type: 'object',
+    required: ['type', 'method'],
+    properties: {
+      type: { type: 'string', enum: ['payg_topup', 'subscription'], description: 'What the payment is for' },
+      method: { type: 'string', enum: ['card', 'mobile'], description: 'Payment method' },
+      amount: { type: 'number', minimum: 0.5, description: 'USD amount (required for payg_topup)' },
+      email: { type: 'string', description: 'Payer email (required for card)' },
+      phoneNumber: { type: 'string', description: 'Payer phone (required for mobile)' },
+      customerName: { type: 'string' },
+      planId: { type: 'string', description: 'Plan ID (required for subscription)' },
+      billingCycle: { type: 'string', enum: ['monthly', 'yearly'], default: 'monthly' },
+    },
+  },
+  response: {
+    201: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+        data: {
+          type: 'object',
+          properties: {
+            transaction: pendingTransaction,
+            orderId: { type: 'string' },
+            amountUSD: { type: 'number' },
+            amountRWF: { type: 'number' },
+            method: { type: 'string', enum: ['card', 'mobile'] },
+            checkoutUrl: { type: 'string' },
+            pcode: { type: 'string' },
+            paymentRef: { type: 'string' },
+            message: { type: 'string' },
+          },
+        },
+      },
+    },
+    400: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+      },
+    },
+  },
+};

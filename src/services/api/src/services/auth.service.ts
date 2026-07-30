@@ -8,7 +8,6 @@ import { prismaWrite, prismaRead } from '@shared/database';
 import { recordLoginFailure } from '../utils/securityRecorder';
 import type { LoginUserRequest, SignupPayload } from '../../../../types/auth';
 import { AccountService } from './account.service';
-import { TrialSubscriptionService } from './trial-subscription.service';
 import { NOTIFICATION_CHANNELS } from '../config/constants';
 import { logger } from '../config/logger';
 import { NotifyService } from './notify.service';
@@ -40,12 +39,6 @@ export class AuthService {
 
     if (!plan) {
       throw new Error(`Plan not found: ${data.planId}`);
-    }
-
-    // Paid plans (non-FREE) require payment method
-    const isPaidPlan = plan.name.toUpperCase() !== 'FREE';
-    if (isPaidPlan && !data.paymentMethodId) {
-      throw new Error('Payment method is required for paid plans');
     }
 
     const hashed = await hashPassword(data.password);
@@ -126,40 +119,15 @@ export class AuthService {
       throw new Error('Invalid account_type');
     });
 
-    // Create subscription with selected plan
+    // Create the subscription record for the selected plan. Paid plans are
+    // charged separately via POST /api/payments/initialize.
     if (result.account) {
-      const isPaidPlanForSub = plan.name.toUpperCase() !== 'FREE';
-
-      if (isPaidPlanForSub && data.paymentMethodId && data.customerId) {
-        // Link the pre-created Stripe customer to the new account
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (prismaWrite.account as any).update({
-          where: { id: result.account.id },
-          data: { stripe_customer_id: data.customerId },
-        });
-
-        // Activate Stripe trial subscription — Stripe owns auto-charge lifecycle
-        await TrialSubscriptionService.activateSubscription(
-          result.account.id,
-          data.planId,
-          data.billingCycle ?? 'monthly',
-          data.paymentMethodId,
-          data.customerId
-        );
-
-        logger.info(
-          { accountId: result.account.id, planId: data.planId, customerId: data.customerId },
-          'Trial subscription activated at registration'
-        );
-      } else {
-        // Free plan — create subscription record without Stripe
-        await accountService.createSubscriptionByPlanId(
-          result.account.id,
-          data.planId,
-          data.billingCycle,
-          data.paymentMethodId
-        );
-      }
+      await accountService.createSubscriptionByPlanId(
+        result.account.id,
+        data.planId,
+        data.billingCycle,
+        data.paymentMethodId
+      );
     }
 
     // Publish email verification message to notify service

@@ -5,7 +5,6 @@ import { NotifyService } from './notify.service';
 import { env } from '../config/env';
 import { accountRepository } from '../repositories/account.repository';
 import { AccountService } from './account.service';
-import { TrialSubscriptionService } from './trial-subscription.service';
 
 const logger = pino();
 const accountService = new AccountService();
@@ -38,12 +37,6 @@ export class OrganizationService {
 
       if (!plan) {
         throw new Error(`Plan not found: ${data.planId}`);
-      }
-
-      // Paid plans require payment method
-      const isPaidPlan = plan.name.toUpperCase() !== 'FREE';
-      if (isPaidPlan && !data.paymentMethodId) {
-        throw new Error('Payment method is required for paid plans');
       }
 
       // Create organization
@@ -81,30 +74,9 @@ export class OrganizationService {
         },
       });
 
-      // Create subscription with selected plan
-      if (isPaidPlan && data.paymentMethodId && data.customerId) {
-        // Store Stripe customer on account
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (prismaWrite.account as any).update({
-          where: { id: account.id },
-          data: { stripe_customer_id: data.customerId },
-        });
-        // Activate trial subscription — Stripe owns auto-charge lifecycle
-        await TrialSubscriptionService.activateSubscription(
-          account.id,
-          data.planId,
-          data.billingCycle ?? 'monthly',
-          data.paymentMethodId,
-          data.customerId
-        );
-      } else {
-        await accountService.createSubscriptionByPlanId(
-          account.id,
-          data.planId,
-          data.billingCycle,
-          data.paymentMethodId
-        );
-      }
+      // Create the subscription record for the selected plan. Paid plans are
+      // charged separately via POST /api/payments/initialize.
+      await accountService.createSubscriptionByPlanId(account.id, data.planId, data.billingCycle, data.paymentMethodId);
 
       logger.info(
         { orgId: org.id, accountId: account.id, planId: data.planId },

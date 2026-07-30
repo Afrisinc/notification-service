@@ -24,6 +24,7 @@ import { registerSubscriptionRoutes } from './subscription.routes';
 import { registerPlanManagementRoutes } from './plan-management.routes';
 import { registerAppEmailProviderRoutes } from './app-email-provider.routes';
 import { registerPaygRoutes } from './payg.routes';
+import { registerPaymentRoutes } from './payment.routes';
 import { clientsRoutes } from './clients.routes';
 import { registerSMSWebhookRoutes } from './sms-webhook.routes';
 
@@ -94,6 +95,10 @@ export async function v1Routes(fastify: FastifyInstance) {
   });
 
   await fastify.register(registerPaygRoutes, {
+    prefix: '/api',
+  });
+
+  await fastify.register(registerPaymentRoutes, {
     prefix: '/api',
   });
 

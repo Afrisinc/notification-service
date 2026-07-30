@@ -74,10 +74,11 @@ function mapBalance(b: {
   };
 }
 
-function mapTransaction(t: {
+export function mapTransaction(t: {
   id: string;
   account_id: string;
   type: string;
+  status: string;
   amount: number;
   balance_after: number;
   description: string | null;
@@ -91,6 +92,7 @@ function mapTransaction(t: {
     id: t.id,
     accountId: t.account_id,
     type: t.type as CreditTransactionDto['type'],
+    status: t.status as CreditTransactionDto['status'],
     amount: t.amount,
     balanceAfter: t.balance_after,
     description: t.description,

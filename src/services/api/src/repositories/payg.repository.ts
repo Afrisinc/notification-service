@@ -1,6 +1,5 @@
 import { prismaRead, prismaWrite } from '@shared/database';
-import { logger } from '../config/logger';
-import type { CreditTransactionType, PaygChannel } from '../types/payg.types';
+import type { CreditTransactionStatus, CreditTransactionType, PaygChannel } from '../types/payg.types';
 
 export class PaygRepository {
   // ─── Balance ────────────────────────────────────────────────────────────────
@@ -33,6 +32,7 @@ export class PaygRepository {
     accountId: string;
     creditBalanceId: string;
     type: CreditTransactionType;
+    status?: CreditTransactionStatus;
     amount: number;
     balanceAfter: number;
     description?: string;
@@ -46,6 +46,7 @@ export class PaygRepository {
         account_id: data.accountId,
         credit_balance_id: data.creditBalanceId,
         type: data.type,
+        status: data.status ?? 'COMPLETED',
         amount: data.amount,
         balance_after: data.balanceAfter,
         description: data.description ?? null,
@@ -54,6 +55,40 @@ export class PaygRepository {
         payment_ref: data.paymentRef ?? null,
         bonus_percent: data.bonusPercent ?? null,
       },
+    });
+  }
+
+  /**
+   * Create a PENDING transaction at payment-initialization time. The balance is
+   * not moved until the payment webhook settles it via markTransactionStatus().
+   */
+  static async createPendingTransaction(data: {
+    accountId: string;
+    creditBalanceId: string;
+    type: CreditTransactionType;
+    amount: number;
+    currentBalance: number;
+    description: string;
+    paymentRef: string;
+  }) {
+    return prismaWrite.creditTransaction.create({
+      data: {
+        account_id: data.accountId,
+        credit_balance_id: data.creditBalanceId,
+        type: data.type,
+        status: 'PENDING',
+        amount: data.amount,
+        balance_after: data.currentBalance,
+        description: data.description,
+        payment_ref: data.paymentRef,
+      },
+    });
+  }
+
+  static async markTransactionStatus(paymentRef: string, status: CreditTransactionStatus) {
+    return prismaWrite.creditTransaction.updateMany({
+      where: { payment_ref: paymentRef, status: 'PENDING' },
+      data: { status },
     });
   }
 
@@ -103,6 +138,7 @@ export class PaygRepository {
           account_id: accountId,
           credit_balance_id: balanceId,
           type: 'topup',
+          status: 'COMPLETED',
           amount: topUpAmount,
           balance_after: currentBalance + topUpAmount,
           description: `Credit top-up — $${topUpAmount.toFixed(2)}`,
@@ -119,6 +155,7 @@ export class PaygRepository {
             account_id: accountId,
             credit_balance_id: balanceId,
             type: 'bonus',
+            status: 'COMPLETED',
             amount: bonusAmount,
             balance_after: newBalance,
             description: `Top-up bonus — ${bonusPercent}% on $${topUpAmount.toFixed(2)}`,
@@ -155,6 +192,7 @@ export class PaygRepository {
           account_id: accountId,
           credit_balance_id: balanceId,
           type: 'deduction',
+          status: 'COMPLETED',
           amount: -amount,
           balance_after: newBalance,
           description,

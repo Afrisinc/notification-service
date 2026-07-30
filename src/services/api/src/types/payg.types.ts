@@ -2,7 +2,9 @@
  * PAYG (Pay-as-you-go) domain types
  */
 
-export type CreditTransactionType = 'topup' | 'deduction' | 'bonus' | 'refund';
+export type CreditTransactionType = 'topup' | 'deduction' | 'bonus' | 'refund' | 'subscription';
+
+export type CreditTransactionStatus = 'PENDING' | 'COMPLETED' | 'FAILED';
 
 export type PaygChannel = 'EMAIL' | 'SMS' | 'PUSH' | 'IN_APP';
 
@@ -32,6 +34,7 @@ export interface CreditTransactionDto {
   id: string;
   accountId: string;
   type: CreditTransactionType;
+  status: CreditTransactionStatus;
   amount: number;
   balanceAfter: number;
   description: string | null;
@@ -53,6 +56,32 @@ export interface TopUpResult {
   newBalance: number;
   bonusPercent: number;
   bonusAmount: number;
+}
+
+export type PaymentType = 'payg_topup' | 'subscription';
+export type PaymentMethod = 'card' | 'mobile';
+
+export interface InitializePaymentRequest {
+  type: PaymentType;
+  method: PaymentMethod;
+  amount?: number; // USD — required for payg_topup; derived from the plan for subscription
+  email?: string; // required for card
+  phoneNumber?: string; // required for mobile
+  customerName?: string;
+  planId?: string; // required for subscription
+  billingCycle?: 'monthly' | 'yearly';
+}
+
+export interface InitializePaymentResult {
+  transaction: CreditTransactionDto;
+  orderId: string;
+  amountUSD: number;
+  amountRWF: number;
+  method: PaymentMethod;
+  checkoutUrl?: string; // card
+  pcode?: string; // card
+  paymentRef?: string; // mobile
+  message: string;
 }
 
 export interface DeductCreditsRequest {

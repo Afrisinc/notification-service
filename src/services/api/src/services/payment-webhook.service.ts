@@ -1,8 +1,10 @@
 import { prismaWrite } from '@shared/database';
 import { logger } from '../config/logger';
 import { PaygService } from './payg.service';
+import { PaygRepository } from '../repositories/payg.repository';
 import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { SubscriptionNotificationService } from './subscription-notification.service';
+import type { CreditTransactionStatus } from '../types/payg.types';
 
 /**
  * Webhook event data from afrisinc-pay
@@ -78,6 +80,25 @@ export class PaymentWebhookService {
    * @param payload Webhook event payload
    * @returns Processing result
    */
+  /**
+   * Settle the PENDING credit transaction created at payment initialization.
+   * Keyed by orderId (payment_ref); a no-op for legacy payments without one.
+   */
+  private static async settlePendingTransaction(
+    orderId: string | undefined,
+    status: CreditTransactionStatus
+  ): Promise<void> {
+    if (!orderId) return;
+    try {
+      const result = await PaygRepository.markTransactionStatus(orderId, status);
+      if (result.count > 0) {
+        logger.info({ orderId, status, count: result.count }, 'Pending credit transaction settled');
+      }
+    } catch (error) {
+      logger.error({ error, orderId, status }, 'Failed to settle pending credit transaction');
+    }
+  }
+
   static async processEvent(payload: WebhookEventPayload): Promise<WebhookProcessResult> {
     const { event, data } = payload;
 
@@ -340,6 +361,8 @@ export class PaymentWebhookService {
    * Activates subscription plan after card payment confirmation
    */
   private static async handleCardPaymentSucceeded(data: PaymentEventData): Promise<WebhookProcessResult> {
+    await this.settlePendingTransaction(data.orderId, 'COMPLETED');
+
     const accountId = data.metadata?.['accountId'] as string | undefined;
 
     if (!accountId) {
@@ -402,6 +425,8 @@ export class PaymentWebhookService {
    * Handle card.payment_failed event
    */
   private static async handleCardPaymentFailed(data: PaymentEventData): Promise<WebhookProcessResult> {
+    await this.settlePendingTransaction(data.orderId, 'FAILED');
+
     const accountId = data.metadata?.['accountId'] as string | undefined;
 
     if (accountId) {
@@ -420,6 +445,8 @@ export class PaymentWebhookService {
    * Process one-off payment.succeeded events
    */
   private static async processPaymentSucceeded(data: PaymentEventData): Promise<WebhookProcessResult> {
+    await this.settlePendingTransaction(data.orderId, 'COMPLETED');
+
     const accountId = data.metadata?.['accountId'] as string | undefined;
 
     if (!accountId) {
@@ -548,6 +575,8 @@ export class PaymentWebhookService {
    * Routes to appropriate handler based on payment type (PAYG or subscription)
    */
   private static async handleMobilePaymentSucceeded(data: MobilePaymentEventData): Promise<WebhookProcessResult> {
+    await this.settlePendingTransaction(data.orderId, 'COMPLETED');
+
     const accountId = data.metadata?.['accountId'] as string | undefined;
     const paymentType = data.metadata?.['type'] as string | undefined;
 
@@ -637,6 +666,8 @@ export class PaymentWebhookService {
    * Mobile money payment failed - log and notify if needed
    */
   private static async handleMobilePaymentFailed(data: MobilePaymentEventData): Promise<WebhookProcessResult> {
+    await this.settlePendingTransaction(data.orderId, 'FAILED');
+
     const accountId = data.metadata?.['accountId'] as string | undefined;
 
     logger.warn(
