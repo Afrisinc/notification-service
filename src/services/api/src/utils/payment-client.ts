@@ -717,6 +717,36 @@ export class PaymentClient {
     return wrapped.data;
   }
 
+  async getPaymentStatus(ref: string): Promise<{
+    transaction_id: string;
+    status: 'PENDING' | 'PROCESSING' | 'SUCCESSFUL' | 'FAILED';
+    amount: number;
+  }> {
+    if (!ref?.trim()) {
+      throw new PaymentClientError('ref is required', 'INVALID_PARAM', 400, 'ref');
+    }
+
+    logger.debug({ ref }, '[PaymentClient] Fetching payment status');
+
+    interface PaymentStatusResponse {
+      success: boolean;
+      resp_msg: string;
+      resp_code: number;
+      data: {
+        transaction_id: string;
+        status: 'PENDING' | 'PROCESSING' | 'SUCCESSFUL' | 'FAILED';
+        amount: number;
+      };
+    }
+
+    const response = await this.executeWithResilience<PaymentStatusResponse>(
+      () => this.client.get<PaymentStatusResponse>(`/payments/ref/${ref}/status`),
+      `get payment status for ref: ${ref}`
+    );
+
+    return response.data;
+  }
+
   /**
    * Get mobile money account info (balance, rates)
    */

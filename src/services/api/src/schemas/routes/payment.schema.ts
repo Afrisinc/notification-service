@@ -80,3 +80,66 @@ export const InitializePaymentSchema = {
     },
   },
 };
+
+export const GetPaymentStatusSchema = {
+  description:
+    'Get payment status by reference from Payment Service. Unified endpoint for checking transaction status.',
+  tags: ['Payments'],
+  security: [{ bearerAuth: [] }],
+  params: {
+    type: 'object',
+    required: ['ref'],
+    properties: {
+      ref: {
+        type: 'string',
+        description: 'Payment reference (from payment service)',
+      },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        resp_msg: { type: 'string', example: 'Payment status retrieved successfully' },
+        resp_code: { type: 'number', example: 1000 },
+        data: {
+          type: 'object',
+          properties: {
+            transaction_id: { type: 'string', description: 'UUID of the transaction' },
+            status: {
+              type: 'string',
+              enum: ['PENDING', 'PROCESSING', 'SUCCESSFUL', 'FAILED'],
+              description: 'Current payment status',
+            },
+            amount: { type: 'number', description: 'Payment amount in minor units' },
+          },
+        },
+      },
+    },
+    400: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+      },
+    },
+    404: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+      },
+    },
+    503: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+      },
+    },
+  },
+};
