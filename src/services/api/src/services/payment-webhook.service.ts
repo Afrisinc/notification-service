@@ -1,6 +1,7 @@
 import { prismaWrite } from '@shared/database';
 import { logger } from '../config/logger';
 import { PaygService } from './payg.service';
+import { PaymentTrackingService } from './payment-tracking.service';
 import { PaygRepository } from '../repositories/payg.repository';
 import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { SubscriptionNotificationService } from './subscription-notification.service';
@@ -581,10 +582,19 @@ export class PaymentWebhookService {
    */
   private static async handlePaygTopUp(data: PaymentEventData, accountId: string): Promise<WebhookProcessResult> {
     try {
-      await PaygService.creditFromPayment({
+      const paygResult = await PaygService.creditFromPayment({
         accountId,
         amountCents: data.amount,
         paymentRef: data.paymentId,
+      });
+
+      await PaymentTrackingService.confirmPayment(data.paymentId, {
+        status: 'SUCCESSFUL',
+        transactionId: data.paymentId,
+        creditTransactionId: paygResult.transaction.id,
+        newBalance: Math.round(paygResult.newBalance * 100),
+        bonusAmount: Math.round((paygResult.bonusAmount || 0) * 100),
+        bonusPercent: paygResult.bonusPercent,
       });
 
       logger.info({ accountId, paymentId: data.paymentId, amount: data.amount }, 'PAYG balance credited from payment');
@@ -658,10 +668,20 @@ export class PaymentWebhookService {
     accountId: string
   ): Promise<WebhookProcessResult> {
     try {
-      await PaygService.creditFromMobilePayment({
+      const mobileResult = await PaygService.creditFromMobilePayment({
         accountId,
         amountRwf: data.amount,
         paymentRef: data.ref,
+      });
+
+      await PaymentTrackingService.confirmPayment(data.ref, {
+        status: 'SUCCESSFUL',
+        transactionId: data.paymentId,
+        creditTransactionId: mobileResult.transaction.id,
+        newBalance: Math.round(mobileResult.newBalance * 100),
+        bonusAmount: Math.round((mobileResult.bonusAmount || 0) * 100),
+        bonusPercent: mobileResult.bonusPercent,
+        provider: data.provider,
       });
 
       logger.info(

@@ -162,3 +162,29 @@ enum AlertType {
   HIGH_ERROR_RATE
   USAGE_LIMIT_CRITICAL
 }
+
+// Payment Status
+enum PaymentStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+  EXPIRED
+}
+
+// Payment Type - Category of payment/transaction
+enum PaymentType {
+  payg_topup              // Pay-as-you-go balance top-up
+  subscription            // Subscription plan purchase/upgrade
+  template_purchase       // Template marketplace purchase
+  deduction               // Credit deduction for sending
+  bonus                   // Bonus credits awarded
+  refund                  // Refund or credit reversal
+}
+
+// Transaction Type - For credit ledger transactions
+enum TransactionType {
+  topup                   // Credit top-up
+  deduction               // Credit used for sending
+  bonus                   // Bonus credits
+  refund                  // Refund or reversal
+}

@@ -1,0 +1,58 @@
+model Payment {
+  id              String   @id @default(cuid())
+  accountId       String   @map("account_id")
+  ref             String   @unique
+  orderId         String   @map("order_id")
+
+  // Payment Details
+  method          String?                   // 'card', 'mobile', or null for internal transfers
+  amount          Int                       // In cents
+  currency        Currency @default(USD)
+
+  // Payment Type & Status
+  type            PaymentType
+  transactionType TransactionType?  @map("transaction_type")
+  status          PaymentStatus @default(PENDING)
+
+  // Payment Service Data
+  transactionId   String?  @map("transaction_id")
+  provider        String?                   // 'stripe', 'paypack', 'internal'
+  providerStatus  String?  @map("provider_status")
+
+  // Resource References
+  templateId      String?  @map("template_id")
+  appId           String?  @map("app_id")
+  planId          String?  @map("plan_id")
+  creditTransactionId String? @map("credit_transaction_id")
+  subscriptionId  String?  @map("subscription_id")
+  appTemplateId   String?  @map("app_template_id")
+
+  // Customer Information
+  email           String?
+  phoneNumber     String?  @map("phone_number")
+  customerName    String?  @map("customer_name")
+  recipient       String?                   // For notifications/transfers
+
+  // Bonus & Incentives
+  bonusAmount     Int?     @map("bonus_amount")     // In cents
+  bonusPercent    Int?     @map("bonus_percent")    // Bonus percentage
+  newBalance      Int?     @map("new_balance")      // Balance after transaction in cents
+
+  // Processing Tracking
+  initiatedAt     DateTime? @map("initiated_at")
+  processedAt     DateTime? @map("processed_at")
+  failureReason   String?  @map("failure_reason")
+  description     String?                   // Additional notes
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([accountId])
+  @@index([ref])
+  @@index([orderId])
+  @@index([status])
+  @@index([type])
+  @@index([transactionType])
+  @@index([createdAt])
+  @@map("payments")
+}
