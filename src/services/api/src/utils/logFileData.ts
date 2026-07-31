@@ -1,5 +1,5 @@
-import fs from 'fs/promises';
-import path from 'path';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 const logFileData = async (file: string, data: string) => {
   const currentDate = new Date().toISOString().split('T')[0];

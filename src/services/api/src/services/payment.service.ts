@@ -74,7 +74,7 @@ export class PaymentService {
     };
 
     if (req.method === 'card') {
-      const card = await getPaymentClient().initiateCardPayment({
+      const cardPayload = {
         orderId,
         amount: Math.round(amountRWF * 100),
         email: req.email as string,
@@ -82,7 +82,11 @@ export class PaymentService {
         customerName: req.customerName,
         description,
         metadata: gatewayMetadata,
-      });
+      };
+
+      logger.info({ cardPayload }, '[PaymentService] Card payment payload');
+
+      const card = await getPaymentClient().initiateCardPayment(cardPayload);
 
       logger.info({ accountId, orderId, type: req.type, method: 'card', pcode: card.pcode }, 'Payment initialized');
 
@@ -94,7 +98,7 @@ export class PaymentService {
       };
     }
 
-    const mobile = await getPaymentClient().mobileCashin({
+    const mobilePayload = {
       orderId,
       amount: Math.round(amountRWF),
       phoneNumber: req.phoneNumber as string,
@@ -102,7 +106,11 @@ export class PaymentService {
       customerName: req.customerName,
       description,
       metadata: gatewayMetadata,
-    });
+    };
+
+    logger.info({ mobilePayload }, '[PaymentService] Mobile payment payload');
+
+    const mobile = await getPaymentClient().mobileCashin(mobilePayload);
 
     logger.info({ accountId, orderId, type: req.type, method: 'mobile', ref: mobile.ref }, 'Payment initialized');
 
