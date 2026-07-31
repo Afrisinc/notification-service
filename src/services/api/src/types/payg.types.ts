@@ -64,7 +64,8 @@ export type PaymentMethod = 'card' | 'mobile';
 export interface InitializePaymentRequest {
   type: PaymentType;
   method: PaymentMethod;
-  amount?: number; // USD — required for payg_topup; derived from the plan for subscription
+  amount?: number; // USD or RWF (see currency field)
+  currency?: 'USD' | 'RWF'; // Default: 'USD'
   email?: string; // required for card
   phoneNumber?: string; // required for mobile
   customerName?: string;

@@ -45,8 +45,15 @@ export class PaymentService {
       paymentRef: orderId,
     });
 
-    // The payment gateway charges in RWF for Rwanda.
-    const amountRWF = await convertUsdToRwf(amountUSD);
+    // Convert to RWF if needed (USD → RWF conversion, RWF → use as-is)
+    const currency = req.currency ?? 'USD';
+    let amountRWF: number;
+
+    if (currency === 'RWF') {
+      amountRWF = amountUSD; // Already in RWF
+    } else {
+      amountRWF = await convertUsdToRwf(amountUSD); // Convert USD → RWF
+    }
     // Both keys are set: the card webhook reads `paymentType`, the mobile webhook reads `type`.
     const gatewayMetadata = {
       ...metadata,
@@ -54,6 +61,8 @@ export class PaymentService {
       transactionId: pending.id,
       paymentType: req.type,
       type: req.type,
+      currency,
+      amountUSD,
     };
 
     const base = {
