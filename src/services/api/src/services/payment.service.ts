@@ -33,7 +33,10 @@ export class PaymentService {
     const { amountUSD, description, metadata } = await this.resolveOrder(req);
 
     const balance = await PaygRepository.getOrCreateBalance(accountId);
-    const orderId = `${req.type}_${accountId}_${Date.now()}`;
+
+    // Generate shorter orderId: type_shortAccountId_timestamp
+    const shortAccountId = accountId.substring(0, 12);
+    const orderId = `${req.type}_${shortAccountId}_${Date.now()}`;
 
     const pending = await PaygRepository.createPendingTransaction({
       accountId,
