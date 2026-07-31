@@ -75,7 +75,7 @@ ENV NODE_ENV=production \
 RUN mkdir -p /app && \
     printf '#!/bin/bash\nset -e\n' > /app/entrypoint.sh && \
     printf 'echo "Running database migrations..."\n' >> /app/entrypoint.sh && \
-    printf 'npx prisma migrate deploy\n' >> /app/entrypoint.sh && \
+    printf 'npx prisma@5 migrate deploy\n' >> /app/entrypoint.sh && \
     printf 'echo "Starting service..."\n' >> /app/entrypoint.sh && \
     printf 'exec sh -c "$SERVICE_CMD"\n' >> /app/entrypoint.sh && \
     chmod +x /app/entrypoint.sh && \
