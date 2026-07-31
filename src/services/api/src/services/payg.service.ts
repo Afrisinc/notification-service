@@ -145,7 +145,7 @@ export class PaygService {
       amount: amountCents,
       email: customerEmail,
       currency: 'RWF', // PesaPal charges in RWF for Rwanda
-      description: `Top-up: $${amount} USD (≈${amountRwf} RWF)`,
+      description: `Top-up: USD ${amount} (~RWF ${Math.round(amountRwf)})`,
       metadata: {
         accountId,
         paymentType: 'payg_topup',

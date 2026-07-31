@@ -56,7 +56,7 @@ export class SubscriptionPaymentService {
       amount: amountCents,
       email: customerEmail,
       currency: 'RWF', // PesaPal charges in RWF for Rwanda
-      description: `Subscription upgrade to ${plan.name} (${billingCycle}): $${amountUSD} USD (≈${amountRwf} RWF)`,
+      description: `Subscription upgrade to ${plan.name} (${billingCycle}): USD ${amountUSD} (~RWF ${Math.round(amountRwf)})`,
       metadata: {
         accountId,
         paymentType: 'subscription',

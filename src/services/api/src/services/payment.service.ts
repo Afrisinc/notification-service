@@ -105,10 +105,10 @@ export class PaymentService {
       orderId,
       amount: Math.round(amountRWF),
       phoneNumber: req.phoneNumber as string,
-      currency: 'RWF',
       customerName: req.customerName,
       description,
       metadata: gatewayMetadata,
+      provider: 'itec', // ← Required by payment gateway
     };
 
     logger.info({ mobilePayload }, '[PaymentService] Mobile payment payload');
@@ -181,7 +181,7 @@ export class PaymentService {
     }
     return {
       amountUSD,
-      description: `Template purchase: ${template.code} ($${amountUSD.toFixed(2)} USD)`,
+      description: `Template purchase: ${template.code} (USD ${amountUSD.toFixed(2)})`,
       metadata: { templateId: req.templateId, appId: req.appId, templateCode: template.code },
     };
   }
@@ -192,7 +192,7 @@ export class PaymentService {
     }
     return {
       amountUSD: req.amount,
-      description: `PAYG credit top-up — $${req.amount.toFixed(2)}`,
+      description: `PAYG credit top-up - USD ${req.amount.toFixed(2)}`,
       metadata: { topUpAmountUSD: req.amount.toString() },
     };
   }

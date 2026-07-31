@@ -672,6 +672,7 @@ export class PaymentClient {
     const payload = {
       ...request,
       currency: request.currency ?? 'RWF',
+      provider: 'itec',
     };
 
     const wrapped = await this.executeWithResilience<AfricncPayResponse<MobilePaymentResult>>(

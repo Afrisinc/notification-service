@@ -60,7 +60,7 @@ export class MarketplacePaymentService {
       amount: amountCents,
       email: customerEmail,
       currency: 'RWF', // PesaPal charges in RWF for Rwanda
-      description: `Template purchase: ${template.code} ($${priceUSD} USD ≈ ${priceRwf} RWF)`,
+      description: `Template purchase: ${template.code} (USD ${priceUSD} ~ RWF ${Math.round(priceRwf)})`,
       metadata: {
         accountId,
         paymentType: 'template_purchase',
