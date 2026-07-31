@@ -7,8 +7,8 @@ model CreditTransaction {
   id                  String   @id @default(uuid())
   account_id          String
   credit_balance_id   String
-  type                String   // topup | deduction | bonus | refund | subscription
-  status              String   @default("PENDING") // PENDING | COMPLETED | FAILED
+  type                String                   // topup | deduction | bonus | refund | subscription
+  status              CreditTransactionStatus  @default(PENDING)
   amount              Float    // positive = credit, negative = debit (USD)
   balance_after       Float    // running balance after this transaction
   description         String?

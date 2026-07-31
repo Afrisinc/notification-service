@@ -50,7 +50,6 @@ services:
       context: .
       dockerfile: Dockerfile
     image: afrisinc-notification:latest
-    command: ["node", "-r", "./register-paths.js", "dist/services/api/src/server.js"]
     ports:
       - "8010:8010"
     environment:
@@ -58,6 +57,7 @@ services:
       DATABASE_URL: postgresql://notification:notification@postgres:5432/notification_db
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://notification:notification@rabbitmq:5672
+      SERVICE_CMD: node -r ./register-paths.js dist/services/api/src/server.js
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,10 +66,15 @@ services:
       rabbitmq:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   worker-email:
     image: afrisinc-notification:latest
-    command: ["node", "-r", "./register-paths.js", "dist/services/worker-email/src/index.js"]
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://notification:notification@postgres:5432/notification_db
@@ -77,38 +82,48 @@ services:
       SENDGRID_API_KEY: ${SENDGRID_API_KEY}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
+      SERVICE_CMD: node -r ./register-paths.js dist/services/worker-email/src/index.js
     depends_on:
-      - postgres
-      - rabbitmq
-      - api
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
   worker-sms:
     image: afrisinc-notification:latest
-    command: ["node", "-r", "./register-paths.js", "dist/services/worker-sms/src/index.js"]
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://notification:notification@postgres:5432/notification_db
       REDIS_URL: redis://redis:6379
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      SERVICE_CMD: node -r ./register-paths.js dist/services/worker-sms/src/index.js
     depends_on:
-      - postgres
-      - redis
-      - api
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
   worker-inapp:
     image: afrisinc-notification:latest
-    command: ["node", "-r", "./register-paths.js", "dist/services/worker-inapp/src/index.js"]
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://notification:notification@postgres:5432/notification_db
       REDIS_URL: redis://redis:6379
+      SERVICE_CMD: node -r ./register-paths.js dist/services/worker-inapp/src/index.js
     depends_on:
-      - postgres
-      - redis
-      - api
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

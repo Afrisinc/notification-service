@@ -30,6 +30,13 @@ enum NotificationStatus {
   FAILED
 }
 
+// Credit Transaction Settlement Status
+enum CreditTransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
 // Notification Priority Levels
 enum NotificationPriority {
   LOW

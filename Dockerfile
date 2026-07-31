@@ -61,18 +61,28 @@ COPY --from=builder --chown=nodejs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nodejs:nodejs /app/register-paths.js ./register-paths.js
 COPY --from=builder --chown=nodejs:nodejs /app/src ./src
 
-# Copy schema to default prisma location (required for runtime db:seed/db:push)
+# Copy schema and migrations for Prisma
 RUN mkdir -p /app/prisma && \
     cp /app/src/shared/database/models/schema.prisma /app/prisma/schema.prisma && \
     chown -R nodejs:nodejs /app/prisma
-
-USER nodejs
+COPY --chown=nodejs:nodejs src/shared/database/migrations \
+  /app/prisma/migrations
 
 ENV NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=512"
 
-# Default to API server
-# Override CMD in docker-compose for different services
-CMD ["node", "-r", "./register-paths.js", "dist/services/api/src/server.js"]
+# Startup script: run migrations, then start service
+RUN mkdir -p /app && \
+    printf '#!/bin/bash\nset -e\n' > /app/entrypoint.sh && \
+    printf 'echo "Running database migrations..."\n' >> /app/entrypoint.sh && \
+    printf 'npx prisma migrate deploy\n' >> /app/entrypoint.sh && \
+    printf 'echo "Starting service..."\n' >> /app/entrypoint.sh && \
+    printf 'exec sh -c "$SERVICE_CMD"\n' >> /app/entrypoint.sh && \
+    chmod +x /app/entrypoint.sh && \
+    chown nodejs:nodejs /app/entrypoint.sh
+
+USER nodejs
+
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 EXPOSE 8010

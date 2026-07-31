@@ -18,14 +18,18 @@ const pendingTransaction = {
 };
 
 export const InitializePaymentSchema = {
-  description: 'Initialize a PAYG top-up or subscription payment (card or mobile money)',
+  description: 'Initialize a payment (PAYG top-up, subscription, or template purchase) via card or mobile money',
   tags: ['Payments'],
   security: [{ bearerAuth: [] }],
   body: {
     type: 'object',
     required: ['type', 'method'],
     properties: {
-      type: { type: 'string', enum: ['payg_topup', 'subscription'], description: 'What the payment is for' },
+      type: {
+        type: 'string',
+        enum: ['payg_topup', 'subscription', 'template_purchase'],
+        description: 'What the payment is for',
+      },
       method: { type: 'string', enum: ['card', 'mobile'], description: 'Payment method' },
       amount: { type: 'number', minimum: 0.5, description: 'USD amount (required for payg_topup)' },
       email: { type: 'string', description: 'Payer email (required for card)' },
@@ -33,6 +37,8 @@ export const InitializePaymentSchema = {
       customerName: { type: 'string' },
       planId: { type: 'string', description: 'Plan ID (required for subscription)' },
       billingCycle: { type: 'string', enum: ['monthly', 'yearly'], default: 'monthly' },
+      templateId: { type: 'string', description: 'Template ID (required for template_purchase)' },
+      appId: { type: 'string', description: 'App ID to install template into (required for template_purchase)' },
     },
   },
   response: {

@@ -459,6 +459,7 @@ export class PaymentWebhookService {
     // Route to appropriate handler based on payment type
     switch (paymentType) {
       case 'template':
+      case 'template_purchase':
         return this.handleTemplatePayment(data, accountId);
 
       case 'subscription':

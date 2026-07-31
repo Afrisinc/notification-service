@@ -58,7 +58,7 @@ export interface TopUpResult {
   bonusAmount: number;
 }
 
-export type PaymentType = 'payg_topup' | 'subscription';
+export type PaymentType = 'payg_topup' | 'subscription' | 'template_purchase';
 export type PaymentMethod = 'card' | 'mobile';
 
 export interface InitializePaymentRequest {
@@ -70,6 +70,8 @@ export interface InitializePaymentRequest {
   customerName?: string;
   planId?: string; // required for subscription
   billingCycle?: 'monthly' | 'yearly';
+  templateId?: string; // required for template_purchase
+  appId?: string; // required for template_purchase
 }
 
 export interface InitializePaymentResult {

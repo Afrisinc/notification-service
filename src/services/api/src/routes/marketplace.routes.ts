@@ -6,7 +6,6 @@ import {
   rateTemplate,
   getUserRating,
   getCategories,
-  initTemplatePayment,
 } from '../controllers/marketplace.controller';
 import { validateBaseToken } from '../middlewares/auth.middleware';
 
@@ -153,55 +152,5 @@ export async function registerMarketplaceRoutes(app: FastifyInstance) {
       },
     },
     getCategories
-  );
-
-  // Init payment for a paid template
-  app.post(
-    '/marketplace/templates/:templateId/payment/init',
-    {
-      onRequest: [validateBaseToken],
-      schema: {
-        tags: ['Marketplace', 'Card Payment'],
-        summary: 'Init template purchase payment',
-        description:
-          'Initiate card payment for a paid marketplace template (PesaPal/ITEC). Amount in USD is converted to RWF internally.',
-        params: {
-          type: 'object',
-          properties: {
-            templateId: { type: 'string', description: 'Marketplace template ID' },
-          },
-          required: ['templateId'],
-        },
-        body: {
-          type: 'object',
-          properties: {
-            appId: { type: 'string', description: 'App ID to install template into after payment' },
-            customerEmail: { type: 'string', format: 'email', description: 'Customer email for PesaPal receipt' },
-          },
-          required: ['appId', 'customerEmail'],
-        },
-        response: {
-          201: {
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              resp_msg: { type: 'string' },
-              resp_code: { type: 'number' },
-              data: {
-                type: 'object',
-                properties: {
-                  checkoutUrl: { type: 'string', description: 'Redirect to PesaPal checkout' },
-                  pcode: { type: 'string', description: 'Payment code for fallback polling' },
-                  orderId: { type: 'string' },
-                  amountUSD: { type: 'number', description: 'Template price in USD' },
-                  templateName: { type: 'string', description: 'Template code/name' },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-    initTemplatePayment
   );
 }

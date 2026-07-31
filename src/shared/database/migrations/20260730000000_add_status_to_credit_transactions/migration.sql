@@ -1,5 +1,8 @@
+-- CreateEnum
+CREATE TYPE "CreditTransactionStatus" AS ENUM ('PENDING', 'COMPLETED', 'FAILED');
+
 -- AlterTable
-ALTER TABLE "credit_transactions" ADD COLUMN "status" TEXT NOT NULL DEFAULT 'PENDING';
+ALTER TABLE "credit_transactions" ADD COLUMN "status" "CreditTransactionStatus" NOT NULL DEFAULT 'PENDING';
 
 -- CreateIndex
 CREATE INDEX "credit_transactions_status_idx" ON "credit_transactions"("status");
