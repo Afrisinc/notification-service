@@ -194,12 +194,6 @@ export const paymentController = {
     }
   },
 
-<<<<<<< HEAD
-  /**
-   * Admin endpoint: Initiate payment on behalf of account
-   * Only admins can use this endpoint
-   * Request body includes targetAccountId to specify which account to pay for
-   */
   async adminInitializePayment(req: FastifyRequest, reply: FastifyReply) {
     try {
       const adminId = req.headers['x-account-id'] as string;
@@ -272,7 +266,9 @@ export const paymentController = {
       const msg = getErrorMessage(err);
       const status = msg.includes('required') || msg.includes('Minimum') || msg.includes('not found') ? 400 : 500;
       return ApiResponseHelper.error(reply, msg, 4000, status);
-=======
+    }
+  },
+
   async confirmPaymentStatus(req: FastifyRequest, reply: FastifyReply) {
     try {
       const accountId = req.headers['x-account-id'] as string;
@@ -427,7 +423,6 @@ export const paymentController = {
       }
 
       return ApiResponseHelper.error(reply, msg, 5000, 500);
->>>>>>> 2a921e9 (fix payments model)
     }
   },
 };
