@@ -16,7 +16,7 @@ model Payment {
 
   // Payment Service Data
   transactionId   String?  @map("transaction_id")
-  provider        String?                   // 'stripe', 'paypack', 'internal'
+  provider        String?  @default("internal")   // 'stripe', 'paypack', 'internal'
   providerStatus  String?  @map("provider_status")
 
   // Resource References
