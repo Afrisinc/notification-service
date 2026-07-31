@@ -124,6 +124,10 @@ export class PaymentWebhookService {
       return this.processPaymentSucceeded(data as unknown as PaymentEventData);
     }
 
+    if (event === 'payment.failed') {
+      return this.processPaymentFailed(data as unknown as PaymentEventData);
+    }
+
     // Unknown event - acknowledge but skip processing
     logger.debug({ event }, 'Skipping unhandled webhook event');
     return { success: true, skipped: true };
@@ -469,6 +473,49 @@ export class PaymentWebhookService {
         // Default to PAYG top-up
         return this.handlePaygTopUp(data, accountId);
     }
+  }
+
+  /**
+   * Process one-off payment.failed events
+   */
+  private static async processPaymentFailed(data: PaymentEventData): Promise<WebhookProcessResult> {
+    await this.settlePendingTransaction(data.orderId, 'FAILED');
+
+    const accountId = data.metadata?.['accountId'] as string | undefined;
+
+    if (!accountId) {
+      logger.warn({ paymentId: data.paymentId }, 'payment.failed missing accountId in metadata');
+      return { success: true };
+    }
+
+    const paymentType = data.metadata?.['paymentType'] as string | undefined;
+
+    logger.warn({ accountId, paymentId: data.paymentId, paymentType, amount: data.amount }, 'One-off payment failed');
+
+    // Route based on payment type for specific handling
+    switch (paymentType) {
+      case 'template':
+      case 'template_purchase':
+        logger.warn(
+          { accountId, templateId: data.metadata?.['templateId'], appId: data.metadata?.['appId'] },
+          'Template purchase payment failed'
+        );
+        break;
+
+      case 'subscription':
+        logger.warn({ accountId, planId: data.metadata?.['planId'] }, 'Subscription payment failed');
+        break;
+
+      default:
+        logger.warn({ accountId }, 'PAYG top-up payment failed');
+    }
+
+    // Send payment failed notification (fire-and-forget)
+    SubscriptionNotificationService.sendPaymentFailed(accountId).catch((err) =>
+      logger.error({ err, accountId }, 'Failed to send payment failed notification')
+    );
+
+    return { success: true };
   }
 
   /**
