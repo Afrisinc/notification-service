@@ -80,6 +80,7 @@ export class PlatformController {
         limit?: string;
         accountId?: string;
         type?: string;
+        status?: string;
         channel?: string;
         dateFrom?: string;
         dateTo?: string;
@@ -98,6 +99,7 @@ export class PlatformController {
         limit,
         accountId: query.accountId,
         type: query.type,
+        status: query.status,
         channel: query.channel,
         dateFrom: query.dateFrom,
         dateTo: query.dateTo,

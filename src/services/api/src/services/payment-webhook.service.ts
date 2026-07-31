@@ -594,6 +594,9 @@ export class PaymentWebhookService {
       case 'subscription':
         return this.handleMobileSubscriptionPayment(data, accountId);
 
+      case 'template_purchase':
+        return this.handleMobileTemplatePurchase(data, accountId);
+
       default:
         logger.debug({ ref: data.ref, paymentType }, 'Skipping unhandled mobile payment type');
         return { success: true, skipped: true };
@@ -659,6 +662,38 @@ export class PaymentWebhookService {
     } catch (error) {
       logger.error({ error, accountId, planId, ref: data.ref }, 'Failed to activate subscription from mobile payment');
       return { success: false, error: 'Failed to activate subscription' };
+    }
+  }
+
+  /**
+   * Handle mobile template purchase payment
+   * Installs template after successful mobile money payment
+   */
+  private static async handleMobileTemplatePurchase(
+    data: MobilePaymentEventData,
+    accountId: string
+  ): Promise<WebhookProcessResult> {
+    const templateId = data.metadata?.['templateId'] as string | undefined;
+    const appId = data.metadata?.['appId'] as string | undefined;
+
+    if (!templateId || !appId) {
+      logger.warn({ ref: data.ref, accountId }, 'Mobile template purchase missing templateId or appId');
+      return { success: false, error: 'Missing templateId or appId in metadata' };
+    }
+
+    try {
+      const { marketplaceService } = await import('./marketplace.service');
+      await marketplaceService.installTemplate(templateId, appId, accountId, {});
+
+      logger.info({ accountId, templateId, appId, ref: data.ref }, 'Template installed from mobile money payment');
+
+      return { success: true };
+    } catch (error) {
+      logger.error(
+        { error, accountId, templateId, appId, ref: data.ref },
+        'Failed to install template from mobile money payment'
+      );
+      return { success: false, error: 'Failed to install template' };
     }
   }
 

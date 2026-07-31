@@ -353,6 +353,7 @@ export class AnalyticsRepository {
     limit: number;
     accountId?: string;
     type?: string[];
+    status?: string[];
     channel?: string[];
     dateFrom?: Date;
     dateTo?: Date;
@@ -418,6 +419,7 @@ export class AnalyticsRepository {
   private buildCreditTransactionWhereClause(options: {
     accountId?: string;
     type?: string[];
+    status?: string[];
     channel?: string[];
     dateFrom?: Date;
     dateTo?: Date;
@@ -433,6 +435,10 @@ export class AnalyticsRepository {
 
     if (options.type?.length) {
       where.type = { in: options.type };
+    }
+
+    if (options.status?.length) {
+      where.status = { in: options.status };
     }
 
     if (options.channel?.length) {

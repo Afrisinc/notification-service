@@ -9,11 +9,6 @@ const logger = pino();
 const getErrorMessage = (err: unknown): string => (err instanceof Error ? err.message : 'Unknown error');
 
 export const paymentController = {
-  /**
-   * POST /api/payments/initialize
-   * Initialize a PAYG top-up or subscription payment (card or mobile money).
-   * Records a PENDING credit transaction and returns the checkout/approval details.
-   */
   async initialize(req: FastifyRequest, reply: FastifyReply) {
     try {
       const accountId = req.headers['x-account-id'] as string;

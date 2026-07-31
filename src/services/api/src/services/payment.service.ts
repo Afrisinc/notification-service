@@ -15,11 +15,6 @@ interface OrderDetails {
   metadata: Record<string, string>;
 }
 
-/**
- * Single entry point that initializes a payment for either a PAYG top-up or a
- * subscription, via card or mobile money. A PENDING credit transaction is
- * recorded up front; the payment webhook settles it to COMPLETED/FAILED.
- */
 export class PaymentService {
   static async initializePayment(accountId: string, req: InitializePaymentRequest): Promise<InitializePaymentResult> {
     if (!isPaymentClientInitialized()) {

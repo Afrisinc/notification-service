@@ -38,6 +38,7 @@ export class AnalyticsService {
     limit: number;
     accountId?: string;
     type?: string;
+    status?: string;
     channel?: string;
     dateFrom?: string;
     dateTo?: string;
@@ -52,6 +53,7 @@ export class AnalyticsService {
       limit: options.limit,
       accountId: options.accountId,
       type: options.type?.split(',').filter(Boolean),
+      status: options.status?.split(',').filter(Boolean),
       channel: options.channel?.split(',').filter(Boolean),
       dateFrom: options.dateFrom ? new Date(options.dateFrom) : undefined,
       dateTo: options.dateTo ? new Date(options.dateTo) : undefined,
@@ -80,10 +82,10 @@ export class AnalyticsService {
       notificationId: tx.notification_id,
       paymentRef: tx.payment_ref,
       bonusPercent: tx.bonus_percent,
-      // IMPORTANT: Only shown if webhook confirmed (credit already applied)
-      paymentStatus: tx.type === 'topup' ? 'WEBHOOK_CONFIRMED' : null,
-      isCompleted: tx.type === 'topup',
-      paymentNote: tx.type === 'topup' ? 'Payment confirmed via webhook from africnc-pay' : null,
+      status: tx.status || 'COMPLETED',
+      isCompleted: tx.status === 'COMPLETED',
+      isPending: tx.status === 'PENDING',
+      isFailed: tx.status === 'FAILED',
       createdAt: tx.created_at.toISOString(),
     }));
 

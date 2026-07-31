@@ -35,7 +35,13 @@ export const GetCreditTransactionsSchema = {
       type: {
         type: 'string',
         description:
-          'Filter by transaction type (comma-separated: topup, deduction, bonus, refund). Example: topup,bonus',
+          'Filter by transaction type (comma-separated: topup, deduction, bonus, refund, subscription). Example: topup,bonus',
+      },
+
+      // Filtering - Payment Status
+      status: {
+        type: 'string',
+        description: 'Filter by payment status (comma-separated: PENDING, COMPLETED, FAILED). Example: PENDING,FAILED',
       },
 
       // Filtering - Channel
