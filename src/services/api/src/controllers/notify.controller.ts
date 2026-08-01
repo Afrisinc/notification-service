@@ -34,12 +34,14 @@ export class NotifyController {
         app_id = body.app_id;
       }
 
+      // Normalize channel to uppercase
+      const channel = body.channel.toUpperCase() as PaygChannel;
+
       // ── PAYG: check balance before sending ────────────────────────────────
       const isPayg = await PlanEnforcementMiddleware.isPaygAccount(accountId);
       logger.debug({ accountId, isPayg, correlationId: request.id }, '[PAYG] Account plan check');
 
       if (isPayg) {
-        const channel = body.channel as PaygChannel;
         const balanceCheck = await PaygService.checkSufficientBalance(accountId, channel, 1);
         logger.debug({ accountId, channel, balanceCheck, correlationId: request.id }, '[PAYG] Pre-send balance check');
         if (!balanceCheck.sufficient) {
@@ -52,7 +54,7 @@ export class NotifyController {
         }
       }
 
-      const notification = await notifyService.sendNotification(accountId, app_id, { ...body, app_id });
+      const notification = await notifyService.sendNotification(accountId, app_id, { ...body, app_id, channel });
 
       logger.info(
         { notificationId: notification.id, appId: app_id, isPayg, correlationId: request.id },
@@ -63,7 +65,7 @@ export class NotifyController {
         // ── PAYG: deduct credits & fire low-balance alert ──────────────────
         const deductResult = await PaygService.deductCredits({
           accountId,
-          channel: body.channel as PaygChannel,
+          channel: channel,
           quantity: 1,
           notificationId: notification.id,
         });
@@ -88,28 +90,49 @@ export class NotifyController {
         PaygService.checkAndAlertLowBalance(accountId).catch(() => {});
       } else {
         // ── Subscription: record usage against monthly quota ───────────────
-        const metric = `${body.channel.toLowerCase()}s_per_month`;
+        const metric = `${channel.toLowerCase()}s_per_month`;
         await UsageTrackingService.recordUsage(accountId, app_id, metric, 1);
       }
 
       ApiResponseHelper.accepted(reply, 'Notification queued for processing', {
         id: notification.id,
         status: notification.status,
-        channel: body.channel,
+        channel: channel,
         created_at: notification.createdAt,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to send notification');
 
-      if (errorMessage.includes('not found')) {
+      // Template-related errors
+      if (errorMessage.includes('Template not found')) {
         return ApiResponseHelper.notFound(reply, errorMessage);
       }
 
+      if (errorMessage.includes('Unauthorized') && errorMessage.includes('Template')) {
+        return ApiResponseHelper.unauthorized(reply, errorMessage);
+      }
+
+      // Validation errors
+      if (errorMessage.includes('Attachments are only supported')) {
+        return ApiResponseHelper.badRequest(reply, errorMessage);
+      }
+
+      if (errorMessage.includes('Either provide templateId or payload.message')) {
+        return ApiResponseHelper.badRequest(reply, errorMessage);
+      }
+
+      // Direct message mode errors
+      if (errorMessage.includes('Direct message mode')) {
+        return ApiResponseHelper.badRequest(reply, errorMessage);
+      }
+
+      // Missing or inactive errors
       if (errorMessage.includes('Missing') || errorMessage.includes('inactive')) {
         return ApiResponseHelper.unauthorized(reply, errorMessage);
       }
 
+      // Generic error
       return ApiResponseHelper.badRequest(reply, errorMessage);
     }
   }
@@ -131,7 +154,7 @@ export class NotifyController {
 
       // Use app_id from first notification (all should have the same app_id for bulk operations)
       const appId = body.notifications[0].app_id;
-      const channel = (body.notifications[0]?.channel ?? 'EMAIL') as PaygChannel;
+      const channel = (body.notifications[0]?.channel ?? 'EMAIL').toUpperCase() as PaygChannel;
 
       // ── PAYG: pre-flight balance check for the full batch ─────────────────
       const isPayg = await PlanEnforcementMiddleware.isPaygAccount(accountId);
@@ -201,6 +224,34 @@ export class NotifyController {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to send bulk notifications');
 
+      // Template-related errors
+      if (errorMessage.includes('Template not found')) {
+        return ApiResponseHelper.notFound(
+          reply,
+          `One or more templates do not exist. Please verify all template IDs and try again. Error: ${errorMessage}`
+        );
+      }
+
+      if (errorMessage.includes('Unauthorized') && errorMessage.includes('Template')) {
+        return ApiResponseHelper.unauthorized(
+          reply,
+          'One or more templates do not belong to your account. You do not have access to these templates.'
+        );
+      }
+
+      // Validation errors
+      if (errorMessage.includes('Either provide templateId or payload.message')) {
+        return ApiResponseHelper.badRequest(
+          reply,
+          'Invalid request: Each notification must provide either a valid templateId OR payload.message for direct message mode'
+        );
+      }
+
+      if (errorMessage.includes('Attachments are only supported')) {
+        return ApiResponseHelper.badRequest(reply, errorMessage);
+      }
+
+      // Missing or inactive errors
       if (errorMessage.includes('Missing') || errorMessage.includes('inactive')) {
         return ApiResponseHelper.unauthorized(reply, errorMessage);
       }
