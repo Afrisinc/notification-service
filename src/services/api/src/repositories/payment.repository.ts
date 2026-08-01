@@ -145,4 +145,13 @@ export class PaymentRepository {
 
     return result._sum.amount || 0;
   }
+
+  static async getAllPendingPayments() {
+    return prismaRead.payment.findMany({
+      where: {
+        status: 'PENDING',
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }

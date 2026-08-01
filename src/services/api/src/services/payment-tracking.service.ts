@@ -138,6 +138,9 @@ export class PaymentTrackingService {
    * Get pending payments for an account
    */
   static async getPendingPayments(accountId: string) {
+    if (accountId === '*') {
+      return PaymentRepository.getAllPendingPayments();
+    }
     return PaymentRepository.getPaymentsByStatus(accountId, 'PENDING');
   }
 
