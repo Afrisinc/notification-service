@@ -51,7 +51,7 @@ export const sendNotificationRequestBody = {
     channel: {
       type: 'string',
       enum: ['EMAIL', 'SMS', 'IN_APP', 'PUSH', 'WHATSAPP'],
-      description: 'Notification channel',
+      description: 'Notification channel (accepts lowercase or uppercase, will be normalized to uppercase)',
     },
     recipient: {
       type: 'string',
@@ -62,17 +62,18 @@ export const sendNotificationRequestBody = {
       type: 'string',
       format: 'uuid',
       description:
-        'Template ID (UUID) - the specific template instance to use. Provides better tracking and analytics for app notification usage',
+        'Template ID (UUID) - the specific template instance to use. Must be a valid UUID format (e.g., "550e8400-e29b-41d4-a716-446655440000"). Provides better tracking and analytics for app notification usage',
     },
     app_id: {
       type: 'string',
       format: 'uuid',
       description:
-        'App/Product ID - Required for tracking which app sent the notification for professional usage analytics',
+        'App/Product ID - Required for tracking which app sent the notification for professional usage analytics. Must be a valid UUID format',
     },
     payload: {
       type: 'object',
-      description: 'Dynamic variables for template interpolation',
+      description:
+        'Dynamic variables for template interpolation. When using templateId, payload is optional with any variables the template needs. When no templateId is provided, payload MUST contain a "message" field',
     },
     priority: {
       type: 'string',

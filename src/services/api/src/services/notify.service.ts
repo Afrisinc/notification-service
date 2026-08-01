@@ -30,13 +30,16 @@ let queuePublisher: IQueuePublisher;
 
 export class NotifyService {
   async sendNotification(accountId: string, appId: string, request: SendNotificationRequest): Promise<Notification> {
+    // Normalize channel to uppercase
+    const channel = request.channel.toUpperCase() as Channel;
+
     let template: Template | null = null;
     let renderedContent = '';
     let renderedSubject = '';
 
     // Validate attachments for EMAIL channel
     if (request.attachments && request.attachments.length > 0) {
-      if (request.channel !== 'EMAIL') {
+      if (channel !== 'EMAIL') {
         throw new Error('Attachments are only supported for EMAIL channel');
       }
       const validation = validateAttachments(request.attachments);
@@ -52,14 +55,21 @@ export class NotifyService {
       });
 
       if (!template) {
-        const error = new Error(`Template not found: ${request.templateId}`);
+        const error = new Error(
+          `Template not found: The template with ID "${request.templateId}" does not exist in your account. ` +
+            `Please verify the template ID and ensure it has been created.`
+        );
         logger.warn({ accountId, templateId: request.templateId }, 'Template not found');
         throw error;
       }
 
       // Verify template belongs to account
       if (template.account_id !== accountId) {
-        const error = new Error('Unauthorized: Template does not belong to your account');
+        const error = new Error(
+          `Unauthorized: Template does not belong to your account. ` +
+            `The template with ID "${request.templateId}" belongs to a different account. ` +
+            `You can only send notifications using templates that belong to your account.`
+        );
         logger.warn(
           { accountId, templateId: request.templateId, templateAccountId: template.account_id },
           'Unauthorized template access'
@@ -89,7 +99,11 @@ export class NotifyService {
     } else {
       // DIRECT MESSAGE MODE: no template, use payload.message
       if (!request.payload.message) {
-        const error = new Error('Either provide templateId or payload.message for direct message mode');
+        const error = new Error(
+          'Either provide templateId or payload.message for direct message mode. ' +
+            'When sending without a template, you must include a "message" field in the payload object. ' +
+            'Example: { "channel": "email", "recipient": "user@example.com", "payload": { "message": "Hello World" } }'
+        );
         logger.warn({ accountId, app_id: appId }, 'Direct message mode: missing message in payload');
         throw error;
       }
@@ -97,19 +111,19 @@ export class NotifyService {
       renderedContent = request.payload.message;
 
       // For EMAIL channel, also extract subject from payload
-      if (request.channel === 'EMAIL' && request.payload.subject) {
+      if (channel === 'EMAIL' && request.payload.subject) {
         renderedSubject = request.payload.subject;
       }
 
       logger.debug(
-        { accountId, app_id: appId, channel: request.channel, hasSubject: !!renderedSubject },
+        { accountId, app_id: appId, channel: channel, hasSubject: !!renderedSubject },
         'Sending notification in direct message mode'
       );
     }
 
     // Calculate SMS segments for billing/analytics if channel is SMS
     const payloadWithSegments = { ...request.payload };
-    if (request.channel === 'SMS' && renderedContent) {
+    if (channel === 'SMS' && renderedContent) {
       try {
         const segmentInfo = calculateSmsSegments(renderedContent);
         payloadWithSegments.smsSegments = {
@@ -129,7 +143,7 @@ export class NotifyService {
       data: {
         account_id: accountId,
         app_id: appId, // Save app ID for tracking
-        channel: request.channel,
+        channel: channel,
         recipient: request.recipient,
         templateCode: template?.code || 'DIRECT_MESSAGE',
         templateId: request.templateId,
@@ -165,7 +179,7 @@ export class NotifyService {
       notificationId: notification.id,
       tenantId: accountId,
       appId: appId,
-      channel: request.channel,
+      channel: channel,
       recipient: request.recipient,
       templateId: request.templateId,
       subject: renderedSubject,
@@ -189,7 +203,7 @@ export class NotifyService {
         notificationId: notification.id,
         templateId: request.templateId,
         accountId,
-        channel: request.channel,
+        channel: channel,
         mode: request.templateId ? 'template' : 'direct',
       },
       'Notification enqueued'
