@@ -194,6 +194,11 @@ export const paymentController = {
     }
   },
 
+  /**
+   * Admin endpoint: Initiate payment on behalf of account
+   * Only admins can use this endpoint
+   * Request body includes targetAccountId to specify which account to pay for
+   */
   async adminInitializePayment(req: FastifyRequest, reply: FastifyReply) {
     try {
       const adminId = req.headers['x-account-id'] as string;
