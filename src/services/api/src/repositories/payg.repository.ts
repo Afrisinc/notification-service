@@ -8,8 +8,23 @@ export class PaygRepository {
     return prismaRead.creditBalance.findUnique({ where: { account_id: accountId } });
   }
 
+  static async getBalanceForUpdate(accountId: string) {
+    return prismaWrite.creditBalance.findUnique({ where: { account_id: accountId } });
+  }
+
   static async getOrCreateBalance(accountId: string) {
     const existing = await prismaRead.creditBalance.findUnique({
+      where: { account_id: accountId },
+    });
+    if (existing) return existing;
+
+    return prismaWrite.creditBalance.create({
+      data: { account_id: accountId, balance: 0, currency: 'USD' },
+    });
+  }
+
+  static async getOrCreateBalanceForUpdate(accountId: string) {
+    const existing = await prismaWrite.creditBalance.findUnique({
       where: { account_id: accountId },
     });
     if (existing) return existing;

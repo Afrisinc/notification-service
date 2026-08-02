@@ -51,8 +51,7 @@ export class MarketplacePaymentService {
 
     const orderId = `tpl_${accountId}_${templateId}_${Date.now()}`;
 
-    // Convert USD to RWF for PesaPal
-    const priceRwf = await convertUsdToRwf(priceUSD);
+    const { amountRWF: priceRwf } = await convertUsdToRwf(priceUSD);
     const amountCents = Math.round(priceRwf * 100);
 
     const cardPayment = await getPaymentClient().initiateCardPayment({

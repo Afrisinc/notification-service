@@ -19,6 +19,10 @@ export interface CreatePaymentData {
   initiatedAt?: Date;
   transactionId?: string;
   provider?: string;
+  exchangeRate?: number;
+  baseCode?: string;
+  targetCode?: string;
+  amountLocal?: number;
 }
 
 export interface UpdatePaymentData {
@@ -34,6 +38,10 @@ export interface UpdatePaymentData {
   bonusAmount?: number;
   bonusPercent?: number;
   provider?: string;
+  exchangeRate?: number;
+  baseCode?: string;
+  targetCode?: string;
+  amountLocal?: number;
 }
 
 export class PaymentRepository {
@@ -58,6 +66,10 @@ export class PaymentRepository {
         customerName: data.customerName,
         transactionId: data.transactionId,
         provider: data.provider,
+        exchangeRate: data.exchangeRate,
+        baseCode: data.baseCode,
+        targetCode: data.targetCode,
+        amountLocal: data.amountLocal,
       },
     });
   }

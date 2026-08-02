@@ -19,6 +19,12 @@ model Payment {
   provider        String?  @default("internal")   // 'stripe', 'paypack', 'internal'
   providerStatus  String?  @map("provider_status")
 
+  // Exchange Rate (for audit trail & reconciliation)
+  exchangeRate    Float?   @map("exchange_rate")
+  baseCode        String?  @map("base_code")
+  targetCode      String?  @map("target_code")
+  amountLocal     Int?     @map("amount_local")
+
   // Resource References
   templateId      String?  @map("template_id")
   appId           String?  @map("app_id")

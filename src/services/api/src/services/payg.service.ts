@@ -2,18 +2,19 @@ import { logger } from '../config/logger';
 import { getConfig } from '@shared/config';
 import { prismaRead, prismaWrite } from '@shared/database';
 import { PaygRepository } from '../repositories/payg.repository';
+import { PaymentRepository } from '../repositories/payment.repository';
 import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { getPaymentClient, isPaymentClientInitialized, MobilePaymentResult } from '../utils/payment-client';
 import { convertUsdToRwf } from '../utils/exchange-rate';
+import { TOPUP_TIERS, getBonusPercent, calculateBonusAmount } from '../utils/bonus.util';
+import { mapTransaction, mapTransactions, type RawCreditTransaction } from '../utils/transaction-mapper.util';
 import type {
   PaygRates,
-  TopUpTier,
   TopUpRequest,
   TopUpResult,
   DeductCreditsRequest,
   DeductCreditsResult,
   CreditBalanceDto,
-  CreditTransactionDto,
   PaygChannel,
 } from '../types/payg.types';
 
@@ -25,13 +26,6 @@ export const PAYG_RATES: PaygRates = {
   PUSH: 0.00005, // $0.50 per 10,000 push
   IN_APP: 0.00004, // $0.40 per 10,000 in-app
 };
-
-const TOPUP_TIERS: TopUpTier[] = [
-  { minAmount: 250, bonusPercent: 15 },
-  { minAmount: 100, bonusPercent: 10 },
-  { minAmount: 50, bonusPercent: 5 },
-  { minAmount: 0, bonusPercent: 0 },
-];
 
 const MIN_TOPUP_AMOUNT = 0.5; // USD
 
@@ -53,11 +47,6 @@ function mockProcessPayment(amount: number): MockPaymentResult {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getBonusPercent(amount: number): number {
-  const tier = TOPUP_TIERS.find((t) => amount >= t.minAmount);
-  return tier?.bonusPercent ?? 0;
-}
-
 function mapBalance(b: {
   id: string;
   account_id: string;
@@ -71,36 +60,6 @@ function mapBalance(b: {
     balance: b.balance,
     currency: b.currency,
     updatedAt: b.updated_at,
-  };
-}
-
-export function mapTransaction(t: {
-  id: string;
-  account_id: string;
-  type: string;
-  status: string;
-  amount: number;
-  balance_after: number;
-  description: string | null;
-  channel: string | null;
-  notification_id: string | null;
-  payment_ref: string | null;
-  bonus_percent: number | null;
-  created_at: Date;
-}): CreditTransactionDto {
-  return {
-    id: t.id,
-    accountId: t.account_id,
-    type: t.type as CreditTransactionDto['type'],
-    status: t.status as CreditTransactionDto['status'],
-    amount: t.amount,
-    balanceAfter: t.balance_after,
-    description: t.description,
-    channel: t.channel,
-    notificationId: t.notification_id,
-    paymentRef: t.payment_ref,
-    bonusPercent: t.bonus_percent,
-    createdAt: t.created_at,
   };
 }
 
@@ -136,8 +95,7 @@ export class PaygService {
 
     const orderId = `topup_${accountId}_${Date.now()}`;
 
-    // Convert USD to RWF for PesaPal
-    const amountRwf = await convertUsdToRwf(amount);
+    const { amountRWF: amountRwf } = await convertUsdToRwf(amount);
     const amountCents = Math.round(amountRwf * 100);
 
     const cardPayment = await getPaymentClient().initiateCardPayment({
@@ -169,6 +127,7 @@ export class PaygService {
 
   /**
    * Credit PAYG balance after afrisinc-pay confirms payment via webhook.
+   * Fetches the original USD amount from payment table (not from webhook response).
    * Called by the internal /api/internal/payment-event endpoint.
    */
   static async creditFromPayment(params: {
@@ -176,10 +135,18 @@ export class PaygService {
     amountCents: number;
     paymentRef: string;
   }): Promise<TopUpResult> {
-    const amount = params.amountCents / 100;
-    const balance = await PaygRepository.getOrCreateBalance(params.accountId);
+    // Fetch payment record to get the correct USD amount stored at initialization
+    const payment = await PaymentRepository.findByRef(params.paymentRef);
+
+    if (!payment) {
+      throw new Error(`Payment record not found for ref: ${params.paymentRef}`);
+    }
+
+    // Use the original USD amount from payment table, not the webhook response
+    const amount = payment.amount / 100; // Convert from cents to USD
+    const balance = await PaygRepository.getOrCreateBalanceForUpdate(params.accountId);
     const bonusPercent = getBonusPercent(amount);
-    const bonusAmount = parseFloat(((amount * bonusPercent) / 100).toFixed(6));
+    const bonusAmount = calculateBonusAmount(amount, bonusPercent);
 
     const result = await PaygRepository.atomicTopUp(
       params.accountId,
@@ -192,13 +159,21 @@ export class PaygService {
     );
 
     logger.info(
-      { accountId: params.accountId, amount, bonus: bonusAmount, newBalance: result.newBalance },
-      'PAYG balance credited from payment webhook'
+      {
+        accountId: params.accountId,
+        amount,
+        bonus: bonusAmount,
+        newBalance: result.newBalance,
+        paymentRef: params.paymentRef,
+      },
+      'PAYG balance credited from payment webhook — using payment table amount'
     );
 
     return {
-      transaction: mapTransaction(result.topUpTx as Parameters<typeof mapTransaction>[0]),
-      bonusTransaction: result.bonusTx ? mapTransaction(result.bonusTx as Parameters<typeof mapTransaction>[0]) : null,
+      transaction: mapTransaction({ ...result.topUpTx, status: 'COMPLETED' } as Parameters<typeof mapTransaction>[0]),
+      bonusTransaction: result.bonusTx
+        ? mapTransaction({ ...result.bonusTx, status: 'COMPLETED' } as Parameters<typeof mapTransaction>[0])
+        : null,
       newBalance: result.newBalance,
       bonusPercent,
       bonusAmount,
@@ -220,9 +195,9 @@ export class PaygService {
       throw new Error(`Payment failed: ${payment.message}`);
     }
 
-    const balance = await PaygRepository.getOrCreateBalance(accountId);
+    const balance = await PaygRepository.getOrCreateBalanceForUpdate(accountId);
     const bonusPercent = getBonusPercent(req.amount);
-    const bonusAmount = parseFloat(((req.amount * bonusPercent) / 100).toFixed(6));
+    const bonusAmount = Number.parseFloat(((req.amount * bonusPercent) / 100).toFixed(6));
 
     const result = await PaygRepository.atomicTopUp(
       accountId,
@@ -240,8 +215,10 @@ export class PaygService {
     );
 
     return {
-      transaction: mapTransaction(result.topUpTx as Parameters<typeof mapTransaction>[0]),
-      bonusTransaction: result.bonusTx ? mapTransaction(result.bonusTx as Parameters<typeof mapTransaction>[0]) : null,
+      transaction: mapTransaction({ ...result.topUpTx, status: 'COMPLETED' } as Parameters<typeof mapTransaction>[0]),
+      bonusTransaction: result.bonusTx
+        ? mapTransaction({ ...result.bonusTx, status: 'COMPLETED' } as Parameters<typeof mapTransaction>[0])
+        : null,
       newBalance: result.newBalance,
       bonusPercent,
       bonusAmount,
@@ -302,7 +279,9 @@ export class PaygService {
   static async getTransactions(accountId: string, opts: { page: number; limit: number; type?: string }) {
     const result = await PaygRepository.getTransactions(accountId, opts);
     return {
-      items: result.items.map((t: Parameters<typeof mapTransaction>[0]) => mapTransaction(t)),
+      items: result.items.map((t: any) =>
+        mapTransaction({ ...t, status: 'COMPLETED' } as Parameters<typeof mapTransaction>[0])
+      ),
       total: result.total,
       page: result.page,
       limit: result.limit,
@@ -343,7 +322,7 @@ export class PaygService {
   ): Promise<{ sufficient: boolean; required: number; available: number }> {
     const balance = await PaygRepository.getOrCreateBalance(accountId);
     const rate = PAYG_RATES[channel];
-    const required = parseFloat((rate * quantity).toFixed(6));
+    const required = Number.parseFloat((rate * quantity).toFixed(6));
 
     return {
       sufficient: balance.balance >= required,
@@ -537,6 +516,7 @@ export class PaygService {
 
   /**
    * Credit PAYG balance after mobile money payment confirmation (webhook)
+   * Fetches the original USD amount from payment table (not from webhook response).
    * Called by the internal webhook handler when Paypack confirms payment
    */
   static async creditFromMobilePayment(params: {
@@ -544,11 +524,15 @@ export class PaygService {
     amountRwf: number;
     paymentRef: string;
   }): Promise<TopUpResult> {
-    // Convert RWF to USD (approximate rate, should be fetched from config/API)
-    const RWF_TO_USD_RATE = 0.00075; // ~1333 RWF = 1 USD
-    const amountUsd = Number.parseFloat((params.amountRwf * RWF_TO_USD_RATE).toFixed(2));
+    const payment = await PaymentRepository.findByRef(params.paymentRef);
 
-    const balance = await PaygRepository.getOrCreateBalance(params.accountId);
+    if (!payment) {
+      throw new Error(`Payment record not found for ref: ${params.paymentRef}`);
+    }
+
+    const amountUsd = payment.amount / 100; // Convert from cents to USD
+
+    const balance = await PaygRepository.getOrCreateBalanceForUpdate(params.accountId);
     const bonusPercent = getBonusPercent(amountUsd);
     const bonusAmount = Number.parseFloat(((amountUsd * bonusPercent) / 100).toFixed(6));
 
@@ -569,13 +553,16 @@ export class PaygService {
         amountUsd,
         bonus: bonusAmount,
         newBalance: result.newBalance,
+        paymentRef: params.paymentRef,
       },
-      'PAYG balance credited from mobile money payment'
+      'PAYG balance credited from mobile money payment — using payment table amount'
     );
 
     return {
-      transaction: mapTransaction(result.topUpTx as Parameters<typeof mapTransaction>[0]),
-      bonusTransaction: result.bonusTx ? mapTransaction(result.bonusTx as Parameters<typeof mapTransaction>[0]) : null,
+      transaction: mapTransaction({ ...result.topUpTx, status: 'COMPLETED' } as Parameters<typeof mapTransaction>[0]),
+      bonusTransaction: result.bonusTx
+        ? mapTransaction({ ...result.bonusTx, status: 'COMPLETED' } as Parameters<typeof mapTransaction>[0])
+        : null,
       newBalance: result.newBalance,
       bonusPercent,
       bonusAmount,

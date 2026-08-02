@@ -13,17 +13,6 @@ export interface SubscriptionPaymentInitResult {
 }
 
 export class SubscriptionPaymentService {
-  /**
-   * Initiate card payment for subscription upgrade via ITEC PesaPal (africinc-pay).
-   *
-   * Pricing:
-   *  - monthly  → price_monthly (USD)
-   *  - yearly   → price_yearly (monthly-equivalent) × 12 (USD)
-   *
-   * Converts USD amount to RWF before sending to payment provider.
-   * Returns checkout URL for customer to complete payment.
-   * After payment is confirmed, afrisinc-pay fires webhook → activates plan.
-   */
   static async initPayment(
     accountId: string,
     planId: string,
@@ -47,15 +36,14 @@ export class SubscriptionPaymentService {
 
     const orderId = `sub_${accountId}_${planId}_${billingCycle}_${Date.now()}`;
 
-    // Convert USD to RWF for PesaPal
-    const amountRwf = await convertUsdToRwf(amountUSD);
+    const { amountRWF: amountRwf } = await convertUsdToRwf(amountUSD);
     const amountCents = Math.round(amountRwf * 100);
 
     const cardPayment = await getPaymentClient().initiateCardPayment({
       orderId,
       amount: amountCents,
       email: customerEmail,
-      currency: 'RWF', // PesaPal charges in RWF for Rwanda
+      currency: 'RWF',
       description: `Subscription upgrade to ${plan.name} (${billingCycle}): USD ${amountUSD} (~RWF ${Math.round(amountRwf)})`,
       metadata: {
         accountId,
@@ -69,7 +57,7 @@ export class SubscriptionPaymentService {
 
     logger.info(
       { accountId, planId, billingCycle, amountUSD, amountRWF: amountRwf, orderId, pcode: cardPayment.pcode },
-      'Subscription card payment initiated (ITEC PesaPal) — converted USD to RWF'
+      'Subscription card payment initiated (Afrisinc-pay) — converted USD to RWF'
     );
 
     return {

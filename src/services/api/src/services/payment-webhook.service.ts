@@ -6,6 +6,7 @@ import { PaygRepository } from '../repositories/payg.repository';
 import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { SubscriptionNotificationService } from './subscription-notification.service';
 import type { CreditTransactionStatus } from '../types/payg.types';
+import { PaymentRepository } from '../repositories/payment.repository';
 
 /**
  * Webhook event data from afrisinc-pay
@@ -395,12 +396,20 @@ export class PaymentWebhookService {
     data: PaymentEventData,
     accountId: string
   ): Promise<WebhookProcessResult> {
-    const planId = data.metadata?.['planId'] as string | undefined;
+    // Fetch payment record to get the authoritative planId and billingCycle
+    const payment = await PaymentRepository.findByRef(data.paymentId);
+
+    if (!payment) {
+      logger.warn({ paymentId: data.paymentId }, 'Card subscription payment record not found');
+      return { success: false, error: 'Payment record not found' };
+    }
+
+    const planId = payment.planId;
     const billingCycle = (data.metadata?.['billingCycle'] as string | undefined) ?? 'monthly';
 
     if (!planId) {
-      logger.warn({ paymentId: data.paymentId }, 'Card subscription payment missing planId');
-      return { success: false, error: 'Missing planId in metadata' };
+      logger.warn({ paymentId: data.paymentId, accountId }, 'Card subscription payment missing planId in record');
+      return { success: false, error: 'Missing planId in payment record' };
     }
 
     try {
@@ -523,12 +532,20 @@ export class PaymentWebhookService {
    * Handle template purchase payment
    */
   private static async handleTemplatePayment(data: PaymentEventData, accountId: string): Promise<WebhookProcessResult> {
-    const templateId = data.metadata?.['templateId'] as string | undefined;
-    const appId = data.metadata?.['appId'] as string | undefined;
+    // Fetch payment record to get the authoritative templateId and appId
+    const payment = await PaymentRepository.findByRef(data.paymentId);
+
+    if (!payment) {
+      logger.warn({ paymentId: data.paymentId }, 'Template payment record not found');
+      return { success: false, error: 'Payment record not found' };
+    }
+
+    const templateId = payment.templateId;
+    const appId = payment.appId;
 
     if (!templateId || !appId) {
-      logger.warn({ paymentId: data.paymentId }, 'Template payment missing templateId or appId');
-      return { success: false, error: 'Missing templateId or appId in metadata' };
+      logger.warn({ paymentId: data.paymentId, accountId }, 'Template payment missing templateId or appId in record');
+      return { success: false, error: 'Missing templateId or appId in payment record' };
     }
 
     try {
@@ -704,12 +721,20 @@ export class PaymentWebhookService {
     data: MobilePaymentEventData,
     accountId: string
   ): Promise<WebhookProcessResult> {
-    const planId = data.metadata?.['planId'] as string | undefined;
+    // Fetch payment record to get the authoritative planId and billingCycle
+    const payment = await PaymentRepository.findByRef(data.ref);
+
+    if (!payment) {
+      logger.warn({ ref: data.ref, accountId }, 'Mobile subscription payment record not found');
+      return { success: false, error: 'Payment record not found' };
+    }
+
+    const planId = payment.planId;
     const billingCycle = (data.metadata?.['billingCycle'] as string | undefined) ?? 'monthly';
 
     if (!planId) {
-      logger.warn({ ref: data.ref, accountId }, 'Mobile subscription payment missing planId');
-      return { success: false, error: 'Missing planId in metadata' };
+      logger.warn({ ref: data.ref, accountId }, 'Mobile subscription payment missing planId in record');
+      return { success: false, error: 'Missing planId in payment record' };
     }
 
     try {
@@ -740,12 +765,20 @@ export class PaymentWebhookService {
     data: MobilePaymentEventData,
     accountId: string
   ): Promise<WebhookProcessResult> {
-    const templateId = data.metadata?.['templateId'] as string | undefined;
-    const appId = data.metadata?.['appId'] as string | undefined;
+    // Fetch payment record to get the authoritative templateId and appId
+    const payment = await PaymentRepository.findByRef(data.ref);
+
+    if (!payment) {
+      logger.warn({ ref: data.ref, accountId }, 'Mobile template purchase record not found');
+      return { success: false, error: 'Payment record not found' };
+    }
+
+    const templateId = payment.templateId;
+    const appId = payment.appId;
 
     if (!templateId || !appId) {
-      logger.warn({ ref: data.ref, accountId }, 'Mobile template purchase missing templateId or appId');
-      return { success: false, error: 'Missing templateId or appId in metadata' };
+      logger.warn({ ref: data.ref, accountId }, 'Mobile template purchase missing templateId or appId in record');
+      return { success: false, error: 'Missing templateId or appId in payment record' };
     }
 
     try {

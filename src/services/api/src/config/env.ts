@@ -24,6 +24,7 @@ export const env = cleanEnv(process.env, {
   APP_URL: url({ default: 'http://localhost:3000' }),
 
   USDEXCHANGE_RATE: str({ default: '1450' }),
+  EXCHANGE_RATE_API_KEY: str({ default: '' }),
 
   // Tenant & Company Info
   COMPANY_NAME: str({ default: 'Afrisinc' }),
