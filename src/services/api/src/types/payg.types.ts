@@ -14,6 +14,7 @@ export interface PaygRates {
   SMS: number; // 0.035 per message
   PUSH: number; // 0.00005 per push  ($0.50 / 10,000)
   IN_APP: number; // 0.00004 per in-app ($0.40 / 10,000)
+  WHATSAPP: number; // 0.035 per message
 }
 
 /** Top-up tiers with bonus percentages */
