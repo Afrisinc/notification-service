@@ -24,6 +24,7 @@ export const PAYG_RATES: PaygRates = {
   SMS: 0.035, // $0.035 per message
   PUSH: 0.00005, // $0.50 per 10,000 push
   IN_APP: 0.00004, // $0.40 per 10,000 in-app
+  WHATSAPP: 0.035, // $0.035 per message
 };
 
 const TOPUP_TIERS: TopUpTier[] = [

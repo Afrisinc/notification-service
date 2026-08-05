@@ -4,6 +4,7 @@ import { notifyService, SendNotificationRequest, BulkSendRequest } from '../serv
 import { UsageTrackingService } from '../services/usage-tracking.service';
 import { PaygService } from '../services/payg.service';
 import { PlanEnforcementMiddleware } from '../middleware/plan-enforcement.middleware';
+import { validateChannelEligibility } from '../utils/sms-eligibility';
 import { ApiResponseHelper } from '../utils';
 import type { PaygChannel } from '../types/payg.types';
 
@@ -34,20 +35,37 @@ export class NotifyController {
         app_id = body.app_id;
       }
 
-      // Normalize channel to uppercase
+      // ── Validate channel is provided ───────────────────────────────────────
+      if (!body.channel) {
+        return ApiResponseHelper.badRequest(reply, 'channel is required in request body');
+      }
+
       const channel = body.channel.toUpperCase() as PaygChannel;
 
-      // ── PAYG: check balance before sending ────────────────────────────────
-      const isPayg = await PlanEnforcementMiddleware.isPaygAccount(accountId);
-      logger.debug({ accountId, isPayg, correlationId: request.id }, '[PAYG] Account plan check');
+      // ── Channel eligibility validation ────────────────────────────────────
+      const eligibilityCheck = await validateChannelEligibility(accountId, channel);
+      if (!eligibilityCheck.eligible) {
+        logger.warn(
+          { accountId, channel, reason: eligibilityCheck.reason, correlationId: request.id },
+          'Notification blocked: channel not eligible for account'
+        );
+        return ApiResponseHelper.error(
+          reply,
+          eligibilityCheck.reason || 'Channel not available for this account',
+          eligibilityCheck.errorCode || 4000,
+          eligibilityCheck.statusCode || 400
+        );
+      }
 
+      // ── PAYG: check balance for single message ────────────────────────────
+      const isPayg = await PlanEnforcementMiddleware.isPaygAccount(accountId);
       if (isPayg) {
-        const balanceCheck = await PaygService.checkSufficientBalance(accountId, channel, 1);
+        const balanceCheck = await PlanEnforcementMiddleware.checkPaygBalance(accountId, channel, 1);
         logger.debug({ accountId, channel, balanceCheck, correlationId: request.id }, '[PAYG] Pre-send balance check');
-        if (!balanceCheck.sufficient) {
+        if (!balanceCheck.allowed) {
           return ApiResponseHelper.error(
             reply,
-            `Insufficient PAYG credit balance. Required: $${balanceCheck.required.toFixed(4)}, Available: $${balanceCheck.available.toFixed(4)}. Please top up at /api/payg/topup.`,
+            `Insufficient PAYG credit balance. Available: $${balanceCheck.remaining.toFixed(4)}. Please top up at /api/payg/topup.`,
             4030,
             402
           );
@@ -156,21 +174,34 @@ export class NotifyController {
       const appId = body.notifications[0].app_id;
       const channel = (body.notifications[0]?.channel ?? 'EMAIL').toUpperCase() as PaygChannel;
 
+      // ── Channel eligibility validation ────────────────────────────────────
+      const eligibilityCheck = await validateChannelEligibility(accountId, channel);
+      if (!eligibilityCheck.eligible) {
+        logger.warn(
+          { accountId, channel, reason: eligibilityCheck.reason, correlationId: request.id },
+          'Bulk send blocked: channel not eligible for account'
+        );
+        return ApiResponseHelper.error(
+          reply,
+          eligibilityCheck.reason || 'Channel not available for this account',
+          eligibilityCheck.errorCode || 4000,
+          eligibilityCheck.statusCode || 400
+        );
+      }
+
       // ── PAYG: pre-flight balance check for the full batch ─────────────────
       const isPayg = await PlanEnforcementMiddleware.isPaygAccount(accountId);
-      logger.debug({ accountId, isPayg, correlationId: request.id }, '[PAYG] Bulk send plan check');
-
       if (isPayg) {
         const quantity = body.notifications.length;
-        const balanceCheck = await PaygService.checkSufficientBalance(accountId, channel, quantity);
+        const balanceCheck = await PlanEnforcementMiddleware.checkPaygBalance(accountId, channel, quantity);
         logger.debug(
           { accountId, channel, quantity, balanceCheck, correlationId: request.id },
           '[PAYG] Bulk pre-send balance check'
         );
-        if (!balanceCheck.sufficient) {
+        if (!balanceCheck.allowed) {
           return ApiResponseHelper.error(
             reply,
-            `Insufficient PAYG credit balance for ${quantity} ${channel} messages. Required: $${balanceCheck.required.toFixed(4)}, Available: $${balanceCheck.available.toFixed(4)}. Please top up at /api/payg/topup.`,
+            `Insufficient PAYG credit balance for ${quantity} ${channel} messages. Available: $${balanceCheck.remaining.toFixed(4)}. Please top up at /api/payg/topup.`,
             4030,
             402
           );
