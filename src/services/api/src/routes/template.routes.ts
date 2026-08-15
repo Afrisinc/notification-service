@@ -118,6 +118,16 @@ export async function registerTemplateRoutes(fastify: FastifyInstance) {
     asyncWrapper(controller.duplicateTemplate.bind(controller))
   );
 
+  // Duplicate template in app - Protected
+  fastify.post(
+    '/organizations/:orgId/apps/:appId/templates/:id/duplicate',
+    {
+      onRequest: [validateBaseToken],
+      preHandler: [planGuards.checkEntityLimit('templates')],
+    },
+    asyncWrapper(controller.duplicateAppTemplate.bind(controller))
+  );
+
   // Install template in project - PROTECTED
   fastify.post(
     '/organizations/:orgId/templates/:id/install',

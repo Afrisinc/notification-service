@@ -1335,6 +1335,53 @@ export class TemplateController {
       ApiResponseHelper.badRequest(reply, errorMessage);
     }
   }
+
+  async duplicateAppTemplate(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { orgId, appId, id: templateId } = request.params as { orgId: string; appId: string; id: string };
+      const userId = (request as any).user?.id;
+      const body = request.body as { newCode?: string } | undefined;
+
+      if (!userId) {
+        return ApiResponseHelper.unauthorized(reply, 'User information not found');
+      }
+
+      const result = await templateService.duplicateAppTemplate(orgId, appId, templateId, userId, body?.newCode);
+
+      logger.info(
+        {
+          originalId: templateId,
+          duplicateId: result.template.id,
+          code: result.template.code,
+          installationId: result.installationId,
+          correlationId: request.id,
+        },
+        'Template duplicated in App'
+      );
+
+      ApiResponseHelper.created(reply, 'Template duplicated in App successfully', {
+        id: result.template.id,
+        code: result.template.code,
+        channel: result.template.channel,
+        active: result.template.active,
+        installationId: result.installationId,
+        appId: result.appId,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, correlationId: request.id }, 'Failed to duplicate template');
+
+      if (errorMessage.includes('not found')) {
+        return ApiResponseHelper.notFound(reply, errorMessage);
+      }
+
+      if (errorMessage.includes('already exists')) {
+        return ApiResponseHelper.duplicate(reply, errorMessage);
+      }
+
+      ApiResponseHelper.badRequest(reply, errorMessage);
+    }
+  }
 }
 
 export const templateController = new TemplateController();
