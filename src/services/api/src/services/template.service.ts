@@ -6,6 +6,7 @@ import { extractRequiredVariables } from '../template/validators/template.valida
 import { getDefaultTemplate, hasDefaultTemplate, listDefaultTemplates as listDefaults } from '../templates';
 import { parseTemplateRequest } from '../utils/template-parser';
 import { accountRepository } from '../repositories/account.repository';
+import { appTemplateRepository } from '../repositories/template-installation.repository';
 
 export interface Template {
   id: string;
@@ -573,6 +574,58 @@ export class TemplateService {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error({ error: errorMessage, orgId, templateId, userId }, 'Failed to duplicate template');
+      throw error;
+    }
+  }
+
+  /**
+   * Duplicate a template and install the copy on an app
+   */
+  async duplicateAppTemplate(
+    orgId: string,
+    appId: string,
+    templateId: string,
+    userId: string,
+    newCode?: string
+  ): Promise<{
+    template: Template;
+    installationId: string;
+    appId: string;
+  }> {
+    try {
+      const duplicate = await this.duplicateTemplate(orgId, templateId, userId, newCode);
+
+      const existingInstallation = await appTemplateRepository.findByAppAndTemplate(appId, duplicate.id);
+      if (existingInstallation) {
+        throw new Error('Template already installed on this app');
+      }
+
+      const installation = await appTemplateRepository.create({
+        app_id: appId,
+        template_id: duplicate.id,
+        customizations: {},
+      });
+
+      logger.info(
+        {
+          originalTemplateId: templateId,
+          duplicateTemplateId: duplicate.id,
+          installationId: installation.id,
+          appId,
+          userId,
+          orgId,
+        },
+        'Template duplicated and installed on app'
+      );
+
+      return {
+        template: duplicate,
+        installationId: installation.id,
+        appId,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, orgId, appId, templateId, userId }, 'Failed to duplicate app template');
       throw error;
     }
   }
