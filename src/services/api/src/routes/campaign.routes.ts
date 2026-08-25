@@ -11,11 +11,12 @@ import {
   getCampaignStats,
   getCampaignsSummaryStats,
 } from '../controllers/campaign.controller';
-import { validateBaseToken } from '../middlewares/auth.middleware';
+import { flexAuthMiddleware, validateBaseToken } from '../middlewares/auth.middleware';
 import { planGuards } from '../guards/plan-guard';
 import {
   ListCampaignsSchema,
   CreateCampaignSchema,
+  CreateCampaignSdkSchema,
   GetCampaignSchema,
   UpdateCampaignSchema,
   DeleteCampaignSchema,
@@ -45,6 +46,17 @@ export async function registerCampaignRoutes(app: FastifyInstance) {
       schema: GetCampaignsSummaryStatsSchema,
     },
     getCampaignsSummaryStats
+  );
+
+  // Create Campaign - SDK route (no :appId in URL; resolved via flexAuthMiddleware,
+  // see resolveAppContext in campaign.controller.ts)
+  app.post(
+    '/campaigns',
+    {
+      preHandler: [flexAuthMiddleware, planGuards.checkEntityLimit('campaigns')],
+      schema: CreateCampaignSdkSchema,
+    },
+    createCampaign
   );
 
   // Create Campaign

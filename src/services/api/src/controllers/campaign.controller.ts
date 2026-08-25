@@ -3,6 +3,7 @@ import { campaignService } from '../services/campaign.service';
 import { UsageTrackingService } from '../services/usage-tracking.service';
 import { ApiResponseHelper } from '../utils';
 import { AccountService } from '../services/account.service';
+import { resolveAppContext } from '../utils/resolve-app-context';
 import {
   CreateCampaignDto,
   UpdateCampaignDto,
@@ -51,9 +52,10 @@ export async function listCampaigns(req: FastifyRequest, reply: FastifyReply) {
 
 export async function createCampaign(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const { appId } = req.params as { appId: string };
     const body = req.body as CreateCampaignDto;
-    const accountId = await accountService.getAccountIdByAppId(appId);
+    const context = await resolveAppContext(req, reply);
+    if (!context) return;
+    const { appId, accountId } = context;
 
     // Basic validation: name and channel are always required
     if (!body.name || !body.channel) {
