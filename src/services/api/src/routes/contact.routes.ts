@@ -9,11 +9,12 @@ import {
   searchContacts,
   exportContacts,
 } from '../controllers/contact.controller';
-import { validateBaseToken } from '../middlewares/auth.middleware';
+import { flexAuthMiddleware, validateBaseToken } from '../middlewares/auth.middleware';
 import { planGuards } from '../guards/plan-guard';
 import {
   ListContactsSchema,
   CreateContactSchema,
+  CreateContactSdkSchema,
   GetContactSchema,
   UpdateContactSchema,
   DeleteContactSchema,
@@ -51,6 +52,17 @@ export async function registerContactRoutes(app: FastifyInstance) {
       schema: ExportContactsSchema,
     },
     exportContacts
+  );
+
+  // Create Contact - SDK route (no :appId in URL; resolved via flexAuthMiddleware,
+  // see resolveAppContext in contact.controller.ts)
+  app.post(
+    '/contacts',
+    {
+      preHandler: [flexAuthMiddleware, planGuards.checkEntityLimit('contacts')],
+      schema: CreateContactSdkSchema,
+    },
+    createContact
   );
 
   // Create Contact
