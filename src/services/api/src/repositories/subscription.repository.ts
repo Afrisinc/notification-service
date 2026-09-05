@@ -1,25 +1,44 @@
 import { prismaRead, prismaWrite } from '@shared/database';
+import { getOrSetCache, invalidateCache, cacheKeys, CACHE_TTL } from '@shared/cache';
 import { logger } from '../config/logger';
 
 export class SubscriptionRepository {
   /**
-   * Get subscription with plan and limits
+   * Get subscription with plan and limits.
+   * Cached: this exact query is re-run several times per notify-send request
+   * (plan enforcement, usage limit checks, PAYG checks all need it). A short
+   * TTL also acts as a safety net for plan-definition changes (see
+   * PlanManagementService.updateLimit/createLimit/deleteLimit), which mutate
+   * PlanLimit rows shared across every account on that plan and so aren't
+   * cheap to invalidate precisely by account.
    */
   static async getSubscriptionWithLimits(accountId: string) {
-    try {
-      return prismaRead.subscription.findUnique({
-        where: { account_id: accountId },
-        include: {
-          plan: {
-            include: { limits: true },
+    return getOrSetCache(cacheKeys.subscription(accountId), CACHE_TTL.SUBSCRIPTION, async () => {
+      try {
+        return await prismaRead.subscription.findUnique({
+          where: { account_id: accountId },
+          include: {
+            plan: {
+              include: { limits: true },
+            },
+            account: true,
           },
-          account: true,
-        },
-      });
-    } catch (error) {
-      logger.error({ error, accountId }, 'Failed to get subscription with limits');
-      throw error;
-    }
+        });
+      } catch (error) {
+        logger.error({ error, accountId }, 'Failed to get subscription with limits');
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * Invalidate the cached subscription+plan+limits snapshot for an account.
+   * Call this after any write that changes an account's subscription row
+   * (status, plan, billing cycle) - including writes made outside this
+   * repository (webhooks, trial processing, account creation).
+   */
+  static async invalidateCache(accountId: string): Promise<void> {
+    await invalidateCache(cacheKeys.subscription(accountId));
   }
 
   /**
@@ -47,13 +66,15 @@ export class SubscriptionRepository {
    */
   static async updateSubscriptionStatus(accountId: string, status: 'active' | 'inactive' | 'paused' | 'cancelled') {
     try {
-      return prismaWrite.subscription.update({
+      const result = await prismaWrite.subscription.update({
         where: { account_id: accountId },
         data: { status },
         include: {
           plan: { include: { limits: true } },
         },
       });
+      await this.invalidateCache(accountId);
+      return result;
     } catch (error) {
       logger.error({ error, accountId, status }, 'Failed to update subscription status');
       throw error;
@@ -65,13 +86,15 @@ export class SubscriptionRepository {
    */
   static async changePlan(accountId: string, planId: string) {
     try {
-      return prismaWrite.subscription.update({
+      const result = await prismaWrite.subscription.update({
         where: { account_id: accountId },
         data: { plan_id: planId },
         include: {
           plan: { include: { limits: true } },
         },
       });
+      await this.invalidateCache(accountId);
+      return result;
     } catch (error) {
       logger.error({ error, accountId, planId }, 'Failed to change plan');
       throw error;
@@ -93,7 +116,7 @@ export class SubscriptionRepository {
         periodEnd.setMonth(periodEnd.getMonth() + 1);
       }
 
-      return prismaWrite.subscription.upsert({
+      const result = await prismaWrite.subscription.upsert({
         where: { account_id: accountId },
         update: {
           plan_id: planId,
@@ -115,6 +138,8 @@ export class SubscriptionRepository {
           plan: { include: { limits: true } },
         },
       });
+      await this.invalidateCache(accountId);
+      return result;
     } catch (error) {
       logger.error({ error, accountId, planId, billingCycle }, 'Failed to activate subscription from payment');
       throw error;

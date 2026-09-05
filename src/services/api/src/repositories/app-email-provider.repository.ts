@@ -1,4 +1,5 @@
 import { prismaRead, prismaWrite } from '@shared/database';
+import { getOrSetCache, invalidateCache, cacheKeys, CACHE_TTL } from '@shared/cache';
 import { logger } from '../config/logger';
 import type { EmailProvider, CustomerDomainStatus } from '@prisma/client';
 
@@ -45,14 +46,16 @@ export class AppEmailProviderRepository {
    * Find email provider config by app ID
    */
   static async findByAppId(appId: string) {
-    try {
-      return await prismaRead.appEmailProvider.findUnique({
-        where: { app_id: appId },
-      });
-    } catch (error) {
-      logger.error({ error, appId }, 'Failed to find email provider config');
-      throw error;
-    }
+    return getOrSetCache(cacheKeys.appEmailProvider(appId), CACHE_TTL.APP_EMAIL_PROVIDER, async () => {
+      try {
+        return await prismaRead.appEmailProvider.findUnique({
+          where: { app_id: appId },
+        });
+      } catch (error) {
+        logger.error({ error, appId }, 'Failed to find email provider config');
+        throw error;
+      }
+    });
   }
 
   /**
@@ -60,7 +63,7 @@ export class AppEmailProviderRepository {
    */
   static async upsert(appId: string, data: any) {
     try {
-      return await prismaWrite.appEmailProvider.upsert({
+      const result = await prismaWrite.appEmailProvider.upsert({
         where: { app_id: appId },
         update: data,
         create: {
@@ -68,6 +71,8 @@ export class AppEmailProviderRepository {
           ...data,
         },
       });
+      await invalidateCache(cacheKeys.appEmailProvider(appId));
+      return result;
     } catch (error) {
       logger.error({ error, appId }, 'Failed to upsert email provider config');
       throw error;
@@ -79,10 +84,12 @@ export class AppEmailProviderRepository {
    */
   static async update(appId: string, data: any) {
     try {
-      return await prismaWrite.appEmailProvider.update({
+      const result = await prismaWrite.appEmailProvider.update({
         where: { app_id: appId },
         data,
       });
+      await invalidateCache(cacheKeys.appEmailProvider(appId));
+      return result;
     } catch (error) {
       logger.error({ error, appId }, 'Failed to update email provider config');
       throw error;
@@ -94,9 +101,11 @@ export class AppEmailProviderRepository {
    */
   static async delete(appId: string) {
     try {
-      return await prismaWrite.appEmailProvider.delete({
+      const result = await prismaWrite.appEmailProvider.delete({
         where: { app_id: appId },
       });
+      await invalidateCache(cacheKeys.appEmailProvider(appId));
+      return result;
     } catch (error) {
       logger.error({ error, appId }, 'Failed to delete email provider config');
       throw error;
@@ -107,14 +116,7 @@ export class AppEmailProviderRepository {
    * Get active email provider for an app
    */
   static async getActive(appId: string) {
-    try {
-      return await prismaRead.appEmailProvider.findUnique({
-        where: { app_id: appId },
-      });
-    } catch (error) {
-      logger.error({ error, appId }, 'Failed to get active email provider');
-      throw error;
-    }
+    return this.findByAppId(appId);
   }
 
   /**
@@ -130,7 +132,7 @@ export class AppEmailProviderRepository {
     }
   ) {
     try {
-      return await prismaWrite.appEmailProvider.update({
+      const result = await prismaWrite.appEmailProvider.update({
         where: { app_id: appId },
         data: {
           spf_verified: data.spfVerified,
@@ -140,6 +142,8 @@ export class AppEmailProviderRepository {
           domain_verified_at: data.status === 'verified' ? new Date() : undefined,
         },
       });
+      await invalidateCache(cacheKeys.appEmailProvider(appId));
+      return result;
     } catch (error) {
       logger.error({ error, appId }, 'Failed to update domain verification');
       throw error;
@@ -151,7 +155,7 @@ export class AppEmailProviderRepository {
    */
   static async updateOAuthToken(appId: string, accessToken: string, refreshToken?: string, expiryDate?: Date) {
     try {
-      return await prismaWrite.appEmailProvider.update({
+      const result = await prismaWrite.appEmailProvider.update({
         where: { app_id: appId },
         data: {
           oauth_access_token: accessToken,
@@ -159,6 +163,8 @@ export class AppEmailProviderRepository {
           oauth_token_expiry: expiryDate,
         },
       });
+      await invalidateCache(cacheKeys.appEmailProvider(appId));
+      return result;
     } catch (error) {
       logger.error({ error, appId }, 'Failed to update OAuth token');
       throw error;

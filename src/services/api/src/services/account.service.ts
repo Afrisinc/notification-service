@@ -6,6 +6,7 @@
 import { prismaWrite, prismaRead } from '@shared/database';
 import { accountRepository } from '../repositories/account.repository';
 import { appRepository } from '../repositories/app.repository';
+import { SubscriptionRepository } from '../repositories/subscription.repository';
 
 export class AccountService {
   /**
@@ -178,6 +179,8 @@ export class AccountService {
         trial_reminder_sent: false,
       },
     });
+
+    await SubscriptionRepository.invalidateCache(accountId);
 
     return subscription;
   }

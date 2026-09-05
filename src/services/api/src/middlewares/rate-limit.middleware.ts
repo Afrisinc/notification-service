@@ -1,78 +1,54 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { redisClient } from '@shared/redis';
 import { logger } from '../config/logger';
 
 interface RateLimitConfig {
   windowMs: number;
   max: number;
   keyGenerator?: (request: FastifyRequest) => string;
-  skipFailedRequests?: boolean;
-  skipSuccessfulRequests?: boolean;
   message?: string;
 }
 
-interface RateLimitStore {
-  [key: string]: {
-    count: number;
-    resetTime: number;
-  };
-}
-
-const stores: Map<string, RateLimitStore> = new Map();
-
-function getStore(name: string): RateLimitStore {
-  if (!stores.has(name)) {
-    stores.set(name, {});
-  }
-  return stores.get(name)!;
-}
-
-function cleanupExpired(store: RateLimitStore, now: number): void {
-  for (const key in store) {
-    if (store[key].resetTime < now) {
-      delete store[key];
-    }
-  }
-}
-
 export function createRateLimiter(name: string, config: RateLimitConfig) {
-  const store = getStore(name);
-
   return async (request: FastifyRequest, reply: FastifyReply) => {
-    const now = Date.now();
-    cleanupExpired(store, now);
-
     const key = config.keyGenerator
       ? config.keyGenerator(request)
       : (request.headers['x-account-id'] as string) || request.ip || 'anonymous';
 
-    if (!store[key]) {
-      store[key] = {
-        count: 0,
-        resetTime: now + config.windowMs,
-      };
+    const redisKey = `ratelimit:${name}:${key}`;
+
+    let count: number;
+    let ttl: number;
+
+    try {
+      const results = await redisClient.multi().incr(redisKey).pttl(redisKey).exec();
+
+      if (!results) throw new Error('Redis transaction returned no results');
+
+      count = results[0][1] as number;
+      ttl = results[1][1] as number;
+
+      if (ttl < 0) {
+        await redisClient.pexpire(redisKey, config.windowMs);
+        ttl = config.windowMs;
+      }
+    } catch (err) {
+      logger.error({ err, key: redisKey }, 'Rate limiter Redis error, failing open');
+      return;
     }
 
-    if (store[key].resetTime < now) {
-      store[key] = {
-        count: 0,
-        resetTime: now + config.windowMs,
-      };
-    }
-
-    store[key].count++;
-
-    const remaining = Math.max(0, config.max - store[key].count);
-    const resetTime = Math.ceil(store[key].resetTime / 1000);
+    const remaining = Math.max(0, config.max - count);
+    const resetTime = Math.ceil((Date.now() + ttl) / 1000);
 
     reply.header('X-RateLimit-Limit', config.max);
     reply.header('X-RateLimit-Remaining', remaining);
     reply.header('X-RateLimit-Reset', resetTime);
 
-    if (store[key].count > config.max) {
-      const retryAfter = Math.ceil((store[key].resetTime - now) / 1000);
+    if (count > config.max) {
+      const retryAfter = Math.ceil(ttl / 1000);
       reply.header('Retry-After', retryAfter);
 
-      logger.warn({ key, count: store[key].count, limit: config.max }, 'Rate limit exceeded');
+      logger.warn({ key, count, limit: config.max }, 'Rate limit exceeded');
 
       return reply.code(429).send({
         success: false,

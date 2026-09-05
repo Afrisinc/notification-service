@@ -7,6 +7,10 @@ import { logger } from '../config/logger';
 import { initializeTrialJob, stopTrialJob } from './trial.job';
 import { initializeCampaignJob, stopCampaignJob } from './campaign.job';
 import { initializePaymentReconciliationJob, stopPaymentReconciliationJob } from './payment-reconciliation.job';
+import {
+  initializeNotificationReconciliationJob,
+  stopNotificationReconciliationJob,
+} from './notification-reconciliation.job';
 
 /**
  * Initialize all scheduled jobs
@@ -19,6 +23,7 @@ export function initializeJobs(): void {
   initializeTrialJob();
   initializeCampaignJob();
   initializePaymentReconciliationJob();
+  initializeNotificationReconciliationJob();
 
   logger.info('[OK] All scheduled jobs initialized');
 }
@@ -32,6 +37,7 @@ export function stopAllJobs(): void {
   stopTrialJob();
   stopCampaignJob();
   stopPaymentReconciliationJob();
+  stopNotificationReconciliationJob();
 
   logger.info('All scheduled jobs stopped');
 }
@@ -39,3 +45,4 @@ export function stopAllJobs(): void {
 export { runTrialProcessingManually } from './trial.job';
 export { runCampaignProcessingManually } from './campaign.job';
 export { runPaymentReconciliation } from './payment-reconciliation.job';
+export { runNotificationReconciliationManually } from './notification-reconciliation.job';

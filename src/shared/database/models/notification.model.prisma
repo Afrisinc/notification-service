@@ -18,6 +18,7 @@ model Notification {
   scheduledAt  DateTime?
   sentAt       DateTime?
   deliveredAt  DateTime?
+  refundedAt   DateTime?
   createdAt    DateTime             @default(now())
 
   // Relations
@@ -28,5 +29,6 @@ model Notification {
   @@index([account_id, status])
   @@index([app_id, status])
   @@index([createdAt])
+  @@index([status, createdAt])
   @@map("notifications")
 }

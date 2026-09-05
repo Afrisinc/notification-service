@@ -1,4 +1,5 @@
 import { prismaRead, prismaWrite } from '@shared/database';
+import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { logger } from '../config/logger';
 
 export class PlanManagementService {
@@ -259,10 +260,7 @@ export class PlanManagementService {
       }
 
       // Get plan limit
-      const subscription = await prismaRead.subscription.findUnique({
-        where: { account_id: accountId },
-        include: { plan: { include: { limits: true } } },
-      });
+      const subscription = await SubscriptionRepository.getSubscriptionWithLimits(accountId);
 
       const limit = subscription?.plan.limits.find((l) => l.metric === metric);
       return limit?.limit_value || 0;
@@ -293,10 +291,7 @@ export class PlanManagementService {
       }
 
       // Get plan limit
-      const subscription = await prismaRead.subscription.findUnique({
-        where: { account_id: accountId },
-        include: { plan: { include: { limits: true } } },
-      });
+      const subscription = await SubscriptionRepository.getSubscriptionWithLimits(accountId);
 
       const planLimit = subscription?.plan.limits.find((l) => l.metric === metric);
       if (!planLimit) {

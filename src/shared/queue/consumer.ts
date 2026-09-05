@@ -6,13 +6,15 @@ import { RabbitConnection } from './connection';
 import type { QueueMessage } from './types';
 
 export type MessageHandler<T = QueueMessage> = (message: T) => Promise<void>;
+export type ExhaustedHandler<T = QueueMessage> = (message: T, error: Error, retryCount: number) => Promise<void> | void;
 
-export interface RabbitConsumerOptions {
+export interface RabbitConsumerOptions<T = QueueMessage> {
   url: string;
   dlqConfig: DLQConfig;
   retryConfig: QueueRetryConfig;
   logger: Logger;
   prefetch?: number;
+  onExhausted?: ExhaustedHandler<T>;
 }
 
 export class RabbitConsumer<T = QueueMessage> {
@@ -21,7 +23,7 @@ export class RabbitConsumer<T = QueueMessage> {
   private handler: MessageHandler<T> | null = null;
   private stopping = false;
 
-  constructor(private readonly options: RabbitConsumerOptions) {
+  constructor(private readonly options: RabbitConsumerOptions<T>) {
     this.connection = new RabbitConnection({
       url: options.url,
       name: `consumer:${options.dlqConfig.mainQueue}`,
@@ -114,6 +116,20 @@ export class RabbitConsumer<T = QueueMessage> {
         await sendToDLQ(channel, dlqConfig.dlxExchange, dlqConfig.dlqRoutingKey, msg.content, headers, error, logger);
         channel.ack(msg);
         logger.error({ notificationId, retryCount }, 'Retries exhausted, message sent to DLQ');
+
+        if (this.options.onExhausted) {
+          try {
+            await this.options.onExhausted(message, error, retryCount);
+          } catch (hookError) {
+            logger.error(
+              {
+                notificationId,
+                error: hookError instanceof Error ? hookError.message : String(hookError),
+              },
+              'onExhausted hook failed'
+            );
+          }
+        }
       }
     }
   }

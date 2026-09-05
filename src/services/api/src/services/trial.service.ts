@@ -7,6 +7,7 @@ import { prismaRead, prismaWrite } from '@shared/database';
 import { logger } from '../config/logger';
 import { env } from '../config/env';
 import { NotifyService } from './notify.service';
+import { SubscriptionRepository } from '../repositories/subscription.repository';
 
 const notifyService = new NotifyService();
 
@@ -98,6 +99,7 @@ export class TrialService {
         where: { id: subscription.id },
         data: { trial_reminder_sent: true },
       });
+      await SubscriptionRepository.invalidateCache(subscription.account_id);
 
       logger.info({ subscriptionId: subscription.id, userId: user.id, daysRemaining }, 'Trial reminder sent');
 
@@ -195,6 +197,7 @@ export class TrialService {
           current_period_end: periodEnd,
         },
       });
+      await SubscriptionRepository.invalidateCache(subscription.account_id);
 
       // Create invoice record
       const invoiceNumber = `INV-${Date.now()}-${subscription.id.slice(0, 8)}`;
@@ -224,6 +227,7 @@ export class TrialService {
         where: { id: subscription.id },
         data: { status: 'past_due' },
       });
+      await SubscriptionRepository.invalidateCache(subscription.account_id);
 
       logger.error({ error, subscriptionId: subscription.id }, 'Payment failed on trial end');
       throw error;
@@ -245,6 +249,7 @@ export class TrialService {
         where: { id: subscription.id },
         data: { status: 'past_due' },
       });
+      await SubscriptionRepository.invalidateCache(subscription.account_id);
       return;
     }
 
@@ -263,6 +268,7 @@ export class TrialService {
         current_period_end: periodEnd,
       },
     });
+    await SubscriptionRepository.invalidateCache(subscription.account_id);
 
     await this.sendTrialExpiredNotification(subscription);
 
