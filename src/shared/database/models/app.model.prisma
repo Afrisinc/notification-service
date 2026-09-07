@@ -20,6 +20,7 @@ model App {
   campaigns         Campaign[]
   settings          AppSettings?
   emailProvider     AppEmailProvider?
+  emailDomains      EmailDomain[]
 
   @@index([account_id])
   @@index([organization_id])

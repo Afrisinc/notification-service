@@ -23,6 +23,8 @@ import { registerNotificationLogsRoutes } from './notification-logs.routes';
 import { registerSubscriptionRoutes } from './subscription.routes';
 import { registerPlanManagementRoutes } from './plan-management.routes';
 import { registerAppEmailProviderRoutes } from './app-email-provider.routes';
+import { registerEmailIdentityRoutes } from './email-identity.routes';
+import { registerPlatformEmailSettingsRoutes } from './platform-email-settings.routes';
 import { registerPaygRoutes } from './payg.routes';
 import { registerPaymentRoutes } from './payment.routes';
 import { clientsRoutes } from './clients.routes';
@@ -91,6 +93,14 @@ export async function v1Routes(fastify: FastifyInstance) {
   });
 
   await fastify.register(registerAppEmailProviderRoutes, {
+    prefix: '/api',
+  });
+
+  await fastify.register(registerEmailIdentityRoutes, {
+    prefix: '/api',
+  });
+
+  await fastify.register(registerPlatformEmailSettingsRoutes, {
     prefix: '/api',
   });
 

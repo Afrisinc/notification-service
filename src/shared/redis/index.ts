@@ -1,9 +1,9 @@
 import Redis from 'ioredis';
-import { getConfig } from '@shared/config';
 
 const NODE_ENV = process.env.NODE_ENV || 'development';
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
-export const redisClient = new Redis(getConfig().REDIS_URL, {
+export const redisClient = new Redis(REDIS_URL, {
   lazyConnect: true,
   maxRetriesPerRequest: 3,
   enableReadyCheck: true,

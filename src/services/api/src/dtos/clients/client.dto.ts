@@ -3,6 +3,8 @@
  */
 export interface OrganizationAccountDTO {
   id: number;
+  accountId: string;
+  organizationId: string | null;
   name: string;
   plan: 'FREE' | 'STARTER' | 'SCALE' | 'ENTERPRISE' | 'PRO' | 'PAYG';
   role: 'owner' | 'member' | 'admin';
