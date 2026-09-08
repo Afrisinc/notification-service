@@ -143,3 +143,69 @@ export const GetPaymentStatusSchema = {
     },
   },
 };
+
+export const AdminInitializePaymentSchema = {
+  description:
+    'Admin endpoint: Initialize payment on behalf of account (PAYG top-up, subscription, or template purchase)',
+  tags: ['Admin', 'Payments'],
+  security: [{ bearerAuth: [] }],
+  body: {
+    type: 'object',
+    required: ['targetAccountId', 'type', 'amount', 'method'],
+    properties: {
+      targetAccountId: {
+        type: 'string',
+        description: 'Account ID to initiate payment for',
+      },
+      type: {
+        type: 'string',
+        enum: ['payg_topup', 'subscription', 'template_purchase'],
+        description: 'What the payment is for',
+      },
+      method: { type: 'string', enum: ['card', 'mobile'], description: 'Payment method' },
+      amount: { type: 'number', minimum: 0.5, description: 'Amount in specified currency' },
+      currency: {
+        type: 'string',
+        enum: ['USD', 'RWF'],
+        default: 'USD',
+        description: 'Payment currency',
+      },
+      planId: { type: 'string', description: 'Plan ID (required for subscription)' },
+      templateId: { type: 'string', description: 'Template ID (required for template_purchase)' },
+      appId: { type: 'string', description: 'App ID to install template into (required for template_purchase)' },
+      email: { type: 'string', description: 'Customer email' },
+      phoneNumber: { type: 'string', description: 'Customer phone' },
+      customerName: { type: 'string', description: 'Customer name' },
+    },
+  },
+  response: {
+    201: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+        data: {
+          type: 'object',
+          properties: {
+            orderId: { type: 'string' },
+            paymentRef: { type: 'string' },
+            amount: { type: 'number' },
+            currency: { type: 'string' },
+            status: { type: 'string' },
+            initiatedBy: { type: 'string' },
+            targetAccountId: { type: 'string' },
+          },
+        },
+      },
+    },
+    400: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'number' },
+      },
+    },
+  },
+};

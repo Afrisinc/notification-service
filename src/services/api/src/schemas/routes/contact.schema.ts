@@ -72,6 +72,54 @@ export const ListContactsSchema = {
   security: [{ bearerAuth: [] }],
 };
 
+// Shared by both create-contact routes (with and without :appId in the URL)
+// so the body contract stays identical regardless of how the app is resolved.
+const createContactBody = {
+  type: 'object',
+  properties: {
+    email: { type: 'string', format: 'email', description: 'Email address (required)' },
+    firstName: { type: 'string', description: 'First name' },
+    lastName: { type: 'string', description: 'Last name' },
+    phone: { type: 'string', description: 'Phone number' },
+    company: { type: 'string', description: 'Company name' },
+    subject: { type: 'string', description: 'Subject or inquiry topic' },
+    message: { type: 'string', description: 'Contact form message (for contact_form source)' },
+    status: { type: 'string', enum: ['active', 'inactive', 'unsubscribed'], default: 'active' },
+    subscribed: { type: 'boolean', default: true },
+    tags: { type: 'array', items: { type: 'string' } },
+    attributes: { type: 'object', description: 'Custom attributes' },
+    source: {
+      type: 'string',
+      enum: ['contact_form', 'import', 'api', 'webhook', 'widget', 'newsletter'],
+      description:
+        'Contact source. When set to contact_form: automatically adds contact_form tag and sends auto-reply email',
+    },
+
+    // App resolution for routes with no :appId in the URL (see CreateContactSdkSchema).
+    // Required when authenticating with a JWT; ignored when using an API key or the
+    // /apps/:appId/contacts path, since the app is already known in those cases.
+    app_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'App ID (required only for the param-less SDK route + JWT auth)',
+    },
+  },
+  required: ['email'],
+};
+
+const createContactResponse = {
+  201: {
+    type: 'object',
+    properties: {
+      success: { type: 'boolean' },
+      resp_msg: { type: 'string' },
+      resp_code: { type: 'integer' },
+      data: contactObject,
+    },
+  },
+  ...standardErrorResponses,
+};
+
 export const CreateContactSchema = {
   description: 'Create a new contact (supports both authenticated and public access with contact form support)',
   tags: ['Contacts'],
@@ -82,47 +130,24 @@ export const CreateContactSchema = {
     },
     required: ['appId'],
   },
-  body: {
-    type: 'object',
-    properties: {
-      email: { type: 'string', format: 'email', description: 'Email address (required)' },
-      firstName: { type: 'string', description: 'First name' },
-      lastName: { type: 'string', description: 'Last name' },
-      phone: { type: 'string', description: 'Phone number' },
-      company: { type: 'string', description: 'Company name' },
-      subject: { type: 'string', description: 'Subject or inquiry topic' },
-      message: { type: 'string', description: 'Contact form message (for contact_form source)' },
-      status: { type: 'string', enum: ['active', 'inactive', 'unsubscribed'], default: 'active' },
-      subscribed: { type: 'boolean', default: true },
-      tags: { type: 'array', items: { type: 'string' } },
-      attributes: { type: 'object', description: 'Custom attributes' },
-      source: {
-        type: 'string',
-        enum: ['contact_form', 'import', 'api', 'webhook', 'widget', 'newsletter'],
-        description:
-          'Contact source. When set to contact_form: automatically adds contact_form tag and sends auto-reply email',
-      },
-    },
-    required: ['email'],
-  },
+  body: createContactBody,
   headers: {
     type: 'object',
     properties: {
       'x-account-id': { type: 'string', description: 'Account ID (optional - auto-resolved from app if not provided)' },
     },
   },
-  response: {
-    201: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean' },
-        resp_msg: { type: 'string' },
-        resp_code: { type: 'integer' },
-        data: contactObject,
-      },
-    },
-    ...standardErrorResponses,
-  },
+  response: createContactResponse,
+};
+
+export const CreateContactSdkSchema = {
+  description:
+    'Create a new contact without an appId in the URL. The app is resolved from the API key used, ' +
+    'or from `app_id` in the body when authenticating with a JWT (same contract as /notify/send).',
+  tags: ['Contacts'],
+  body: createContactBody,
+  response: createContactResponse,
+  security: [{ bearerAuth: [] }],
 };
 
 export const GetContactSchema = {

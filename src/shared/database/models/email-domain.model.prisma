@@ -1,0 +1,50 @@
+model EmailDomain {
+  id                     String                @id @default(uuid())
+  app_id                 String
+  domain                 String
+  selector               String                @default("afrisinc")
+  dkim_public_key        String?
+  dkim_private_key_path  String?
+  status                 CustomerDomainStatus  @default(pending)
+  spf_verified           Boolean               @default(false)
+  dkim_verified          Boolean               @default(false)
+  dmarc_verified         Boolean               @default(false)
+  verified_at            DateTime?
+
+  // Cloudflare-assisted DNS setup (optional - falls back to manual DNS records)
+  cloudflare_zone_id     String?
+  cloudflare_api_token   String?               // encrypted
+  cloudflare_connected   Boolean               @default(false)
+
+  created_at             DateTime              @default(now())
+  updated_at             DateTime              @updatedAt
+
+  // Relations
+  app                    App                   @relation(fields: [app_id], references: [id], onDelete: Cascade)
+  senders                EmailSender[]
+
+  @@unique([app_id, domain])
+  @@index([app_id])
+  @@map("email_domains")
+}
+
+model EmailSender {
+  id               String       @id @default(uuid())
+  domain_id        String
+  local_part       String
+  from_name        String?
+  reply_to_email   String?
+  reply_to_name    String?
+  is_default       Boolean      @default(false)
+  is_active        Boolean      @default(true)
+
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
+
+  // Relations
+  domain           EmailDomain  @relation(fields: [domain_id], references: [id], onDelete: Cascade)
+
+  @@unique([domain_id, local_part])
+  @@index([domain_id])
+  @@map("email_senders")
+}

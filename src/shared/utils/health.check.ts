@@ -1,5 +1,6 @@
 import { CheckResult } from '../../types/shared';
 import { prismaRead, prismaWrite } from '../database';
+import { redisClient } from '../redis';
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
@@ -30,4 +31,17 @@ export async function checkDBHealth(): Promise<{
     statusCode: allUp ? 200 : 503,
     db: { read, write },
   };
+}
+
+export async function checkRedisHealth(): Promise<{
+  statusCode: number;
+  redis: CheckResult;
+}> {
+  const start = Date.now();
+  try {
+    await withTimeout(redisClient.ping(), 1500, 'redis');
+    return { statusCode: 200, redis: { status: 'up', latencyMs: Date.now() - start } };
+  } catch (err: any) {
+    return { statusCode: 503, redis: { status: 'down', error: err?.message || 'unknown error' } };
+  }
 }

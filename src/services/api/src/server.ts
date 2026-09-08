@@ -1,5 +1,6 @@
 import { getConfig } from '@shared/config';
 import { verifyDbConnections } from '@shared/database';
+import { verifyRedisConnection, closeRedisConnection } from '@shared/redis';
 import { createFastifyApp } from './app';
 import { logger } from './config/logger';
 import { initializeNotifyService, getQueuePublisher } from './services/notify.service';
@@ -27,6 +28,19 @@ async function startServer() {
       logger.error('[ERROR] Failed to start server - database connection failed');
       process.exit(1);
     }
+
+    logger.info('===================================================');
+    logger.info('[REDIS] Verifying Redis connectivity...');
+    logger.info('===================================================');
+
+    const redisConnected = await verifyRedisConnection();
+
+    if (!redisConnected) {
+      logger.error('[ERROR] Failed to start server - Redis connection failed');
+      process.exit(1);
+    }
+
+    logger.info('[OK] Redis connected and ready');
 
     logger.info('===================================================');
     logger.info('[QUEUE] Initializing queue publisher...');
@@ -91,6 +105,13 @@ async function startServer() {
         }
       } catch (error) {
         logger.error(error, 'Error disconnecting queue publisher');
+      }
+
+      // Disconnect Redis
+      try {
+        await closeRedisConnection();
+      } catch (error) {
+        logger.error(error, 'Error disconnecting Redis');
       }
 
       if (fastify) {

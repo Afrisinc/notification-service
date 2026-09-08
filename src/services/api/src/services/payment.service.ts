@@ -4,7 +4,8 @@ import { SubscriptionRepository } from '../repositories/subscription.repository'
 import { prismaRead } from '@shared/database';
 import { getPaymentClient, isPaymentClientInitialized } from '../utils/payment-client';
 import { convertUsdToRwf } from '../utils/exchange-rate';
-import { mapTransaction } from './payg.service';
+import { mapTransaction } from '../utils/transaction-mapper.util';
+import { PaymentTrackingService } from './payment-tracking.service';
 import type { CreditTransactionType, InitializePaymentRequest, InitializePaymentResult } from '../types/payg.types';
 
 const MIN_TOPUP_USD = 0.5;
@@ -48,16 +49,41 @@ export class PaymentService {
       paymentRef: orderId,
     });
 
-    // Convert to RWF if needed (USD → RWF conversion, RWF → use as-is)
     const currency = req.currency ?? 'USD';
     let amountRWF: number;
+    let exchangeRate: number | undefined;
+    let baseCode: string | undefined;
+    let targetCode: string | undefined;
+    let amountLocal: number | undefined;
 
     if (currency === 'RWF') {
-      amountRWF = amountUSD; // Already in RWF
+      amountRWF = amountUSD;
     } else {
-      amountRWF = await convertUsdToRwf(amountUSD); // Convert USD → RWF
+      const { amountRWF: converted, rateData } = await convertUsdToRwf(amountUSD);
+      amountRWF = converted;
+      exchangeRate = rateData.rate;
+      baseCode = rateData.baseCode;
+      targetCode = rateData.targetCode;
+      amountLocal = Math.round(amountUSD * exchangeRate * 100);
     }
-    // Both keys are set: the card webhook reads `paymentType`, the mobile webhook reads `type`.
+
+    await PaymentTrackingService.recordPaymentInitialization({
+      accountId,
+      ref: orderId,
+      orderId,
+      amount: Math.round(amountUSD * 100),
+      currency: 'USD' as any,
+      type: req.type as any,
+      email: req.email,
+      phoneNumber: req.phoneNumber,
+      customerName: req.customerName,
+      method: req.method,
+      exchangeRate,
+      baseCode,
+      targetCode,
+      amountLocal,
+    });
+
     const gatewayMetadata = {
       ...metadata,
       accountId,

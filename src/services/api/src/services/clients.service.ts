@@ -52,6 +52,8 @@ export class ClientsService {
           return {
             org: {
               id: Math.abs(Number.parseInt(account.id.substring(0, 8), 16)),
+              accountId: account.id,
+              organizationId: account.organization_id ?? null,
               name: account.organization?.name || 'N/A',
               plan: planName as 'FREE' | 'STARTER' | 'SCALE' | 'ENTERPRISE' | 'PRO' | 'PAYG',
               role: 'owner' as const,

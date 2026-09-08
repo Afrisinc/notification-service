@@ -1,5 +1,5 @@
 import { AppEmailProviderRepository } from '../repositories/app-email-provider.repository';
-import { prismaRead, prismaWrite } from '@shared/database';
+import { prismaRead } from '@shared/database';
 import { getConfig } from '@shared/config';
 import { encrypt } from '@shared/utils/encryption';
 import { logger } from '../config/logger';
@@ -297,44 +297,25 @@ export class AppEmailProviderService {
       await dkimService.reloadOpenDKIM();
 
       // Store config in database
-      const emailConfig = await prismaWrite.appEmailProvider.upsert({
-        where: { app_id: appId },
-        create: {
-          app_id: appId,
-          provider: 'custom_domain',
-          method: null,
-          domain: domain,
-          selector: sel,
-          public_key: publicKey,
-          private_key_path: privateKeyPath,
-          domain_status: 'pending',
-          is_active: true,
-          spf_verified: false,
-          dkim_verified: false,
-          dmarc_verified: false,
-          from_email: options?.fromEmail || null,
-          from_name: options?.fromName || null,
-        },
-        update: {
-          provider: 'custom_domain',
-          method: null,
-          domain: domain,
-          selector: sel,
-          public_key: publicKey,
-          private_key_path: privateKeyPath,
-          domain_status: 'pending',
-          is_active: true,
-          spf_verified: false,
-          dkim_verified: false,
-          dmarc_verified: false,
-          from_email: options?.fromEmail || null,
-          from_name: options?.fromName || null,
-          gmail_email: null,
-          oauth_access_token: null,
-          oauth_refresh_token: null,
-          oauth_token_expiry: null,
-          app_password: null,
-        },
+      const emailConfig = await AppEmailProviderRepository.upsert(appId, {
+        provider: 'custom_domain',
+        method: null,
+        domain: domain,
+        selector: sel,
+        public_key: publicKey,
+        private_key_path: privateKeyPath,
+        domain_status: 'pending',
+        is_active: true,
+        spf_verified: false,
+        dkim_verified: false,
+        dmarc_verified: false,
+        from_email: options?.fromEmail || null,
+        from_name: options?.fromName || null,
+        gmail_email: null,
+        oauth_access_token: null,
+        oauth_refresh_token: null,
+        oauth_token_expiry: null,
+        app_password: null,
       });
 
       logger.info({ appId, domain }, 'Custom domain configured with DKIM keys');
@@ -408,14 +389,11 @@ export class AppEmailProviderService {
       logger.info({ domain, spfVerified, dkimVerified, dmarcVerified }, 'DNS verification completed');
 
       // Update database with verification results
-      await prismaWrite.appEmailProvider.update({
-        where: { app_id: appId },
-        data: {
-          spf_verified: spfVerified,
-          dkim_verified: dkimVerified,
-          dmarc_verified: dmarcVerified,
-          domain_status: spfVerified && dkimVerified && dmarcVerified ? 'verified' : 'pending',
-        },
+      await AppEmailProviderRepository.upsert(appId, {
+        spf_verified: spfVerified,
+        dkim_verified: dkimVerified,
+        dmarc_verified: dmarcVerified,
+        domain_status: spfVerified && dkimVerified && dmarcVerified ? 'verified' : 'pending',
       });
 
       return {

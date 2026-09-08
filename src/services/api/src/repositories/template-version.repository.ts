@@ -1,4 +1,5 @@
 import { prismaWrite, prismaRead } from '@shared/database';
+import { invalidateCache, cacheKeys } from '@shared/cache';
 import { logger } from '../config/logger';
 import { transformPrismaError } from '../utils/db-errors';
 
@@ -130,6 +131,7 @@ export class TemplateVersionRepository {
         }),
       ]);
 
+      await invalidateCache(cacheKeys.template(templateId));
       logger.info({ templateId, versionId: id, version: activated.version }, 'Template version activated');
 
       return activated;

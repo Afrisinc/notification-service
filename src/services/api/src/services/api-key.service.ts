@@ -1,4 +1,5 @@
 import { randomBytes, createHash } from 'crypto';
+import { redisClient } from '@shared/redis';
 import { logger } from '../config/logger';
 import { apiKeyRepository } from '../repositories/api-key.repository';
 import {
@@ -111,8 +112,20 @@ export class ApiKeyService {
       return null;
     }
 
-    // Update last used timestamp
-    await apiKeyRepository.update(apiKey.id, { lastUsedAt: new Date() });
+    // Update last used timestamp, throttled to once per 5 minutes per key so a
+    // hot key doesn't generate a DB write on every single request. Fire-and-forget:
+    // this is bookkeeping, not part of the auth decision.
+    const touchGuardKey = `apikey:touch:${apiKey.id}`;
+    redisClient
+      .set(touchGuardKey, '1', 'EX', 300, 'NX')
+      .then((acquired) => {
+        if (acquired === 'OK') {
+          return apiKeyRepository.update(apiKey.id, { lastUsedAt: new Date() });
+        }
+      })
+      .catch((error) => {
+        logger.error({ error, apiKeyId: apiKey.id }, 'Failed to update API key lastUsedAt');
+      });
 
     return {
       account_id: apiKey.account_id,

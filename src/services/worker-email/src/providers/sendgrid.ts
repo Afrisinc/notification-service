@@ -2,6 +2,7 @@ import pino from 'pino';
 import sgMail from '@sendgrid/mail';
 import { EmailNotification, EmailProvider } from '@shared/common';
 import { getConfig } from '@shared/config';
+import { getPlatformEmailSettings } from '@shared/platform-settings';
 
 export class SendGridProvider implements EmailProvider {
   name = 'sendgrid';
@@ -19,8 +20,6 @@ export class SendGridProvider implements EmailProvider {
 
   async send(email: EmailNotification): Promise<{ messageId: string }> {
     try {
-      const config = getConfig();
-
       // Use sender info from message (resolved at publish time)
       let fromEmail = (email as any).fromEmail;
       let fromName = (email as any).fromName;
@@ -51,13 +50,11 @@ export class SendGridProvider implements EmailProvider {
         }
       }
 
-      // Use platform default if still not found
-      if (!fromEmail) {
-        fromEmail = config.FROM_EMAIL || config.SMTP_FROM || 'noreply@notification.local';
-      }
-
-      if (!fromName) {
-        fromName = 'Afrisinc';
+      // Use the platform's admin-editable default if still not found
+      if (!fromEmail || !fromName) {
+        const platformDefaults = await getPlatformEmailSettings();
+        fromEmail = fromEmail || platformDefaults.fromEmail;
+        fromName = fromName || platformDefaults.fromName;
       }
 
       const msg: any = {

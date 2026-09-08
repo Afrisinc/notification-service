@@ -1,9 +1,11 @@
 import { logger } from '../config/logger';
-import { prismaWrite, prismaRead } from '@shared/database';
+import { prismaWrite } from '@shared/database';
 import { IQueuePublisher, QueuePublisherFactory, QueuePublisherConfig } from './queue';
 import { Template } from '../types/template';
 import { calculateSmsSegments } from '../utils/smsSegments';
 import { validateAttachments, normalizeAttachments } from '../utils/attachment';
+import { templateRepository } from '../repositories/template.repository';
+import { AppEmailProviderRepository } from '../repositories/app-email-provider.repository';
 import type { QueueMessageAttachment } from './queue/publisher.interface';
 import {
   Notification,
@@ -50,9 +52,7 @@ export class NotifyService {
 
     // TEMPLATE MODE: if templateId provided
     if (request.templateId) {
-      template = await prismaRead.template.findUnique({
-        where: { id: request.templateId },
-      });
+      template = await templateRepository.getByIdCached(request.templateId);
 
       if (!template) {
         const error = new Error(
@@ -158,9 +158,7 @@ export class NotifyService {
     let fromEmail: string | undefined;
     let fromName: string | undefined;
     try {
-      const emailConfig = await prismaRead.appEmailProvider.findUnique({
-        where: { app_id: appId },
-      });
+      const emailConfig = await AppEmailProviderRepository.findByAppId(appId);
       if (emailConfig && emailConfig.from_email) {
         fromEmail = emailConfig.from_email;
         fromName = emailConfig.from_name || undefined;

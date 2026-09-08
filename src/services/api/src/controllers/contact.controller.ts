@@ -7,6 +7,7 @@ import { PlanEnforcementMiddleware } from '../middleware/plan-enforcement.middle
 import { ApiResponseHelper } from '../utils';
 import { prismaRead } from '@shared/database';
 import { AccountService } from '../services/account.service';
+import { resolveAppContext } from '../utils/resolve-app-context';
 import { CreateContactDto, UpdateContactDto, ListContactsQuery } from '../types/contact.types';
 import pino from 'pino';
 
@@ -45,14 +46,14 @@ export async function listContacts(req: FastifyRequest, reply: FastifyReply) {
 
 export async function createContact(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const { appId } = req.params as { appId: string };
     const body = req.body as CreateContactDto;
+    const context = await resolveAppContext(req, reply);
+    if (!context) return;
+    const { appId, accountId } = context;
 
     if (!body.email) {
       return ApiResponseHelper.badRequest(reply, 'Email is required');
     }
-
-    const accountId = await accountService.getAccountIdByAppId(appId);
 
     // Check contact limit before creation
     const limitCheck = await PlanEnforcementMiddleware.checkEntityLimit(accountId, 'contacts');

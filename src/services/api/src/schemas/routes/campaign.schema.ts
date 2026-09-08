@@ -91,6 +91,74 @@ export const ListCampaignsSchema = {
   security: [{ bearerAuth: [] }],
 };
 
+// Shared by both create-campaign routes (with and without :appId in the URL)
+// so the body contract stays identical regardless of how the app is resolved.
+const createCampaignBody = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', description: 'Campaign name (required)' },
+    channel: { type: 'string', enum: ['EMAIL', 'SMS', 'PUSH', 'IN_APP'], description: 'Channel (required)' },
+
+    // App resolution for routes with no :appId in the URL (see CreateCampaignSdkSchema).
+    // Required when authenticating with a JWT; ignored when using an API key or the
+    // /apps/:appId/campaigns path, since the app is already known in those cases.
+    app_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'App ID (required only for the param-less SDK route + JWT auth)',
+    },
+
+    // Template mode (optional - use this OR direct content)
+    templateId: { type: 'string', format: 'uuid', description: 'Template ID (use template mode)' },
+
+    // EMAIL direct content
+    subject: { type: 'string', description: 'Email subject (EMAIL channel)' },
+    html_content: { type: 'string', description: 'Email HTML body (EMAIL channel)' },
+
+    // SMS direct content
+    text_content: { type: 'string', description: 'SMS text message (SMS channel)' },
+
+    // PUSH direct content
+    push_title: { type: 'string', description: 'Push notification title (PUSH channel)' },
+    push_body: { type: 'string', description: 'Push notification body (PUSH channel)' },
+    push_image_url: { type: 'string', description: 'Push image URL (PUSH channel)' },
+    push_action_url: { type: 'string', description: 'Push action URL (PUSH channel)' },
+    push_data: { type: 'object', description: 'Push custom data payload (PUSH channel)' },
+
+    // IN_APP direct content
+    inapp_title: { type: 'string', description: 'In-app title (IN_APP channel)' },
+    inapp_body: { type: 'string', description: 'In-app body (IN_APP channel)' },
+    inapp_image_url: { type: 'string', description: 'In-app image URL (IN_APP channel)' },
+    inapp_action_url: { type: 'string', description: 'In-app action URL (IN_APP channel)' },
+    inapp_action_text: { type: 'string', description: 'In-app CTA button text (IN_APP channel)' },
+
+    // Recipient targeting
+    recipientType: { type: 'string', enum: ['all', 'tags', 'segment', 'custom'], default: 'all' },
+    recipientCount: { type: 'integer', default: 0 },
+    recipientTags: { type: 'array', items: { type: 'string' } },
+    recipientSegment: { type: 'string' },
+
+    // Campaign settings
+    status: { type: 'string', enum: ['draft', 'scheduled'], default: 'draft' },
+    scheduledAt: { type: 'string', format: 'date-time' },
+    metadata: { type: 'object' },
+  },
+  required: ['name', 'channel'],
+};
+
+const createCampaignResponse = {
+  201: {
+    type: 'object',
+    properties: {
+      success: { type: 'boolean' },
+      resp_msg: { type: 'string' },
+      resp_code: { type: 'integer' },
+      data: campaignObject,
+    },
+  },
+  ...standardErrorResponses,
+};
+
 export const CreateCampaignSchema = {
   description:
     'Create a new campaign. Use templateId for template mode, or provide channel-specific content for direct mode.',
@@ -102,61 +170,18 @@ export const CreateCampaignSchema = {
     },
     required: ['appId'],
   },
-  body: {
-    type: 'object',
-    properties: {
-      name: { type: 'string', description: 'Campaign name (required)' },
-      channel: { type: 'string', enum: ['EMAIL', 'SMS', 'PUSH', 'IN_APP'], description: 'Channel (required)' },
+  body: createCampaignBody,
+  response: createCampaignResponse,
+  security: [{ bearerAuth: [] }],
+};
 
-      // Template mode (optional - use this OR direct content)
-      templateId: { type: 'string', format: 'uuid', description: 'Template ID (use template mode)' },
-
-      // EMAIL direct content
-      subject: { type: 'string', description: 'Email subject (EMAIL channel)' },
-      html_content: { type: 'string', description: 'Email HTML body (EMAIL channel)' },
-
-      // SMS direct content
-      text_content: { type: 'string', description: 'SMS text message (SMS channel)' },
-
-      // PUSH direct content
-      push_title: { type: 'string', description: 'Push notification title (PUSH channel)' },
-      push_body: { type: 'string', description: 'Push notification body (PUSH channel)' },
-      push_image_url: { type: 'string', description: 'Push image URL (PUSH channel)' },
-      push_action_url: { type: 'string', description: 'Push action URL (PUSH channel)' },
-      push_data: { type: 'object', description: 'Push custom data payload (PUSH channel)' },
-
-      // IN_APP direct content
-      inapp_title: { type: 'string', description: 'In-app title (IN_APP channel)' },
-      inapp_body: { type: 'string', description: 'In-app body (IN_APP channel)' },
-      inapp_image_url: { type: 'string', description: 'In-app image URL (IN_APP channel)' },
-      inapp_action_url: { type: 'string', description: 'In-app action URL (IN_APP channel)' },
-      inapp_action_text: { type: 'string', description: 'In-app CTA button text (IN_APP channel)' },
-
-      // Recipient targeting
-      recipientType: { type: 'string', enum: ['all', 'tags', 'segment', 'custom'], default: 'all' },
-      recipientCount: { type: 'integer', default: 0 },
-      recipientTags: { type: 'array', items: { type: 'string' } },
-      recipientSegment: { type: 'string' },
-
-      // Campaign settings
-      status: { type: 'string', enum: ['draft', 'scheduled'], default: 'draft' },
-      scheduledAt: { type: 'string', format: 'date-time' },
-      metadata: { type: 'object' },
-    },
-    required: ['name', 'channel'],
-  },
-  response: {
-    201: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean' },
-        resp_msg: { type: 'string' },
-        resp_code: { type: 'integer' },
-        data: campaignObject,
-      },
-    },
-    ...standardErrorResponses,
-  },
+export const CreateCampaignSdkSchema = {
+  description:
+    'Create a new campaign without an appId in the URL. The app is resolved from the API key used, ' +
+    'or from `app_id` in the body when authenticating with a JWT (same contract as /notify/send).',
+  tags: ['Campaigns'],
+  body: createCampaignBody,
+  response: createCampaignResponse,
   security: [{ bearerAuth: [] }],
 };
 

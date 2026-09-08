@@ -1,5 +1,6 @@
 import { prismaRead } from '@shared/database';
 import { PlanManagementService } from '../services/plan-management.service';
+import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { logger } from '../config/logger';
 
 export interface UsageLimitResult {
@@ -17,10 +18,7 @@ export class PlanEnforcementMiddleware {
     try {
       if (!accountId) return false;
 
-      const subscription = await prismaRead.subscription.findUnique({
-        where: { account_id: accountId },
-        include: { plan: { include: { limits: true } } },
-      });
+      const subscription = await SubscriptionRepository.getSubscriptionWithLimits(accountId);
 
       const validStatuses = ['active', 'trialing'];
       if (!subscription || !validStatuses.includes(subscription.status)) return false;
@@ -47,10 +45,7 @@ export class PlanEnforcementMiddleware {
       if (effectiveLimit === -1) return { allowed: true, remaining: -1, limit: -1 };
       if (effectiveLimit === 0) return { allowed: false, remaining: 0, limit: 0 };
 
-      const subscription = await prismaRead.subscription.findUnique({
-        where: { account_id: accountId },
-        include: { plan: { include: { limits: true } } },
-      });
+      const subscription = await SubscriptionRepository.getSubscriptionWithLimits(accountId);
 
       if (!subscription) return { allowed: false, remaining: 0, limit: 0 };
 
@@ -152,10 +147,7 @@ export class PlanEnforcementMiddleware {
    */
   static async isPaygAccount(accountId: string): Promise<boolean> {
     try {
-      const subscription = await prismaRead.subscription.findUnique({
-        where: { account_id: accountId },
-        include: { plan: true },
-      });
+      const subscription = await SubscriptionRepository.getSubscriptionWithLimits(accountId);
       const isPayg = subscription?.plan.name === 'PAYG';
       logger.debug(
         {
@@ -174,10 +166,7 @@ export class PlanEnforcementMiddleware {
   }
 
   static async getSubscriptionWithLimits(accountId: string) {
-    return prismaRead.subscription.findUnique({
-      where: { account_id: accountId },
-      include: { plan: { include: { limits: true } }, account: true },
-    });
+    return SubscriptionRepository.getSubscriptionWithLimits(accountId);
   }
 
   static getPeriodStart(period: string): Date {

@@ -1,4 +1,5 @@
 import { prismaWrite, prismaRead } from '@shared/database';
+import { getOrSetCache, invalidateCache, cacheKeys, CACHE_TTL } from '@shared/cache';
 import { logger } from '../config/logger';
 import { transformPrismaError } from '../utils/db-errors';
 
@@ -43,36 +44,47 @@ export interface PaginationMeta {
  */
 export class TemplateRepository {
   /**
+   * Find template by ID, regardless of account ownership.
+   * Cached since this row changes rarely relative to how often it's read
+   * (every templated notification send resolves it).
+   */
+  async getByIdCached(id: string): Promise<any> {
+    return getOrSetCache(cacheKeys.template(id), CACHE_TTL.TEMPLATE, async () => {
+      try {
+        return await prismaRead.template.findUnique({
+          where: { id },
+          include: {
+            versions: {
+              where: { isActive: true },
+              select: { id: true, version: true, isActive: true, createdAt: true },
+              take: 1,
+            },
+          },
+        });
+      } catch (error) {
+        logger.error({ error, id }, 'Failed to find template by ID');
+        throw transformPrismaError(error, 'template.repository');
+      }
+    });
+  }
+
+  /**
    * Find template by ID with account isolation
    * Returns null if template is soft-deleted
    */
   async findById(accountId: string, id: string): Promise<any> {
-    try {
-      const template = await prismaRead.template.findUnique({
-        where: { id },
-        include: {
-          versions: {
-            where: { isActive: true },
-            select: { id: true, version: true, isActive: true, createdAt: true },
-            take: 1,
-          },
-        },
-      });
+    const template = await this.getByIdCached(id);
 
-      // Verify account ownership and not soft-deleted
-      if (template && template.account_id !== accountId) {
-        return null;
-      }
-
-      if (template && template.deletedAt !== null) {
-        return null;
-      }
-
-      return template;
-    } catch (error) {
-      logger.error({ error, accountId, id }, 'Failed to find template by ID');
-      throw transformPrismaError(error, 'template.repository');
+    // Verify account ownership and not soft-deleted
+    if (template && template.account_id !== accountId) {
+      return null;
     }
+
+    if (template && template.deletedAt !== null) {
+      return null;
+    }
+
+    return template;
   }
 
   /**
@@ -288,6 +300,7 @@ export class TemplateRepository {
         },
       });
 
+      await invalidateCache(cacheKeys.template(id));
       logger.info({ accountId, templateId: id }, 'Template updated');
       return updated;
     } catch (error) {
@@ -311,6 +324,7 @@ export class TemplateRepository {
         data: { deletedAt: new Date() },
       });
 
+      await invalidateCache(cacheKeys.template(id));
       logger.info({ accountId, templateId: id }, 'Template soft deleted');
     } catch (error) {
       logger.error({ error, accountId, id }, 'Failed to soft delete template');
@@ -340,6 +354,7 @@ export class TemplateRepository {
         },
       });
 
+      await invalidateCache(cacheKeys.template(id));
       logger.info({ accountId, templateId: id }, 'Template activated');
       return activated;
     } catch (error) {
@@ -370,6 +385,7 @@ export class TemplateRepository {
         },
       });
 
+      await invalidateCache(cacheKeys.template(id));
       logger.info({ accountId, templateId: id }, 'Template deactivated');
       return deactivated;
     } catch (error) {
