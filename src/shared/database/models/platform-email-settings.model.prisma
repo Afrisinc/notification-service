@@ -1,0 +1,12 @@
+// Single-row table holding the platform-wide default sender identity, used
+// whenever an app has no custom email provider configured. Row id is always
+// the literal string "default".
+model PlatformEmailSettings {
+  id             String    @id @default("default")
+  from_email     String
+  from_name      String
+  support_email  String?
+  updated_at     DateTime  @updatedAt
+
+  @@map("platform_email_settings")
+}

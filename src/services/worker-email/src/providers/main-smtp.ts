@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { EmailNotification, EmailProvider } from '@shared/common';
 import { getConfig } from '@shared/config';
 import { prismaRead } from '@shared/database';
+import { getPlatformEmailSettings } from '@shared/platform-settings';
 import { dkimService } from '../../../api/src/services/dkim.service';
 
 /**
@@ -46,9 +47,12 @@ export class MainSMTPProvider implements EmailProvider {
 
   async send(email: EmailNotification): Promise<{ messageId: string }> {
     try {
-      const config = getConfig();
-      let fromEmail = config.FROM_EMAIL || config.SMTP_FROM || 'noreply@afrisinc.com';
-      let fromName: string | undefined = undefined;
+      // FROM_EMAIL/SMTP_FROM both carry non-empty env-schema defaults, so they can never
+      // reflect "unset" - the platform's admin-editable default is the real source of
+      // truth here (it's itself seeded from these same env vars on first read).
+      const platformDefaults = await getPlatformEmailSettings();
+      let fromEmail = platformDefaults.fromEmail;
+      let fromName: string | undefined = platformDefaults.fromName;
       let replyTo: string | undefined = undefined;
       let dkimConfig: any = undefined;
       let isCustomDomain = false;

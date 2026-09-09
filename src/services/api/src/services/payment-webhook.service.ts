@@ -201,6 +201,7 @@ export class PaymentWebhookService {
           ...(currentPeriodEnd && { current_period_end: new Date(currentPeriodEnd * 1000) }),
         },
       });
+      await SubscriptionRepository.invalidateCache(accountId);
 
       logger.info({ accountId, subscriptionId }, 'Subscription payment succeeded - status synced to active');
 
@@ -228,6 +229,7 @@ export class PaymentWebhookService {
         where: { account_id: accountId, provider_id: subscriptionId },
         data: { status: 'past_due' },
       });
+      await SubscriptionRepository.invalidateCache(accountId);
 
       logger.warn({ accountId, subscriptionId }, 'Subscription payment failed - status set to past_due');
 
@@ -255,6 +257,7 @@ export class PaymentWebhookService {
         where: { account_id: accountId, provider_id: subscriptionId },
         data: { trial_reminder_sent: true },
       });
+      await SubscriptionRepository.invalidateCache(accountId);
 
       logger.info({ accountId, subscriptionId }, 'Trial ending soon - reminder marked');
 
@@ -291,6 +294,7 @@ export class PaymentWebhookService {
           ...(currentPeriodEnd && { current_period_end: new Date(currentPeriodEnd * 1000) }),
         },
       });
+      await SubscriptionRepository.invalidateCache(accountId);
 
       logger.info({ accountId, subscriptionId, status }, 'Subscription status synced');
 
@@ -323,6 +327,7 @@ export class PaymentWebhookService {
           canceled_at: cancellationDate,
         },
       });
+      await SubscriptionRepository.invalidateCache(accountId);
 
       logger.info({ accountId, subscriptionId }, 'Subscription cancelled and synced');
 

@@ -115,7 +115,7 @@ export class SMSProcessor {
 
       // Update notification record and record success log
       try {
-        const notificationExists = await prismaRead.notification.findUnique({
+        const notificationExists = await prismaWrite.notification.findUnique({
           where: { id: smsId },
         });
 
@@ -127,6 +127,7 @@ export class SMSProcessor {
           await prismaWrite.notification.update({
             where: { id: smsId },
             data: {
+              status: 'SENT',
               sentAt: now,
               payload: {
                 ...existingPayload,
@@ -191,7 +192,7 @@ export class SMSProcessor {
 
       // Update notification record and record failure log
       try {
-        const notificationExists = await prismaRead.notification.findUnique({
+        const notificationExists = await prismaWrite.notification.findUnique({
           where: { id: smsId },
         });
 

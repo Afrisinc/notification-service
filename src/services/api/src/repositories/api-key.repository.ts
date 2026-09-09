@@ -1,4 +1,5 @@
 import { prismaWrite, prismaRead } from '@shared/database';
+import { getOrSetCache, invalidateCache, cacheKeys, CACHE_TTL } from '@shared/cache';
 import { logger } from '../config/logger';
 
 export class ApiKeyRepository {
@@ -58,25 +59,27 @@ export class ApiKeyRepository {
     createdAt: Date;
     lastUsedAt: Date | null;
   } | null> {
-    try {
-      return (await prismaRead.apiKey.findUnique({
-        where: { keyHash },
-        select: {
-          id: true,
-          keyHash: true,
-          name: true,
-          type: true,
-          account_id: true,
-          app_id: true,
-          revoked: true,
-          createdAt: true,
-          lastUsedAt: true,
-        },
-      })) as any;
-    } catch (error) {
-      logger.error({ error }, 'Failed to find API key by hash');
-      throw error;
-    }
+    return getOrSetCache(cacheKeys.apiKeyByHash(keyHash), CACHE_TTL.API_KEY, async () => {
+      try {
+        return (await prismaRead.apiKey.findUnique({
+          where: { keyHash },
+          select: {
+            id: true,
+            keyHash: true,
+            name: true,
+            type: true,
+            account_id: true,
+            app_id: true,
+            revoked: true,
+            createdAt: true,
+            lastUsedAt: true,
+          },
+        })) as any;
+      } catch (error) {
+        logger.error({ error }, 'Failed to find API key by hash');
+        throw error;
+      }
+    });
   }
 
   /**
@@ -93,14 +96,16 @@ export class ApiKeyRepository {
     createdAt: Date;
     lastUsedAt: Date | null;
   } | null> {
-    try {
-      return await prismaRead.apiKey.findUnique({
-        where: { id },
-      });
-    } catch (error) {
-      logger.error({ error, id }, 'Failed to find API key by ID');
-      throw error;
-    }
+    return getOrSetCache(cacheKeys.apiKeyById(id), CACHE_TTL.API_KEY, async () => {
+      try {
+        return await prismaRead.apiKey.findUnique({
+          where: { id },
+        });
+      } catch (error) {
+        logger.error({ error, id }, 'Failed to find API key by ID');
+        throw error;
+      }
+    });
   }
 
   /**
@@ -165,6 +170,14 @@ export class ApiKeyRepository {
         data,
       });
 
+      // A lastUsedAt-only touch doesn't affect validation outcomes, so skip
+      // busting the cache for it - that would defeat the point of caching
+      // the hottest path (API key validation on every request).
+      const touchesOnlyLastUsedAt = Object.keys(data).every((key) => key === 'lastUsedAt');
+      if (!touchesOnlyLastUsedAt) {
+        await invalidateCache([cacheKeys.apiKeyById(id), cacheKeys.apiKeyByHash(apiKey.keyHash)]);
+      }
+
       logger.info({ apiKeyId: id }, 'API key updated in repository');
       return apiKey;
     } catch (error) {
@@ -192,6 +205,8 @@ export class ApiKeyRepository {
         where: { id },
         data: { revoked: true },
       });
+
+      await invalidateCache([cacheKeys.apiKeyById(id), cacheKeys.apiKeyByHash(apiKey.keyHash)]);
 
       logger.info({ apiKeyId: id }, 'API key revoked in repository');
       return apiKey;

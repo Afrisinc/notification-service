@@ -1,6 +1,6 @@
-import { prismaRead } from '@shared/database';
 import { logger } from '../config/logger';
 import { PlanEnforcementMiddleware } from '../middleware/plan-enforcement.middleware';
+import { SubscriptionRepository } from '../repositories/subscription.repository';
 import type { PaygChannel } from '../types/payg.types';
 
 export interface ChannelEligibilityResult {
@@ -15,12 +15,7 @@ const FREE_CHANNELS = new Set(['EMAIL']);
 const PAID_CHANNELS = new Set(['SMS', 'PUSH', 'IN_APP', 'WHATSAPP']);
 
 async function getPlanName(accountId: string): Promise<string | null> {
-  const subscription = await prismaRead.subscription.findFirst({
-    where: { account_id: accountId },
-    select: {
-      plan: { select: { name: true } },
-    },
-  });
+  const subscription = await SubscriptionRepository.getSubscriptionWithLimits(accountId);
   return subscription?.plan?.name ?? null;
 }
 
