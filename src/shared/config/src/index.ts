@@ -44,6 +44,9 @@ const EnvSchema = z.object({
   // JWT Configuration
   JWT_SECRET: z.string().default('dev-secret-change-in-production'),
 
+  // Gateway HMAC signature verification (must match API Gateway's SERVICE_SECRET)
+  SERVICE_SECRET: z.string().default('gateway-service-secret-change-in-production'),
+
   // Redis Configuration
   REDIS_URL: z.string().default('redis://localhost:6379'),
 

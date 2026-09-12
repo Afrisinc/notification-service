@@ -1,5 +1,9 @@
 import { logger } from '../config/logger';
 import { ClientsRepository } from '../repositories/clients.repository';
+import { dashboardRepository } from '../repositories/dashboard.repository';
+import { getOrSetCache, buildCacheKey } from '../utils/cache';
+import { resolveDateRange, buildPeriodCacheKey } from '../utils/date-range';
+import { buildCountKpi, buildRateKpi } from '../utils/kpi';
 import {
   ClientDTO,
   ClientsListResponseDTO,
@@ -7,22 +11,33 @@ import {
   ClientsListFiltersDTO,
   OrganizationAccountDTO,
 } from '../dtos/clients';
+import type { ClientsStats, ClientsStatsQueryParams } from '../types/clients-stats.types';
+
+const CLIENTS_CACHE_TTL_SECONDS = 30;
+const CLIENTS_STATS_CACHE_TTL_SECONDS = 30;
 
 export class ClientsService {
   async getAllClients(options: ListClientsQueryDTO = {}): Promise<ClientsListResponseDTO> {
+    // Validate and set defaults
+    const limit = Math.min(100, Math.max(1, options.limit || 20));
+    const offset = Math.max(0, options.offset || 0);
+
+    const cacheKey = buildCacheKey('clients:list', {
+      limit,
+      offset,
+      search: options.search,
+      status: options.status,
+      plan: options.plan,
+    });
+
+    return getOrSetCache(cacheKey, CLIENTS_CACHE_TTL_SECONDS, () =>
+      this.fetchAllClients({ limit, offset, search: options.search, status: options.status, plan: options.plan })
+    );
+  }
+
+  private async fetchAllClients(filters: ClientsListFiltersDTO): Promise<ClientsListResponseDTO> {
+    const { limit, offset } = filters;
     try {
-      // Validate and set defaults
-      const limit = Math.min(100, Math.max(1, options.limit || 20));
-      const offset = Math.max(0, options.offset || 0);
-
-      const filters: ClientsListFiltersDTO = {
-        limit,
-        offset,
-        search: options.search,
-        status: options.status,
-        plan: options.plan,
-      };
-
       const { accounts } = await ClientsRepository.getAccounts({
         ...filters,
         limit: 1000, // Fetch all to deduplicate by user
@@ -39,13 +54,18 @@ export class ClientsService {
         userMap.get(email)!.push(account);
       });
 
+      // Fetch notification stats for every account in one batched pair of queries
+      // instead of two queries per account (was exhausting the DB connection pool).
+      const accountIds = accounts.map((account) => account.id);
+      const statsByAccount = await ClientsRepository.getNotificationStatsForAccounts(accountIds);
+
       // Convert to client DTOs
-      const clientsPromises = Array.from(userMap.entries()).map(async ([email, userAccounts]) => {
+      const clients = Array.from(userMap.entries()).map(([email, userAccounts]) => {
         const firstAccount = userAccounts[0];
         const ownerName = `${firstAccount.owner.firstName || ''} ${firstAccount.owner.lastName || ''}`.trim();
 
-        const organizationsPromises = userAccounts.map(async (account) => {
-          const { sentCount, failedCount } = await ClientsRepository.getNotificationStats(account.id);
+        const organizationData = userAccounts.map((account) => {
+          const { sentCount, failedCount } = statsByAccount.get(account.id) || { sentCount: 0, failedCount: 0 };
           const totalCount = sentCount + failedCount;
           const planName = account.subscription?.plan?.name || 'FREE';
 
@@ -72,7 +92,6 @@ export class ClientsService {
           };
         });
 
-        const organizationData = await Promise.all(organizationsPromises);
         const organizations = organizationData.map((o) => o.org);
         const ownedCount = organizations.filter((o) => o.role === 'owner').length;
         const memberCount = organizations.filter((o) => o.role === 'member').length;
@@ -99,7 +118,6 @@ export class ClientsService {
         } as ClientDTO;
       });
 
-      const clients = await Promise.all(clientsPromises);
       const paginatedClients = clients.slice(offset, offset + limit);
 
       return {
@@ -130,6 +148,54 @@ export class ClientsService {
     if (totalCount === 0) return '0%';
     const deliveryRate = (sentCount / totalCount) * 100;
     return deliveryRate.toFixed(1) + '%';
+  }
+
+  async getStats(options: ClientsStatsQueryParams = {}): Promise<ClientsStats> {
+    const { dateFrom, dateTo } = resolveDateRange(options.period, options.dateFrom, options.dateTo);
+
+    const cacheKey = buildCacheKey(
+      'clients:stats',
+      buildPeriodCacheKey(options.period, options.dateFrom, options.dateTo)
+    );
+
+    return getOrSetCache(cacheKey, CLIENTS_STATS_CACHE_TTL_SECONDS, () => this.fetchStats(dateFrom, dateTo));
+  }
+
+  private async fetchStats(dateFrom: Date, dateTo: Date): Promise<ClientsStats> {
+    try {
+      const spanMs = dateTo.getTime() - dateFrom.getTime();
+      const prevStart = new Date(dateFrom.getTime() - spanMs);
+      const prevEnd = dateFrom;
+      const periodDays = Math.max(1, Math.ceil(spanMs / (24 * 60 * 60 * 1000)));
+
+      const [activeClients, newClients, prevNewClients, totalSent, statusCounts, prevTotalSent, prevStatusCounts] =
+        await Promise.all([
+          dashboardRepository.getActiveClientCount(),
+          dashboardRepository.getNewClientsInPeriod({ periodDays, dateFrom, dateTo }),
+          dashboardRepository.getNewClientsInPeriod({ periodDays, dateFrom: prevStart, dateTo: prevEnd }),
+          dashboardRepository.getTotalNotificationCount({ periodDays, dateFrom, dateTo }),
+          dashboardRepository.getNotificationCountsByStatus({ periodDays, dateFrom, dateTo }),
+          dashboardRepository.getTotalNotificationCount({ periodDays, dateFrom: prevStart, dateTo: prevEnd }),
+          dashboardRepository.getNotificationCountsByStatus({ periodDays, dateFrom: prevStart, dateTo: prevEnd }),
+        ]);
+
+      const delivered = statusCounts.DELIVERED + statusCounts.SENT;
+      const deliveryRate = totalSent > 0 ? (delivered / totalSent) * 100 : 0;
+      const prevDelivered = prevStatusCounts.DELIVERED + prevStatusCounts.SENT;
+      const prevDeliveryRate = prevTotalSent > 0 ? (prevDelivered / prevTotalSent) * 100 : 0;
+
+      return {
+        activeClients,
+        newClients: buildCountKpi(newClients, prevNewClients, (n) => n.toString()),
+        totalSent: buildCountKpi(totalSent, prevTotalSent, (n) => this.formatNumber(n)),
+        avgDeliveryRate: buildRateKpi(deliveryRate, prevDeliveryRate),
+        rangeStart: dateFrom.toISOString(),
+        rangeEnd: dateTo.toISOString(),
+      };
+    } catch (error) {
+      logger.error({ error }, 'Failed to get client stats');
+      throw error;
+    }
   }
 }
 

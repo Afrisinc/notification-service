@@ -1,5 +1,5 @@
 import { getConfig } from '@shared/config';
-import { verifyDbConnections } from '@shared/database';
+import { verifyDbConnections, closeDbConnections } from '@shared/database';
 import { verifyRedisConnection, closeRedisConnection } from '@shared/redis';
 import { createFastifyApp } from './app';
 import { logger } from './config/logger';
@@ -112,6 +112,13 @@ async function startServer() {
         await closeRedisConnection();
       } catch (error) {
         logger.error(error, 'Error disconnecting Redis');
+      }
+
+      // Disconnect Prisma database connections
+      try {
+        await closeDbConnections();
+      } catch (error) {
+        logger.error(error, 'Error disconnecting database connections');
       }
 
       if (fastify) {

@@ -1,4 +1,6 @@
 import { paginationMeta } from '../common/pagination';
+import { dateRangeQueryProperties, rangeResponseProperties } from '../common/date-range';
+import { ErrorResponseSchema } from '../responses/common.schema';
 
 const organizationItem = {
   type: 'object',
@@ -106,6 +108,50 @@ export const GetClientsSchema = {
         message: { type: 'string' },
       },
     },
+  },
+  security: [{ bearerAuth: [] }],
+};
+
+const kpiSchema = {
+  type: 'object',
+  properties: {
+    value: { type: 'string' },
+    delta: { type: 'string' },
+    deltaUp: { type: 'boolean' },
+  },
+  required: ['value', 'delta', 'deltaUp'],
+};
+
+export const GetClientsStatsSchema = {
+  description: 'Client analytics for the control dashboard: active clients, new clients, sent volume, delivery rate',
+  tags: ['Control Dashboard'],
+  querystring: {
+    type: 'object',
+    properties: dateRangeQueryProperties,
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        resp_msg: { type: 'string' },
+        resp_code: { type: 'integer' },
+        data: {
+          type: 'object',
+          properties: {
+            activeClients: { type: 'integer' },
+            newClients: kpiSchema,
+            totalSent: kpiSchema,
+            avgDeliveryRate: kpiSchema,
+            ...rangeResponseProperties,
+          },
+          required: ['activeClients', 'newClients', 'totalSent', 'avgDeliveryRate', 'rangeStart', 'rangeEnd'],
+        },
+      },
+    },
+    400: ErrorResponseSchema,
+    401: ErrorResponseSchema,
+    500: ErrorResponseSchema,
   },
   security: [{ bearerAuth: [] }],
 };

@@ -5,6 +5,8 @@
 
 import { logger } from '../config/logger';
 import { dashboardRepository, DashboardFilters } from '../repositories/dashboard.repository';
+import { getOrSetCache, buildCacheKey } from '../utils/cache';
+import { formatRelativeTime } from '../utils/time-format';
 import {
   DashboardPeriod,
   DashboardStats,
@@ -21,11 +23,20 @@ import {
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+const DASHBOARD_CACHE_TTL_SECONDS = 30;
+const STATS_CACHE_TTL_SECONDS = 15;
+const RECENT_SENDS_CACHE_TTL_SECONDS = 15;
+
 export class DashboardService {
   /**
    * Get full dashboard data
    */
   async getDashboard(period: DashboardPeriod = '7d', timezone: string = 'UTC'): Promise<DashboardData> {
+    const cacheKey = buildCacheKey('dashboard:full', { period, timezone });
+    return getOrSetCache(cacheKey, DASHBOARD_CACHE_TTL_SECONDS, () => this.fetchDashboard(period, timezone));
+  }
+
+  private async fetchDashboard(period: DashboardPeriod, timezone: string): Promise<DashboardData> {
     try {
       const filters = this.buildFilters(period);
 
@@ -61,6 +72,11 @@ export class DashboardService {
    * Get stats cards only
    */
   async getStats(period: DashboardPeriod = '7d'): Promise<DashboardStats> {
+    const cacheKey = buildCacheKey('dashboard:stats', { period });
+    return getOrSetCache(cacheKey, STATS_CACHE_TTL_SECONDS, () => this.fetchStats(period));
+  }
+
+  private async fetchStats(period: DashboardPeriod): Promise<DashboardStats> {
     try {
       const filters = this.buildFilters(period);
       const periodLabel = PERIOD_CONFIG[period].label;
@@ -138,6 +154,11 @@ export class DashboardService {
    * Get recent sends with pagination
    */
   async getRecentSends(limit: number = 10, offset: number = 0): Promise<RecentSendsData> {
+    const cacheKey = buildCacheKey('dashboard:recent-sends', { limit, offset });
+    return getOrSetCache(cacheKey, RECENT_SENDS_CACHE_TTL_SECONDS, () => this.fetchRecentSends(limit, offset));
+  }
+
+  private async fetchRecentSends(limit: number, offset: number): Promise<RecentSendsData> {
     try {
       const safeLimit = Math.min(50, Math.max(1, limit));
       const safeOffset = Math.max(0, offset);
@@ -154,7 +175,7 @@ export class DashboardService {
         channel: this.normalizeChannel(item.channel),
         count: item.count,
         status: this.normalizeStatus(item.status),
-        time: this.formatRelativeTime(item.latestSentAt),
+        time: formatRelativeTime(item.latestSentAt),
       }));
 
       return {
@@ -307,7 +328,7 @@ export class DashboardService {
       channel: this.normalizeChannel(item.channel),
       count: item.count,
       status: this.normalizeStatus(item.status),
-      time: this.formatRelativeTime(item.latestSentAt),
+      time: formatRelativeTime(item.latestSentAt),
     }));
   }
 
@@ -432,29 +453,6 @@ export class DashboardService {
       default:
         return 'pending';
     }
-  }
-
-  private formatRelativeTime(date: Date): string {
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffMins < 1) {
-      return 'just now';
-    }
-    if (diffMins < 60) {
-      return `${diffMins} min ago`;
-    }
-    if (diffHours < 24) {
-      return diffHours === 1 ? '1h ago' : `${diffHours}h ago`;
-    }
-    if (diffDays < 7) {
-      return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
-    }
-
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 }
 

@@ -73,25 +73,49 @@ export class ClientsRepository {
     return { accounts, total };
   }
 
-  static async getNotificationStats(accountId: string) {
-    // Get counts by status in one query
-    const countByStatus = await prismaRead.notification.groupBy({
-      by: ['status'],
-      where: { account_id: accountId, status: { in: ['SENT', 'FAILED'] } },
-      _count: true,
+  /**
+   * Batched replacement for per-account notification stats.
+   * A single pair of groupBy queries covers every account instead of firing
+   * 2 queries per account, which was exhausting the DB connection pool
+   * (P2037 "too many clients already") once the account list grew.
+   */
+  static async getNotificationStatsForAccounts(
+    accountIds: string[]
+  ): Promise<Map<string, { sentCount: number; failedCount: number; channels: string[] }>> {
+    const statsByAccount = new Map<string, { sentCount: number; failedCount: number; channels: string[] }>();
+
+    if (accountIds.length === 0) {
+      return statsByAccount;
+    }
+
+    const [countByStatus, channelData] = await Promise.all([
+      prismaRead.notification.groupBy({
+        by: ['account_id', 'status'],
+        where: { account_id: { in: accountIds }, status: { in: ['SENT', 'FAILED'] } },
+        _count: true,
+      }),
+      prismaRead.notification.groupBy({
+        by: ['account_id', 'channel'],
+        where: { account_id: { in: accountIds } },
+      }),
+    ]);
+
+    accountIds.forEach((id) => statsByAccount.set(id, { sentCount: 0, failedCount: 0, channels: [] }));
+
+    countByStatus.forEach((row) => {
+      const entry = statsByAccount.get(row.account_id);
+      if (!entry) return;
+      if (row.status === 'SENT') entry.sentCount = row._count;
+      if (row.status === 'FAILED') entry.failedCount = row._count;
     });
 
-    // Get channels in one query
-    const channelData = await prismaRead.notification.groupBy({
-      by: ['channel'],
-      where: { account_id: accountId },
+    channelData.forEach((row) => {
+      const entry = statsByAccount.get(row.account_id);
+      if (!entry) return;
+      entry.channels.push(row.channel.toLowerCase());
     });
 
-    const sentCount = countByStatus.find((c) => c.status === 'SENT')?._count || 0;
-    const failedCount = countByStatus.find((c) => c.status === 'FAILED')?._count || 0;
-    const channels = channelData.map((c) => c.channel.toLowerCase());
-
-    return { sentCount, failedCount, channels };
+    return statsByAccount;
   }
 }
 

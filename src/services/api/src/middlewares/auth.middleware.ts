@@ -158,11 +158,15 @@ export async function validateBaseToken(request: FastifyRequest, reply: FastifyR
   // Set context for downstream handlers
   request.headers['x-user-id'] = userId;
   request.headers['x-user-email'] = payload.email || '';
+  request.headers['x-user-role'] = payload.role || '';
 
   // Attach user info to request
   (request as any).user = {
     id: userId,
     email: payload.email,
+    role: payload.role,
+    account_id: payload.account_id,
+    account_type: payload.account_type,
   };
 
   logger.debug(
@@ -170,9 +174,52 @@ export async function validateBaseToken(request: FastifyRequest, reply: FastifyR
       requestId: request.id,
       userId,
       userEmail: payload.email,
+      role: payload.role,
     },
     'Base token validated'
   );
+}
+
+/**
+ * Restrict access to platform-staff admin roles (SUPER_ADMIN, OPS_MANAGER -
+ * see platform-frontend's `ControlRole` / `PLATFORM_WIDE_ROLES`). This is a
+ * staff console, not a per-account role like an account owner.
+ *
+ * Must run after `validateBaseToken` (or `authMiddleware`), which populates
+ * `request.user.role`. This is the notify-service-side half of the two-layer
+ * check - the gateway already restricts these routes by role, this is
+ * defense in depth in case the service is ever reached directly.
+ */
+const PLATFORM_ADMIN_ROLES = ['SUPER_ADMIN', 'OPS_MANAGER'];
+
+export async function requirePlatformAdmin(request: FastifyRequest, reply: FastifyReply) {
+  const role = (request as any).user?.role;
+
+  if (!role || !PLATFORM_ADMIN_ROLES.includes(role)) {
+    logger.warn(
+      { requestId: request.id, userId: (request as any).user?.id, role, path: request.url },
+      'Platform admin access denied: insufficient role'
+    );
+    return ApiResponseHelper.forbidden(reply, 'Platform administrator access required');
+  }
+}
+
+/**
+ * Stricter than `requirePlatformAdmin`: only SUPER_ADMIN, not OPS_MANAGER.
+ * Use on endpoints that touch shared infrastructure directly (e.g. the mail
+ * server's Postfix config over SSH), where a broader "platform admin" grant
+ * is more access than the operation warrants.
+ */
+export async function requireSuperAdmin(request: FastifyRequest, reply: FastifyReply) {
+  const role = (request as any).user?.role;
+
+  if (role !== 'SUPER_ADMIN') {
+    logger.warn(
+      { requestId: request.id, userId: (request as any).user?.id, role, path: request.url },
+      'Super admin access denied: insufficient role'
+    );
+    return ApiResponseHelper.forbidden(reply, 'Super administrator access required');
+  }
 }
 
 /**
