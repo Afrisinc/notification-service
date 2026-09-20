@@ -14,6 +14,8 @@ function serializeDomain(domain: any) {
     dmarcVerified: domain.dmarc_verified,
     verifiedAt: domain.verified_at,
     cloudflareConnected: domain.cloudflare_connected,
+    inboundEnabled: domain.inbound_enabled,
+    mxVerified: domain.mx_verified,
     createdAt: domain.created_at,
     senders: (domain.senders || []).map(serializeSender),
   };
@@ -127,6 +129,53 @@ export async function verifyEmailDomain(request: FastifyRequest, reply: FastifyR
   } catch (error) {
     logger.error({ error }, 'Failed to verify email domain');
     return ApiResponseHelper.internalError(reply, 'Failed to verify domain');
+  }
+}
+
+export async function getInboundMxRecord(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { appId, domainId } = request.params as { appId: string; domainId: string };
+    const accountId = request.headers['x-account-id'] as string | undefined;
+
+    const owns = await emailIdentityService.verifyAppOwnership(appId, accountId);
+    if (!owns) {
+      return ApiResponseHelper.forbidden(reply, 'You do not own this app');
+    }
+
+    const record = await emailIdentityService.getMxRecord(domainId);
+    if (!record) {
+      return ApiResponseHelper.notFound(reply, 'Domain not found');
+    }
+
+    return ApiResponseHelper.success(reply, 'MX record retrieved', record);
+  } catch (error) {
+    logger.error({ error }, 'Failed to get MX record');
+    return ApiResponseHelper.internalError(reply, 'Failed to retrieve MX record');
+  }
+}
+
+export async function enableInboundDomain(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { appId, domainId } = request.params as { appId: string; domainId: string };
+    const accountId = request.headers['x-account-id'] as string | undefined;
+
+    const owns = await emailIdentityService.verifyAppOwnership(appId, accountId);
+    if (!owns) {
+      return ApiResponseHelper.forbidden(reply, 'You do not own this app');
+    }
+
+    try {
+      const domain = await emailIdentityService.enableInbound(domainId);
+      return ApiResponseHelper.success(reply, 'Inbound receiving updated', serializeDomain(domain));
+    } catch (error) {
+      return ApiResponseHelper.badRequest(
+        reply,
+        error instanceof Error ? error.message : 'Failed to enable inbound receiving'
+      );
+    }
+  } catch (error) {
+    logger.error({ error }, 'Failed to enable inbound domain');
+    return ApiResponseHelper.internalError(reply, 'Failed to enable inbound receiving');
   }
 }
 

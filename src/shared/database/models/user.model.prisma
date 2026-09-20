@@ -30,6 +30,7 @@ model User {
   createdContacts   Contact[]         @relation("CreatedBy")
   campaigns         Campaign[]        @relation("CreatedByCampaign")
   templateReviews   TemplateReview[]  @relation("TemplateReviews")
+  assignedEmailSenders EmailSender[]
 
   @@map("users")
 }

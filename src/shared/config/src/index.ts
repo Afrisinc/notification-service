@@ -82,6 +82,9 @@ const EnvSchema = z.object({
   ASSETS_API_URL: z.string().default('http://localhost:8080'),
   ASSETS_API_KEY: z.string().default('dev-api-key'),
 
+  // Inbound Email (worker-email-inbound LMTP listener)
+  LMTP_PORT: z.coerce.number().default(2525),
+
   // SMS Provider Configuration
   // Africa's Talking
   AFRICAS_TALKING_API_KEY: z.string().optional(),

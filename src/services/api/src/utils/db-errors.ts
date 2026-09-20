@@ -30,6 +30,11 @@ export function transformPrismaError(error: unknown, context: string): Error {
       message = `A template with code "${err.meta?.code || 'unknown'}", channel, and language already exists for this account`;
     }
 
+    // Provide specific message for email domain unique constraint (per-app or per-org)
+    if (context === 'email-identity.repository' && fields.includes('domain')) {
+      message = 'This domain is already registered';
+    }
+
     logger.warn({ context, fields }, message);
     return new DatabaseError('UNIQUE_CONSTRAINT_VIOLATION', error, message);
   }

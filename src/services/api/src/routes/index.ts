@@ -30,6 +30,10 @@ import { registerPaygRoutes } from './payg.routes';
 import { registerPaymentRoutes } from './payment.routes';
 import { clientsRoutes } from './clients.routes';
 import { registerSMSWebhookRoutes } from './sms-webhook.routes';
+import { registerRecipientAuthRoutes } from './recipient-auth.routes';
+import { registerBusinessInboxRoutes } from './business-inbox.routes';
+import { registerRecipientInboxRoutes } from './recipient-inbox.routes';
+import { registerOrgDomainRoutes } from './org-domain.routes';
 
 //  Register all API v1 routes
 export async function v1Routes(fastify: FastifyInstance) {
@@ -132,5 +136,21 @@ export async function v1Routes(fastify: FastifyInstance) {
 
   await fastify.register(registerSMSWebhookRoutes, {
     prefix: '/webhooks/sms',
+  });
+
+  await fastify.register(registerRecipientAuthRoutes, {
+    prefix: '/api',
+  });
+
+  await fastify.register(registerBusinessInboxRoutes, {
+    prefix: '/api',
+  });
+
+  await fastify.register(registerRecipientInboxRoutes, {
+    prefix: '/api',
+  });
+
+  await fastify.register(registerOrgDomainRoutes, {
+    prefix: '/api',
   });
 }

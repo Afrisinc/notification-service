@@ -38,6 +38,8 @@ export const env = cleanEnv(process.env, {
   VERIFY_EMAIL_TEMPLATE_ID: str({ default: 'system-verify-email' }),
   WELCOME_EMAIL_TEMPLATE_ID: str({ default: 'system-welcome-email' }),
   INVITE_MEMBER_TEMPLATE_ID: str({ default: 'system-invite-member' }),
+  RECIPIENT_ACCESS_TEMPLATE_ID: str({ default: 'system-recipient-access' }),
+  RECIPIENT_RESET_PASSWORD_TEMPLATE_ID: str({ default: 'system-recipient-reset-password' }),
 
   // Admin Alerts & System Notifications
   ADMIN_EMAILS: str({ default: '' }),
@@ -54,6 +56,9 @@ export const env = cleanEnv(process.env, {
   SUBSCRIPTION_CANCELLED_TEMPLATE_ID: str({ default: 'system-subscription-cancelled' }),
   PLAN_CHANGED_TEMPLATE_ID: str({ default: 'system-plan-changed' }),
   TRIAL_REMINDER_DAYS_BEFORE: str({ default: '3' }),
+
+  // Inbound Email (MX host worker-email-inbound's Postfix front-end listens on)
+  INBOUND_MX_HOST: str({ default: 'mail-in.afrisinc.com' }),
 
   // SMTP Configuration (optional)
   SMTP_HOST: str({ default: 'localhost' }),

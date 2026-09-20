@@ -73,6 +73,54 @@ export class CloudflareService {
     }
   }
 
+  async upsertMxRecord(token: string, zoneId: string, name: string, content: string, priority: number): Promise<void> {
+    const client = this.client(token);
+    const existing = await this.request<Array<{ id: string }>>(
+      () => client.get(`/zones/${zoneId}/dns_records`, { params: { type: 'MX', name } }),
+      `look up MX record ${name}`
+    );
+
+    const body = { type: 'MX', name, content, priority, ttl: 1 };
+
+    if (existing[0]) {
+      await this.request(
+        () => client.put(`/zones/${zoneId}/dns_records/${existing[0].id}`, body),
+        `update MX record ${name}`
+      );
+    } else {
+      await this.request(() => client.post(`/zones/${zoneId}/dns_records`, body), `create MX record ${name}`);
+    }
+  }
+
+  /**
+   * Auto-provision the inbound-receiving MX record for a domain. Never
+   * throws - callers should fall back to the manual-DNS UI on failure.
+   */
+  async configureMxRecord(
+    token: string,
+    domain: string,
+    mxHost: string,
+    priority: number = 10
+  ): Promise<CloudflareConfigureResult> {
+    try {
+      const zoneId = await this.findZoneId(token, domain);
+      if (!zoneId) {
+        return {
+          success: false,
+          error: `No Cloudflare zone found for "${this.getRootDomain(domain)}". Make sure the domain is added to your Cloudflare account and the API token has access to it.`,
+        };
+      }
+
+      await this.upsertMxRecord(token, zoneId, domain, mxHost, priority);
+
+      return { success: true, zoneId };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown Cloudflare API error';
+      logger.error({ error: message, domain }, 'Failed to auto-configure MX record via Cloudflare');
+      return { success: false, error: message };
+    }
+  }
+
   /**
    * Auto-provision every SPF/DKIM/DMARC TXT record for a domain in one call.
    * Never throws - callers should fall back to the manual-DNS UI on failure.

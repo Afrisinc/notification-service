@@ -57,8 +57,55 @@ export class MainSMTPProvider implements EmailProvider {
       let dkimConfig: any = undefined;
       let isCustomDomain = false;
 
+      // Thread-reply / org-level inbox fields, set by inbox.service.ts - read
+      // up front since Priority 0 depends on directSend.
+      const threadEmail = email as EmailNotification & {
+        messageIdHeader?: string;
+        inReplyToMessageId?: string;
+        referencesHeader?: string[];
+        threadReplyToAddress?: string;
+        cc?: string[];
+        directSend?: { fromEmail: string; fromName?: string; domain: string; selector: string };
+      };
+
+      // Priority 0: direct domain+selector override (org-level inbox send) -
+      // bypasses the per-App AppEmailProvider lookup entirely. Only ever set
+      // by inbox.service.ts for org-composed threads/sends with no App.
+      if (threadEmail.directSend) {
+        isCustomDomain = true;
+        fromEmail = threadEmail.directSend.fromEmail;
+        fromName = threadEmail.directSend.fromName;
+        replyTo = fromEmail;
+
+        try {
+          const result = await dkimService.getPrivateKey(
+            threadEmail.directSend.domain,
+            threadEmail.directSend.selector
+          );
+          if (result.key) {
+            dkimConfig = {
+              domainName: threadEmail.directSend.domain,
+              keySelector: threadEmail.directSend.selector,
+              privateKey: result.key,
+              cacheDir: false,
+            };
+          } else {
+            this.logger.warn(
+              { domain: threadEmail.directSend.domain, error: result.error },
+              'Failed to load private key for direct-send DKIM signing - email will be sent without signature'
+            );
+          }
+        } catch (dkimError) {
+          const errorMsg = dkimError instanceof Error ? dkimError.message : String(dkimError);
+          this.logger.error(
+            { domain: threadEmail.directSend.domain, error: errorMsg },
+            'Exception configuring direct-send DKIM'
+          );
+        }
+      }
+
       // Priority 1: Custom Domain (if app has one and it's verified)
-      if (email.appId) {
+      if (!isCustomDomain && email.appId) {
         try {
           const customDomain = await prismaRead.appEmailProvider.findUnique({
             where: { app_id: email.appId },
@@ -136,9 +183,30 @@ export class MainSMTPProvider implements EmailProvider {
         html: email.html || email.body,
       };
 
-      // Add reply-to if set (from custom domain)
+      if (threadEmail.cc && threadEmail.cc.length > 0) {
+        mailOptions.cc = threadEmail.cc;
+      }
+
+      // Thread-reply headers, set when this send is a reply from inbox.service.ts -
+      // threadReplyToAddress overrides the default reply-to so a real-world reply
+      // routes back through the inbound worker's VERP address.
+      if (threadEmail.threadReplyToAddress) {
+        replyTo = threadEmail.threadReplyToAddress;
+      }
+
+      // Add reply-to if set (from custom domain, or overridden above for thread replies)
       if (replyTo) {
         mailOptions.replyTo = replyTo;
+      }
+
+      if (threadEmail.messageIdHeader) {
+        mailOptions.messageId = threadEmail.messageIdHeader;
+      }
+      if (threadEmail.inReplyToMessageId) {
+        mailOptions.inReplyTo = threadEmail.inReplyToMessageId;
+      }
+      if (threadEmail.referencesHeader && threadEmail.referencesHeader.length > 0) {
+        mailOptions.references = threadEmail.referencesHeader;
       }
 
       // Add DKIM signing if configured for custom domain

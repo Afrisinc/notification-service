@@ -23,7 +23,19 @@ export interface QueueMessage {
   body?: string;
   fromEmail?: string;
   fromName?: string;
+  cc?: string[];
   attachments?: QueueMessageAttachment[];
+  /** Thread-reply headers (set by inbox.service.ts's replyToThread) - passed through to the SMTP provider. */
+  messageIdHeader?: string;
+  inReplyToMessageId?: string;
+  referencesHeader?: string[];
+  threadReplyToAddress?: string;
+  /**
+   * Send directly through this domain/selector's DKIM key, bypassing the
+   * per-App AppEmailProvider lookup entirely - used by org-level inbox
+   * sends that have no App at all (see inbox.service.ts#composeThread).
+   */
+  directSend?: { fromEmail: string; fromName?: string; domain: string; selector: string };
 }
 
 export interface QueueEnvelope {

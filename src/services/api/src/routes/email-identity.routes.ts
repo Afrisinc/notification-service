@@ -7,6 +7,8 @@ import {
   AddEmailDomainSchema,
   GetEmailDomainRecordsSchema,
   VerifyEmailDomainSchema,
+  GetInboundMxRecordSchema,
+  EnableInboundDomainSchema,
   DeleteEmailDomainSchema,
   AddEmailSenderSchema,
   UpdateEmailSenderSchema,
@@ -42,6 +44,18 @@ export async function registerEmailIdentityRoutes(fastify: FastifyInstance) {
     '/apps/:appId/email-domains/:domainId/verify',
     { onRequest: [validateBaseToken], schema: VerifyEmailDomainSchema },
     asyncWrapper(EmailIdentityController.verifyEmailDomain)
+  );
+
+  fastify.get(
+    '/apps/:appId/email-domains/:domainId/mx-record',
+    { onRequest: [validateBaseToken], schema: GetInboundMxRecordSchema },
+    asyncWrapper(EmailIdentityController.getInboundMxRecord)
+  );
+
+  fastify.post(
+    '/apps/:appId/email-domains/:domainId/inbound/enable',
+    { onRequest: [validateBaseToken], schema: EnableInboundDomainSchema },
+    asyncWrapper(EmailIdentityController.enableInboundDomain)
   );
 
   fastify.delete(

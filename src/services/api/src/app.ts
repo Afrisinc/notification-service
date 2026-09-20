@@ -17,8 +17,13 @@ export async function createFastifyApp(): Promise<FastifyInstance> {
     requestIdHeader: 'x-request-id',
     requestIdLogLabel: 'requestId',
     trustProxy: true,
-    connectionTimeout: 30000,
-    keepAliveTimeout: 30000,
+    // 90s, not the default 30s: adding a custom domain runs several
+    // sequential SSH round-trips to the mail server for DKIM key
+    // generation/table updates plus a live Cloudflare API call, all in one
+    // request - 30s was routinely too tight and made the client see a
+    // timeout even though the domain got created successfully server-side.
+    connectionTimeout: 90000,
+    keepAliveTimeout: 90000,
     pluginTimeout: 30000,
     bodyLimit: 10 * 1024 * 1024,
     caseSensitive: true,

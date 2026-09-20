@@ -1,8 +1,9 @@
 import { promisify } from 'util';
-import { resolveTxt } from 'dns';
+import { resolveTxt, resolveMx } from 'dns';
 import { logger } from '../config/logger';
 
 const resolveTxtAsync = promisify(resolveTxt);
+const resolveMxAsync = promisify(resolveMx);
 
 export class DNSVerifyService {
   async verifySPF(domain: string): Promise<boolean> {
@@ -45,6 +46,19 @@ export class DNSVerifyService {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.warn({ domain, dmarcDomain: `_dmarc.${domain}`, error: msg }, 'DMARC lookup failed');
+      return false;
+    }
+  }
+
+  async verifyMX(domain: string, expectedMxHost: string): Promise<boolean> {
+    try {
+      const records = await resolveMxAsync(domain);
+      logger.info({ domain, recordCount: records.length }, 'MX lookup succeeded');
+      const hasExpectedHost = records.some((record) => record.exchange.toLowerCase() === expectedMxHost.toLowerCase());
+      return hasExpectedHost;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.warn({ domain, expectedMxHost, error: msg }, 'MX lookup failed');
       return false;
     }
   }

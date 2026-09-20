@@ -6,6 +6,7 @@ import { AppEmailProviderRepository } from '../repositories/app-email-provider.r
 import { dkimService } from './dkim.service';
 import { dnsVerifyService } from './dns-verify.service';
 import { cloudflareService, type CloudflareDNSRecord } from './cloudflare.service';
+import { env } from '../config/env';
 
 export interface DomainDNSRecords {
   domain: string;
@@ -32,6 +33,37 @@ export class EmailIdentityService {
 
   async listDomains(appId: string) {
     return EmailDomainRepository.findByApp(appId);
+  }
+
+  /**
+   * Get the MX record a domain owner must add to receive mail on this
+   * platform, alongside whether it has already been verified.
+   */
+  async getMxRecord(domainId: string): Promise<{ domain: string; host: string; verified: boolean } | null> {
+    const domain = await EmailDomainRepository.findById(domainId);
+    if (!domain) return null;
+
+    return { domain: domain.domain, host: env.INBOUND_MX_HOST, verified: domain.mx_verified };
+  }
+
+  /**
+   * Enable inbound receiving for an already-registered domain. Independent
+   * of outbound SPF/DKIM/DMARC verification - a domain can send without
+   * receiving, or vice versa.
+   */
+  async enableInbound(domainId: string) {
+    const domain = await EmailDomainRepository.findById(domainId);
+    if (!domain) {
+      throw new Error('Domain not found');
+    }
+
+    const verified = await dnsVerifyService.verifyMX(domain.domain, env.INBOUND_MX_HOST);
+
+    return EmailDomainRepository.updateInbound(domainId, {
+      inbound_enabled: true,
+      mx_verified: verified,
+      mx_verified_at: verified ? new Date() : null,
+    });
   }
 
   async getDomainRecords(domainId: string): Promise<DomainDNSRecords | null> {
@@ -84,16 +116,16 @@ export class EmailIdentityService {
       return { domain: created, cloudflare: result };
     }
 
-    await EmailDomainRepository.updateCloudflareConnection(created.id, {
+    const updated = await EmailDomainRepository.updateCloudflareConnection(created.id, {
       cloudflare_zone_id: result.zoneId || null,
       cloudflare_api_token: encrypt(cloudflareApiToken),
       cloudflare_connected: true,
     });
 
-    // Cloudflare propagates near-instantly, so verification usually succeeds immediately.
-    const verified = await this.verifyDomain(created.id);
-
-    return { domain: verified, cloudflare: result };
+    // Deliberately not verifying DNS synchronously here - see org-domain.service.ts#addDomain
+    // for why an immediate post-write DNS check is racy and best left to a
+    // client-triggered verifyDomain call instead.
+    return { domain: updated, cloudflare: result };
   }
 
   /**
@@ -123,8 +155,8 @@ export class EmailIdentityService {
       verified_at: allVerified ? new Date() : null,
     });
 
-    const activeProvider = await AppEmailProviderRepository.findByAppId(domain.app_id);
-    if (activeProvider?.provider === 'custom_domain' && activeProvider.domain === domain.domain) {
+    const activeProvider = domain.app_id ? await AppEmailProviderRepository.findByAppId(domain.app_id) : null;
+    if (domain.app_id && activeProvider?.provider === 'custom_domain' && activeProvider.domain === domain.domain) {
       await AppEmailProviderRepository.upsert(domain.app_id, {
         domain_status: updated.status,
         spf_verified: spfVerified,

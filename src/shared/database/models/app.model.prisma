@@ -21,6 +21,7 @@ model App {
   settings          AppSettings?
   emailProvider     AppEmailProvider?
   emailDomains      EmailDomain[]
+  emailThreads      EmailThread[]
 
   @@index([account_id])
   @@index([organization_id])

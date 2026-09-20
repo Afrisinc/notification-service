@@ -1,0 +1,119 @@
+////////////////////////////////////////////////////////////
+// DOMAIN: INBOUND EMAIL / THREADED INBOX
+////////////////////////////////////////////////////////////
+
+enum EmailThreadStatus {
+  open
+  closed
+}
+
+enum EmailMessageDirection {
+  inbound
+  outbound
+}
+
+model EmailThread {
+  id              String            @id @default(uuid())
+  app_id          String?
+  organization_id String?
+  domain_id       String
+  contact_email   String
+  subject         String?
+  status          EmailThreadStatus @default(open)
+  last_message_at DateTime          @default(now())
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+
+  // Relations
+  app             App?              @relation(fields: [app_id], references: [id], onDelete: Cascade)
+  organization    Organization?     @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  domain          EmailDomain       @relation(fields: [domain_id], references: [id], onDelete: Cascade)
+  messages        EmailMessage[]
+
+  // app_id is set for legacy app-based threads, organization_id for
+  // org-composed ones - always at least one of the two is set, and
+  // organization_id is denormalized onto app-based threads too so every
+  // thread is findable by org with a single flat query.
+  @@index([app_id])
+  @@index([organization_id])
+  @@index([domain_id])
+  @@index([contact_email])
+  @@index([organization_id, last_message_at])
+  @@map("email_threads")
+}
+
+model EmailMessage {
+  id                String                @id @default(uuid())
+  thread_id         String
+  direction         EmailMessageDirection
+  from_address      String
+  to_addresses      String[]              @default([])
+  cc_addresses      String[]              @default([])
+  subject           String?
+  text_body         String?
+  html_body         String?
+  message_id_header String                @unique
+  in_reply_to       String?
+  references        String[]              @default([])
+  sent_by_user_id   String?
+  created_at        DateTime              @default(now())
+
+  // Relations
+  thread            EmailThread           @relation(fields: [thread_id], references: [id], onDelete: Cascade)
+  attachments       EmailAttachment[]
+
+  @@index([thread_id])
+  @@index([in_reply_to])
+  @@map("email_messages")
+}
+
+model EmailAttachment {
+  id           String       @id @default(uuid())
+  message_id   String
+  filename     String
+  content_type String
+  size_bytes   Int
+  storage_url  String
+  created_at   DateTime     @default(now())
+
+  // Relations
+  message      EmailMessage @relation(fields: [message_id], references: [id], onDelete: Cascade)
+
+  @@index([message_id])
+  @@map("email_attachments")
+}
+
+////////////////////////////////////////////////////////////
+// DOMAIN: RECIPIENT (GLOBAL, EMAIL-SCOPED) IDENTITY
+////////////////////////////////////////////////////////////
+
+model RecipientIdentity {
+  id             String                   @id @default(uuid())
+  email          String                   @unique
+  password_hash  String?
+  email_verified Boolean                  @default(false)
+  status         String                   @default("active")
+  created_at     DateTime                 @default(now())
+  updated_at     DateTime                 @updatedAt
+
+  // Relations
+  loginFailures  RecipientLoginFailure[]
+
+  @@map("recipient_identities")
+}
+
+model RecipientLoginFailure {
+  id           String             @id @default(uuid())
+  email        String
+  ip_address   String
+  reason       String
+  recipient_id String?
+  created_at   DateTime           @default(now())
+
+  // Relations
+  recipient    RecipientIdentity? @relation(fields: [recipient_id], references: [id], onDelete: SetNull)
+
+  @@index([email, created_at])
+  @@index([ip_address, created_at])
+  @@map("recipient_login_failures")
+}

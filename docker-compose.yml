@@ -126,6 +126,28 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # LMTP front-end for inbound mail on customer domains with receiving enabled.
+  # Not a queue consumer - no rabbitmq dependency. See
+  # src/services/worker-email-inbound/README.md for the upstream Postfix host
+  # that delivers accepted mail here via `virtual_transport = lmtp:inet:worker-email-inbound:2525`.
+  worker-email-inbound:
+    image: afrisinc-notification:latest
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://notification:notification@postgres:5432/notification_db
+      ASSETS_API_URL: ${ASSETS_API_URL}
+      ASSETS_API_KEY: ${ASSETS_API_KEY}
+      LMTP_PORT: 2525
+      SERVICE_CMD: node -r ./register-paths.js dist/services/worker-email-inbound/src/index.js
+    ports:
+      - '2525:2525'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:

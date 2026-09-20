@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import pino from 'pino';
 import { prismaRead, prismaWrite } from '@shared/database';
+import { encrypt, decrypt } from '@shared/utils/encryption';
 import { NotifyService } from './notify.service';
 import { env } from '../config/env';
 import { accountRepository } from '../repositories/account.repository';
@@ -157,6 +158,22 @@ export class OrganizationService {
       return !!member;
     } catch (error) {
       logger.error({ error, orgId, userId }, 'Error checking organization permissions');
+      return false;
+    }
+  }
+
+  /**
+   * Check if user is specifically the OWNER of the organization - stricter
+   * than canManageOrganization, which also allows ADMIN.
+   */
+  async isOrganizationOwner(orgId: string, userId: string): Promise<boolean> {
+    try {
+      const member = await prismaRead.organizationMember.findFirst({
+        where: { organization_id: orgId, user_id: userId, role: 'OWNER' },
+      });
+      return !!member;
+    } catch (error) {
+      logger.error({ error, orgId, userId }, 'Error checking organization ownership');
       return false;
     }
   }
@@ -753,6 +770,53 @@ export class OrganizationService {
       logger.error({ error, inviteId, userId }, message);
       throw error;
     }
+  }
+
+  /**
+   * Whether the organization has an org-wide Cloudflare API token configured.
+   * Never returns the token itself - use getDecryptedCloudflareToken for that.
+   */
+  async getCloudflareStatus(orgId: string): Promise<{ connected: boolean }> {
+    const org = await prismaRead.organization.findUnique({
+      where: { id: orgId },
+      select: { cloudflare_connected: true },
+    });
+    return { connected: !!org?.cloudflare_connected };
+  }
+
+  /**
+   * Set the organization's default Cloudflare API token. Domains added under
+   * this org without their own token fall back to this one (see
+   * OrgDomainService.addDomain). Route-level requireOrgOwner already
+   * restricts callers, so no role check here.
+   */
+  async setCloudflareToken(orgId: string, token: string): Promise<{ connected: boolean }> {
+    await prismaWrite.organization.update({
+      where: { id: orgId },
+      data: { cloudflare_api_token: encrypt(token), cloudflare_connected: true },
+    });
+    logger.info({ orgId }, 'Organization Cloudflare token configured');
+    return { connected: true };
+  }
+
+  /** Clear the organization's default Cloudflare API token. */
+  async clearCloudflareToken(orgId: string): Promise<{ connected: boolean }> {
+    await prismaWrite.organization.update({
+      where: { id: orgId },
+      data: { cloudflare_api_token: null, cloudflare_connected: false },
+    });
+    logger.info({ orgId }, 'Organization Cloudflare token removed');
+    return { connected: false };
+  }
+
+  /** Decrypt the org's stored Cloudflare token, for internal fallback use (e.g. OrgDomainService.addDomain). */
+  async getDecryptedCloudflareToken(orgId: string): Promise<string | null> {
+    const org = await prismaRead.organization.findUnique({
+      where: { id: orgId },
+      select: { cloudflare_api_token: true },
+    });
+    if (!org?.cloudflare_api_token) return null;
+    return decrypt(org.cloudflare_api_token);
   }
 
   /**

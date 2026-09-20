@@ -16,11 +16,20 @@ model Organization {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
+  // Org-level Cloudflare default: used to auto-configure DNS for any domain
+  // added under this organization when no per-domain token is supplied
+  // (see OrgDomainService.addDomain). Encrypted the same way as the
+  // per-domain fallback on EmailDomain.
+  cloudflare_api_token   String?  // encrypted
+  cloudflare_connected   Boolean  @default(false)
+
   // Relations
   members           OrganizationMember[]
   invites           OrganizationInvite[] @relation("OrganizationInvites")
   accounts          Account[]
   apps              App[]
+  emailDomains      EmailDomain[]
+  emailThreads      EmailThread[]
 
   @@map("organizations")
 }

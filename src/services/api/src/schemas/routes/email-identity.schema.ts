@@ -58,6 +58,8 @@ const domainSchema = {
     dmarcVerified: { type: 'boolean' },
     verifiedAt: { type: 'string' },
     cloudflareConnected: { type: 'boolean' },
+    inboundEnabled: { type: 'boolean' },
+    mxVerified: { type: 'boolean' },
     createdAt: { type: 'string' },
     senders: { type: 'array', items: senderSchema },
   },
@@ -151,6 +153,37 @@ export const GetEmailDomainRecordsSchema: FastifySchema = {
 export const VerifyEmailDomainSchema: FastifySchema = {
   tags: ['Email Identities'],
   description: 'Re-check SPF/DKIM/DMARC DNS records for a domain',
+  params: domainIdParam,
+  response: {
+    200: { type: 'object', properties: { ...StandardResponseProperties, data: domainSchema } },
+  },
+};
+
+export const GetInboundMxRecordSchema: FastifySchema = {
+  tags: ['Email Identities'],
+  description: 'Get the MX record needed to enable inbound receiving for a domain',
+  params: domainIdParam,
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        ...StandardResponseProperties,
+        data: {
+          type: 'object',
+          properties: {
+            domain: { type: 'string' },
+            host: { type: 'string' },
+            verified: { type: 'boolean' },
+          },
+        },
+      },
+    },
+  },
+};
+
+export const EnableInboundDomainSchema: FastifySchema = {
+  tags: ['Email Identities'],
+  description: 'Enable inbound receiving for a domain, verifying its MX record',
   params: domainIdParam,
   response: {
     200: { type: 'object', properties: { ...StandardResponseProperties, data: domainSchema } },
