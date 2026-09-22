@@ -6,6 +6,14 @@ const StandardResponseProperties = {
   resp_code: { type: 'number' },
 };
 
+// Requires a non-empty local part before the @ - guards against values like
+// "@afrisinc.com" being saved as an app's SMTP envelope sender.
+const EmailAddressProperty = {
+  type: 'string',
+  pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
+  description: 'Sender email address',
+} as const;
+
 export const GetEmailProviderSchema: FastifySchema = {
   tags: ['Email Provider'],
   description: 'Get current email provider configuration',
@@ -60,7 +68,7 @@ export const SetSimpleConfigSchema: FastifySchema = {
     type: 'object',
     required: ['fromEmail'],
     properties: {
-      fromEmail: { type: 'string', description: 'Sender email address' },
+      fromEmail: EmailAddressProperty,
       fromName: { type: 'string', description: 'Sender display name' },
       replyToEmail: { type: 'string', description: 'Reply-to email address' },
       replyToName: { type: 'string', description: 'Reply-to display name' },
@@ -222,7 +230,7 @@ export const SetCustomDomainSchema: FastifySchema = {
     properties: {
       domain: { type: 'string', description: 'Custom domain (e.g., mail.example.com)' },
       selector: { type: 'string', description: 'DKIM selector (default: afrisinc)' },
-      fromEmail: { type: 'string', description: 'Sender email address' },
+      fromEmail: EmailAddressProperty,
       fromName: { type: 'string', description: 'Sender display name' },
     },
   },

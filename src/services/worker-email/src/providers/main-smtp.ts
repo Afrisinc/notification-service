@@ -175,6 +175,21 @@ export class MainSMTPProvider implements EmailProvider {
         }
       }
 
+      // Last line of defense: a malformed fromEmail (e.g. missing local part,
+      // from stale data saved before schema validation was added) must never
+      // reach the SMTP envelope - it causes an undeliverable sender that
+      // floods postfix with bounce-to-bounce loops.
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)) {
+        this.logger.error(
+          { invalidFromEmail: fromEmail, appId: email.appId, isCustomDomain },
+          'Resolved fromEmail failed validation, falling back to platform default'
+        );
+        fromEmail = getConfig().FROM_EMAIL;
+        fromName = undefined;
+        replyTo = undefined;
+        dkimConfig = undefined;
+      }
+
       const mailOptions: any = {
         from: fromName ? `${fromName} <${fromEmail}>` : fromEmail,
         to: email.to,
